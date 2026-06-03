@@ -9,9 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.14.0",
     "next": "16.2.4",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "swiper": "^12.1.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -21,6 +24,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "playwright-core": "^1.60.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
