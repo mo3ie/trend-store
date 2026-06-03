@@ -42,11 +42,11 @@ const services = [
 
 
 const navTop = [
-  { label: "الرئيسية",          icon: HomeIcon    },
-  { label: "طلب شي ان",         icon: ShoppingCart },
-  { label: "متجر الإلكترونيات", icon: Smartphone  },
-  { label: "الصيانة",           icon: Wrench      },
-  { label: "خدمات رقمية",      icon: Megaphone   },
+  { label: "الرئيسية",          icon: HomeIcon,    href: undefined },
+  { label: "طلب شي ان",         icon: ShoppingCart, href: "https://order.trendstore-ly.com" },
+  { label: "متجر الإلكترونيات", icon: Smartphone,  href: undefined },
+  { label: "الصيانة",           icon: Wrench,      href: undefined },
+  { label: "خدمات رقمية",      icon: Megaphone,   href: undefined },
 ];
 
 const navBottom = [
@@ -80,18 +80,22 @@ export default function Home() {
 
           {/* Navigation Top */}
           <nav className="space-y-1 flex-1">
-            {navTop.map(({ label, icon: Icon }, i) => (
-              <div
-                key={i}
-                title={!sidebarOpen ? label : undefined}
-                className={`flex items-center py-2.5 rounded-xl text-gray-300 hover:text-purple-300 hover:bg-purple-500/10 cursor-pointer transition-all ${
-                  sidebarOpen ? "gap-3 px-3" : "justify-center px-0"
-                }`}
-              >
-                <Icon size={18} className="shrink-0" />
-                {sidebarOpen && <span className="text-sm">{label}</span>}
-              </div>
-            ))}
+            {navTop.map(({ label, icon: Icon, href }, i) => {
+              if (href) {
+                return (
+                  <a key={i} href={href} target="_blank" className="flex gap-2 items-center hover:text-purple-400 cursor-pointer px-3 py-2.5">
+                    <ShoppingCart size={18} /> {sidebarOpen && "طلب شي ان"}
+                  </a>
+                );
+              }
+              const cls = `flex items-center py-2.5 rounded-xl text-gray-300 hover:text-purple-300 hover:bg-purple-500/10 cursor-pointer transition-all ${sidebarOpen ? "gap-3 px-3" : "justify-center px-0"}`;
+              return (
+                <div key={i} title={!sidebarOpen ? label : undefined} className={cls}>
+                  <Icon size={18} className="shrink-0" />
+                  {sidebarOpen && <span className="text-sm">{label}</span>}
+                </div>
+              );
+            })}
 
             <div className="border-t border-purple-500/15 my-4" />
 
@@ -190,7 +194,7 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-6">
             <div className="shein-wrapper">
               <img src="/images/shein.png" className="shein-bg" alt="shein" />
-              <button className="shein-order-btn">ابدأ الطلب 🛍️</button>
+              <a href="https://order.trendstore-ly.com" target="_blank" className="shein-order-btn">ابدأ الطلب 🛍️</a>
             </div>
             <div className="offer-card">
               <img src="/images/offer.png" alt="عرض اليوم" />
