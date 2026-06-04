@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Home as HomeIcon,
   ShoppingCart,
@@ -21,8 +21,11 @@ import {
   Headphones,
   MapPin,
   Phone,
+  LogOut,
+  ChevronDown,
 } from "lucide-react";
 import HeroSlider from "@/components/HeroSlider";
+import { useAuth } from "@/hooks/useAuth";
 
 const categories = [
   { title: "هواتف",           sub: "PHONES",          icon: Smartphone  },
@@ -58,6 +61,20 @@ const navBottom = [
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const { user, signOut } = useAuth();
+
+  // إغلاق القائمة عند الضغط خارجها
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <div className="flex bg-[#0b0f1a] text-white min-h-screen">
@@ -145,10 +162,54 @@ export default function Home() {
           </button>
 
           {/* Account Button */}
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-gray-300 hover:text-purple-300 transition-all shrink-0">
-            <User size={18} />
-            <span className="text-sm font-medium">حسابي</span>
-          </button>
+          {user ? (
+            <div className="relative shrink-0" ref={dropdownRef}>
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-gray-300 hover:text-purple-300 transition-all"
+              >
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-xs font-black">
+                  {(user.user_metadata?.full_name?.[0] || user.email?.[0] || "؟").toUpperCase()}
+                </div>
+                <span className="text-sm font-medium max-w-[80px] truncate">
+                  {user.user_metadata?.full_name?.split(" ")[0] || user.email?.split("@")[0]}
+                </span>
+                <ChevronDown size={14} className={`transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {dropdownOpen && (
+                <div className="absolute top-full mt-2 right-0 w-44 bg-[#0f1320] border border-purple-500/30 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.5)] overflow-hidden z-50">
+                  {[
+                    { label: "حسابي",    icon: User,    href: "/account"  },
+                    { label: "طلباتي",   icon: Package, href: "/account?tab=shein" },
+                    { label: "المفضلة",  icon: Heart,   href: "/account?tab=favorites" },
+                  ].map(({ label, icon: Icon, href }) => (
+                    <a
+                      key={label}
+                      href={href}
+                      className="flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:text-purple-300 hover:bg-purple-500/10 transition-colors"
+                    >
+                      <Icon size={15} />
+                      {label}
+                    </a>
+                  ))}
+                  <div className="border-t border-purple-500/15" />
+                  <button
+                    onClick={signOut}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                  >
+                    <LogOut size={15} />
+                    تسجيل الخروج
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <a href="/login" className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-gray-300 hover:text-purple-300 transition-all shrink-0">
+              <User size={18} />
+              <span className="text-sm font-medium">تسجيل الدخول</span>
+            </a>
+          )}
 
           {/* Notifications + Cart */}
           <div className="flex items-center gap-3 text-gray-400 shrink-0">
