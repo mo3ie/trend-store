@@ -38,7 +38,7 @@ export default function AdminProducts() {
   async function fetchProducts() {
     setLoading(true);
     const { data } = await supabase.from("products").select("*").order("created_at", { ascending: false });
-    setProducts(data || []);
+    setProducts((data || []).map((p: any) => ({ ...p, stock: p.stock ?? p.quantity })));
     setLoading(false);
   }
 
