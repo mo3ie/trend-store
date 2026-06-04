@@ -43,7 +43,7 @@ export default function ProductView() {
   useEffect(() => {
     fetch(`/api/products/${id}`)
       .then((r) => r.json())
-      .then((data) => { setProduct(data); setLoading(false); })
+      .then((data) => { setProduct(data?.error ? null : data); setLoading(false); })
       .catch(() => setLoading(false));
   }, [id]);
 

@@ -6,24 +6,29 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+type Params = Promise<{ id: string }>;
+
+export async function GET(_req: NextRequest, { params }: { params: Params }) {
+  const { id } = await params;
   const { data, error } = await supabaseAdmin
     .from("products")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
   return NextResponse.json({ ...data, stock: data.stock ?? data.quantity });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const { error } = await supabaseAdmin.from("products").delete().eq("id", params.id);
+export async function DELETE(_req: NextRequest, { params }: { params: Params }) {
+  const { id } = await params;
+  const { error } = await supabaseAdmin.from("products").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Params }) {
+  const { id } = await params;
   try {
     const { name, description, price, stock, category, image_url, images } =
       await req.json();
@@ -35,7 +40,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const { error } = await supabaseAdmin
       .from("products")
       .update({ name, description, price, quantity: stock, category, image_url: image_url || null, images: images || [] })
-      .eq("id", params.id);
+      .eq("id", id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });

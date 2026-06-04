@@ -26,6 +26,7 @@ export default function EditProduct() {
     fetch(`/api/products/${id}`)
       .then((r) => r.json())
       .then((data) => {
+        if (data?.error) { setError("فشل تحميل بيانات المنتج"); setLoading(false); return; }
         setName(data.name || "");
         setDescription(data.description || "");
         setPrice(String(data.price ?? ""));
