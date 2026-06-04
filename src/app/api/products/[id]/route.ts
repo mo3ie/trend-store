@@ -17,6 +17,12 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json(data);
 }
 
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const { error } = await supabaseAdmin.from("products").delete().eq("id", params.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true });
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { name, description, price, stock, category, image_url, images } =
