@@ -28,12 +28,12 @@ import HeroSlider from "@/components/HeroSlider";
 import { useAuth } from "@/hooks/useAuth";
 
 const categories = [
-  { title: "هواتف",           sub: "PHONES",          icon: Smartphone  },
-  { title: "لابتوبات",        sub: "LAPTOPS",         icon: Laptop      },
-  { title: "بلايستيشن",      sub: "PLAYSTATION",     icon: Gamepad2    },
-  { title: "خدمات إلكترونية", sub: "E-SERVICES",      icon: Globe       },
-  { title: "طلب من المواقع", sub: "ONLINE SHOPPING", icon: ShoppingCart },
-  { title: "إعلانات",         sub: "MARKETING",       icon: Megaphone   },
+  { title: "هواتف",           sub: "PHONES",          icon: Smartphone,  href: "/products?category=هواتف"      },
+  { title: "لابتوبات",        sub: "LAPTOPS",         icon: Laptop,      href: "/products?category=لابتوبات"   },
+  { title: "بلايستيشن",      sub: "PLAYSTATION",     icon: Gamepad2,    href: "/products?category=بلايستيشن"  },
+  { title: "خدمات إلكترونية", sub: "E-SERVICES",      icon: Globe,       href: "/products"                     },
+  { title: "طلب من المواقع", sub: "ONLINE SHOPPING", icon: ShoppingCart, href: "https://order.trendstore-ly.com" },
+  { title: "إعلانات",         sub: "MARKETING",       icon: Megaphone,   href: "/products"                     },
 ];
 
 const services = [
@@ -47,7 +47,7 @@ const services = [
 const navTop = [
   { label: "الرئيسية",          icon: HomeIcon,    href: undefined },
   { label: "طلب شي ان",         icon: ShoppingCart, href: "https://order.trendstore-ly.com" },
-  { label: "متجر الإلكترونيات", icon: Smartphone,  href: undefined },
+  { label: "متجر الإلكترونيات", icon: Smartphone,  href: "/products" },
   { label: "الصيانة",           icon: Wrench,      href: undefined },
   { label: "خدمات رقمية",      icon: Megaphone,   href: undefined },
 ];
@@ -98,14 +98,23 @@ export default function Home() {
           {/* Navigation Top */}
           <nav className="space-y-1 flex-1">
             {navTop.map(({ label, icon: Icon, href }, i) => {
+              const cls = `flex items-center py-2.5 rounded-xl text-gray-300 hover:text-purple-300 hover:bg-purple-500/10 cursor-pointer transition-all ${sidebarOpen ? "gap-3 px-3" : "justify-center px-0"}`;
               if (href) {
+                const isExternal = href.startsWith("http");
                 return (
-                  <a key={i} href={href} target="_blank" className="flex gap-2 items-center hover:text-purple-400 cursor-pointer px-3 py-2.5">
-                    <ShoppingCart size={18} /> {sidebarOpen && "طلب شي ان"}
+                  <a
+                    key={i}
+                    href={href}
+                    target={isExternal ? "_blank" : undefined}
+                    rel={isExternal ? "noopener noreferrer" : undefined}
+                    title={!sidebarOpen ? label : undefined}
+                    className={cls}
+                  >
+                    <Icon size={18} className="shrink-0" />
+                    {sidebarOpen && <span className="text-sm">{label}</span>}
                   </a>
                 );
               }
-              const cls = `flex items-center py-2.5 rounded-xl text-gray-300 hover:text-purple-300 hover:bg-purple-500/10 cursor-pointer transition-all ${sidebarOpen ? "gap-3 px-3" : "justify-center px-0"}`;
               return (
                 <div key={i} title={!sidebarOpen ? label : undefined} className={cls}>
                   <Icon size={18} className="shrink-0" />
@@ -241,12 +250,19 @@ export default function Home() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {categories.map((cat, i) => {
               const Icon = cat.icon;
+              const isExternal = cat.href.startsWith("http");
               return (
-                <div key={i} className="category-card">
+                <a
+                  key={i}
+                  href={cat.href}
+                  target={isExternal ? "_blank" : undefined}
+                  rel={isExternal ? "noopener noreferrer" : undefined}
+                  className="category-card"
+                >
                   <Icon size={32} className="icon gradient-icon" />
                   <h3>{cat.title}</h3>
                   <p>{cat.sub}</p>
-                </div>
+                </a>
               );
             })}
           </div>
