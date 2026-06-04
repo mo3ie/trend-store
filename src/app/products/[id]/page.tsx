@@ -15,6 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useCart } from "@/hooks/useCart";
 
 type Product = {
   id: string;
@@ -32,6 +33,7 @@ export default function ProductView() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { addItem, count } = useCart();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +48,8 @@ export default function ProductView() {
   }, [id]);
 
   function handleAddToCart() {
+    if (!product) return;
+    addItem({ id: product.id, name: product.name, price: product.price, image_url: product.image_url, stock: product.stock });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   }
@@ -86,9 +90,14 @@ export default function ProductView() {
             <Bell size={20} />
             <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full" />
           </button>
-          <button className="hover:text-purple-400 transition-colors">
+          <a href="/cart" className="relative hover:text-purple-400 transition-colors">
             <ShoppingCart size={20} />
-          </button>
+            {count > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                {count > 9 ? "9+" : count}
+              </span>
+            )}
+          </a>
           {user ? (
             <a href="/account" className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-sm font-black">
               {(user.user_metadata?.full_name?.[0] || user.email?.[0] || "؟").toUpperCase()}
