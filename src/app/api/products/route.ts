@@ -6,6 +6,21 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const category = searchParams.get("category");
+  const search = searchParams.get("search");
+
+  let query = supabaseAdmin.from("products").select("*").order("created_at", { ascending: false });
+
+  if (category) query = query.eq("category", category);
+  if (search) query = query.ilike("name", `%${search}%`);
+
+  const { data, error } = await query;
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { name, description, price, stock, category, image_url, images } =
