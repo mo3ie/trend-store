@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { User, Phone, MapPin, Mail, Package, Heart, LogOut, Edit3, Check, X, ShoppingBag, ArrowLeft } from "lucide-react";
+import { User, Phone, MapPin, Mail, Package, Heart, LogOut, Edit3, Check, X, ShoppingBag, ArrowLeft, ShoppingCart } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
+import { useCart } from "@/hooks/useCart";
 
 type Profile = {
   full_name: string;
@@ -40,6 +41,7 @@ const statusLabels: Record<string, string> = {
 export default function AccountPage() {
   const router = useRouter();
   const { user, loading: authLoading, signOut } = useAuth();
+  const { count } = useCart();
 
   const [profile, setProfile] = useState<Profile>({ full_name: "", phone: "", email: "", address: "" });
   const [editMode, setEditMode] = useState(false);
@@ -117,13 +119,23 @@ export default function AccountPage() {
         <a href="/" className="text-2xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
           TREND
         </a>
-        <button
-          onClick={signOut}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-all text-sm"
-        >
-          <LogOut size={16} />
-          تسجيل الخروج
-        </button>
+        <div className="flex items-center gap-3">
+          <a href="/cart" className="relative text-gray-400 hover:text-purple-400 transition-colors">
+            <ShoppingCart size={20} />
+            {count > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                {count > 9 ? "9+" : count}
+              </span>
+            )}
+          </a>
+          <button
+            onClick={signOut}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-all text-sm"
+          >
+            <LogOut size={16} />
+            تسجيل الخروج
+          </button>
+        </div>
       </header>
 
       <div className="max-w-3xl mx-auto px-4 py-8">
