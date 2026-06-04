@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  return NextResponse.json(data?.map((p: any) => ({ ...p, stock: p.stock ?? p.quantity })));
 }
 
 export async function POST(req: NextRequest) {
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       name,
       description,
       price,
-      stock,
+      quantity: stock,
       category,
       image_url: image_url || null,
       images: images || [],

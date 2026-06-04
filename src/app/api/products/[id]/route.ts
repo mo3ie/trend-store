@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-  return NextResponse.json(data);
+  return NextResponse.json({ ...data, stock: data.stock ?? data.quantity });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -34,7 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const { error } = await supabaseAdmin
       .from("products")
-      .update({ name, description, price, stock, category, image_url: image_url || null, images: images || [] })
+      .update({ name, description, price, quantity: stock, category, image_url: image_url || null, images: images || [] })
       .eq("id", params.id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
