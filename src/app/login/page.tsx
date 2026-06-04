@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, LogIn, Zap } from "lucide-react";
+import { Eye, EyeOff, LogIn, Zap, ShoppingCart } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { useCart } from "@/hooks/useCart";
 
 function GoogleIcon() {
   return (
@@ -18,6 +19,7 @@ function GoogleIcon() {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { count } = useCart();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -59,7 +61,17 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0f1a] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#0b0f1a] flex items-center justify-center px-4 relative">
+      <a href="/cart" className="absolute top-5 left-5 text-gray-400 hover:text-purple-400 transition-colors">
+        <div className="relative">
+          <ShoppingCart size={22} />
+          {count > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+              {count > 9 ? "9+" : count}
+            </span>
+          )}
+        </div>
+      </a>
       <div className="fixed top-[-100px] left-[-100px] w-[400px] h-[400px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="fixed bottom-[-100px] right-[-100px] w-[400px] h-[400px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
 
