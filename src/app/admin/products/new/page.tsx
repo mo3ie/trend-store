@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, X, ArrowRight, Save } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
 
 const categories = ["هواتف", "لابتوبات", "بلايستيشن", "إكسسوارات"];
 
@@ -12,7 +11,7 @@ export default function NewProduct() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
-  const [quantity, setQuantity] = useState("");
+  const [stock, setStock] = useState("");
   const [category, setCategory] = useState(categories[0]);
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -34,36 +33,48 @@ export default function NewProduct() {
     e.preventDefault();
     setError("");
 
-    if (!name || !price || !quantity) {
+    if (!name || !price || !stock) {
       setError("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
 
     setSaving(true);
 
-    // رفع الصور
+    // رفع الصور عبر API route
     const imageUrls: string[] = [];
     for (const file of images) {
-      const fileName = `${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage.from("product-images").upload(`public/${fileName}`, file);
-      if (uploadError) { setError("فشل رفع الصورة"); setSaving(false); return; }
-      const { data } = supabase.storage.from("product-images").getPublicUrl(`public/${fileName}`);
-      imageUrls.push(data.publicUrl);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const data = await res.json();
+
+      if (!res.ok || !data.url) {
+        setError("فشل رفع الصورة: " + (data.error || "خطأ غير معروف"));
+        setSaving(false);
+        return;
+      }
+      imageUrls.push(data.url);
     }
 
     // حفظ المنتج
-    const { error: insertError } = await supabase.from("products").insert({
-      name,
-      description,
-      price: parseFloat(price),
-      quantity: parseInt(quantity),
-      category,
-      image_url: imageUrls[0] || null,
-      images: imageUrls,
+    const saveRes = await fetch("/api/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        description,
+        price: parseFloat(price),
+        stock: parseInt(stock),
+        category,
+        image_url: imageUrls[0] || null,
+        images: imageUrls,
+      }),
     });
+    const saveData = await saveRes.json();
 
-    if (insertError) {
-      setError("فشل حفظ المنتج: " + insertError.message);
+    if (!saveRes.ok) {
+      setError("فشل حفظ المنتج: " + (saveData.error || "خطأ غير معروف"));
       setSaving(false);
       return;
     }
@@ -106,7 +117,7 @@ export default function NewProduct() {
             </div>
             <div>
               <label className="text-gray-400 text-sm mb-1.5 block">الكمية *</label>
-              <input type="number" min="0" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" className="input-field" required />
+              <input type="number" min="0" value={stock} onChange={(e) => setStock(e.target.value)} placeholder="0" className="input-field" required />
             </div>
           </div>
 

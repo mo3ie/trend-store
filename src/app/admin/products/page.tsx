@@ -8,7 +8,7 @@ type Product = {
   id: string;
   name: string;
   price: number;
-  quantity: number;
+  stock: number;
   category: string;
   image_url?: string;
   description?: string;
@@ -133,8 +133,8 @@ export default function AdminProducts() {
                     </td>
                     <td className="px-5 py-3.5 text-white font-semibold">{product.price} $</td>
                     <td className="px-5 py-3.5">
-                      <span className={`font-semibold ${product.quantity === 0 ? "text-red-400" : product.quantity < 5 ? "text-yellow-400" : "text-green-400"}`}>
-                        {product.quantity}
+                      <span className={`font-semibold ${product.stock === 0 ? "text-red-400" : product.stock < 5 ? "text-yellow-400" : "text-green-400"}`}>
+                        {product.stock}
                       </span>
                     </td>
                     <td className="px-5 py-3.5">

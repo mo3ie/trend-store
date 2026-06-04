@@ -1,25 +1,31 @@
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
+export async function middleware(request: NextRequest) {
+  const response = NextResponse.next();
 
-  if (!req.nextUrl.pathname.startsWith("/admin")) return res;
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: {
+        get: (name) => request.cookies.get(name)?.value,
+        set: (name, value, options) => response.cookies.set(name, value, options),
+        remove: (name, options) => response.cookies.delete(name, options),
+    }}
+  );
 
-  const supabase = createMiddlewareClient({ req, res });
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    return NextResponse.redirect(new URL("/", req.url));
+  const adminEmails = ['mo3iemohamed@gmail.com'];
+
+  if (request.nextUrl.pathname.startsWith("/admin")) {
+    if (!user) return NextResponse.redirect(new URL("/login", request.url));
+    if (!adminEmails.includes(user.email ?? ''))
+      return NextResponse.redirect(new URL("/", request.url));
   }
 
-  const role = user.app_metadata?.role || user.user_metadata?.role;
-  if (role !== "admin") {
-    return NextResponse.redirect(new URL("/", req.url));
-  }
-
-  return res;
+  return response;
 }
 
 export const config = {
