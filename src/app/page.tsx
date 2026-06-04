@@ -36,6 +36,7 @@ type Product = {
 };
 import HeroSlider from "@/components/HeroSlider";
 import { useAuth } from "@/hooks/useAuth";
+import { useCart } from "@/hooks/useCart";
 
 const categories = [
   { title: "هواتف",           sub: "PHONES",          icon: Smartphone,  href: "/products?category=هواتف"      },
@@ -75,6 +76,7 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, signOut } = useAuth();
+  const { count } = useCart();
 
   useEffect(() => {
     fetch("/api/products")
@@ -246,9 +248,14 @@ export default function Home() {
               <Bell size={20} />
               <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full" />
             </button>
-            <button className="hover:text-purple-400 transition-colors">
+            <a href="/cart" className="relative hover:text-purple-400 transition-colors">
               <ShoppingCart size={20} />
-            </button>
+              {count > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                  {count > 9 ? "9+" : count}
+                </span>
+              )}
+            </a>
           </div>
 
           {/* Search */}
