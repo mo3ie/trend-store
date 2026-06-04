@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { User, Phone, MapPin, Mail, Package, Heart, LogOut, Edit3, Check, X, ShoppingBag } from "lucide-react";
+import { User, Phone, MapPin, Mail, Package, Heart, LogOut, Edit3, Check, X, ShoppingBag, ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -221,13 +221,19 @@ export default function AccountPage() {
         {/* ── STORE ORDERS TAB ── */}
         {activeTab === "store" && (
           <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-gray-500 text-sm">{storeOrders.length} طلب</p>
+              <a href="/orders" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors">
+                عرض الكل <ArrowLeft size={14} />
+              </a>
+            </div>
             {storeOrders.length === 0 ? (
               <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-10 text-center text-gray-500">
                 <ShoppingBag size={40} className="mx-auto mb-3 text-purple-500/40" />
                 لا توجد طلبات من المتجر بعد
               </div>
             ) : storeOrders.map((order) => (
-              <div key={order.id} className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-5 flex items-center justify-between">
+              <a key={order.id} href="/orders" className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-5 flex items-center justify-between hover:border-purple-500/50 transition-all block">
                 <div>
                   <p className="text-sm font-semibold">طلب #{order.id.slice(0, 8)}</p>
                   <p className="text-gray-500 text-xs mt-0.5">{new Date(order.created_at).toLocaleDateString("ar-LY")}</p>
@@ -235,7 +241,7 @@ export default function AccountPage() {
                 <span className={`text-xs px-3 py-1 rounded-full border font-medium ${statusColors[order.status] || "bg-gray-500/20 text-gray-400 border-gray-500/30"}`}>
                   {statusLabels[order.status] || order.status}
                 </span>
-              </div>
+              </a>
             ))}
           </div>
         )}

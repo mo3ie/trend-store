@@ -63,10 +63,10 @@ const navTop = [
 ];
 
 const navBottom = [
-  { label: "تتبع طلبك", icon: Package  },
-  { label: "المفضلة",   icon: Heart    },
-  { label: "محفظتي",    icon: Wallet   },
-  { label: "الإعدادات", icon: Settings },
+  { label: "تتبع طلبك", icon: Package,  href: "/orders"  },
+  { label: "المفضلة",   icon: Heart,    href: undefined  },
+  { label: "محفظتي",    icon: Wallet,   href: undefined  },
+  { label: "الإعدادات", icon: Settings, href: undefined  },
 ];
 
 export default function Home() {
@@ -142,18 +142,21 @@ export default function Home() {
 
             <div className="border-t border-purple-500/15 my-4" />
 
-            {navBottom.map(({ label, icon: Icon }, i) => (
-              <div
-                key={i}
-                title={!sidebarOpen ? label : undefined}
-                className={`flex items-center py-2.5 rounded-xl text-gray-300 hover:text-purple-300 hover:bg-purple-500/10 cursor-pointer transition-all ${
-                  sidebarOpen ? "gap-3 px-3" : "justify-center px-0"
-                }`}
-              >
-                <Icon size={18} className="shrink-0" />
-                {sidebarOpen && <span className="text-sm">{label}</span>}
-              </div>
-            ))}
+            {navBottom.map(({ label, icon: Icon, href }, i) => {
+              const cls = `flex items-center py-2.5 rounded-xl text-gray-300 hover:text-purple-300 hover:bg-purple-500/10 cursor-pointer transition-all ${sidebarOpen ? "gap-3 px-3" : "justify-center px-0"}`;
+              if (href) return (
+                <a key={i} href={href} title={!sidebarOpen ? label : undefined} className={cls}>
+                  <Icon size={18} className="shrink-0" />
+                  {sidebarOpen && <span className="text-sm">{label}</span>}
+                </a>
+              );
+              return (
+                <div key={i} title={!sidebarOpen ? label : undefined} className={cls}>
+                  <Icon size={18} className="shrink-0" />
+                  {sidebarOpen && <span className="text-sm">{label}</span>}
+                </div>
+              );
+            })}
           </nav>
 
           {/* Support Card — visible only when open */}
