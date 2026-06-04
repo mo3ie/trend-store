@@ -23,7 +23,17 @@ import {
   Phone,
   LogOut,
   ChevronDown,
+  ArrowLeft,
 } from "lucide-react";
+
+type Product = {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  category: string;
+  image_url?: string;
+};
 import HeroSlider from "@/components/HeroSlider";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -62,8 +72,15 @@ const navBottom = [
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, signOut } = useAuth();
+
+  useEffect(() => {
+    fetch("/api/products")
+      .then((r) => r.json())
+      .then((data) => setProducts(Array.isArray(data) ? data.slice(0, 8) : []));
+  }, []);
 
   // إغلاق القائمة عند الضغط خارجها
   useEffect(() => {
@@ -266,6 +283,49 @@ export default function Home() {
               );
             })}
           </div>
+
+          {/* LATEST PRODUCTS */}
+          {products.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-white">أحدث المنتجات</h2>
+                <a href="/products" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors">
+                  عرض الكل <ArrowLeft size={14} />
+                </a>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {products.map((product) => (
+                  <a
+                    key={product.id}
+                    href={`/products/${product.id}`}
+                    className="group bg-[#0f1320] border border-purple-500/20 rounded-2xl overflow-hidden hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.15)] transition-all"
+                  >
+                    <div className="aspect-square bg-black/30 overflow-hidden">
+                      {product.image_url ? (
+                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-purple-400/20">
+                          <Package size={36} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3 space-y-1.5">
+                      <span className="text-xs text-purple-400/70">{product.category}</span>
+                      <p className="text-sm font-semibold text-white leading-tight line-clamp-2">{product.name}</p>
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="font-black text-base bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                          {product.price} د
+                        </span>
+                        <span className={`text-xs font-medium ${product.stock === 0 ? "text-red-400" : product.stock < 5 ? "text-yellow-400" : "text-green-400"}`}>
+                          {product.stock === 0 ? "نفد" : product.stock < 5 ? `${product.stock} متبقي` : "متوفر"}
+                        </span>
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* GRID CARDS */}
           <div className="grid grid-cols-2 gap-6">
