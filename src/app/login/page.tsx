@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, LogIn, Zap, ShoppingCart } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
@@ -26,6 +27,20 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Handle OAuth redirect back to this page
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!data.session) return;
+      const { data: profile } = await supabase
+        .from("profiles").select("role").eq("id", data.session.user.id).single();
+      if (profile?.role === "admin" || profile?.role === "employee") {
+        router.push("/admin");
+      } else {
+        router.push("/");
+      }
+    });
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +80,7 @@ export default function LoginPage() {
     setGoogleLoading(true);
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/` },
+      options: { redirectTo: `${window.location.origin}/login` },
     });
     setGoogleLoading(false);
   };
