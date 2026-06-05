@@ -3,18 +3,31 @@
 import { LayoutDashboard, Package, ShoppingBag, Users, Settings, LogOut, ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 
-const navItems = [
-  { label: "الرئيسية",    icon: LayoutDashboard, href: "/admin"           },
-  { label: "المنتجات",    icon: Package,          href: "/admin/products"  },
-  { label: "الطلبات",     icon: ShoppingBag,      href: "/admin/orders"    },
-  { label: "المستخدمون",  icon: Users,             href: "/admin/users"     },
-  { label: "الإعدادات",   icon: Settings,          href: "/admin/settings"  },
+const allNavItems = [
+  { label: "الرئيسية",    icon: LayoutDashboard, href: "/admin",           adminOnly: false },
+  { label: "المنتجات",    icon: Package,          href: "/admin/products",  adminOnly: false },
+  { label: "الطلبات",     icon: ShoppingBag,      href: "/admin/orders",    adminOnly: false },
+  { label: "الموظفون",    icon: Users,             href: "/admin/employees", adminOnly: true  },
+  { label: "الإعدادات",   icon: Settings,          href: "/admin/settings",  adminOnly: true  },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { signOut } = useAuth();
   const pathname = usePathname();
+  const [role, setRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) return;
+      supabase.from("profiles").select("role").eq("id", data.user.id).single()
+        .then(({ data: profile }) => setRole(profile?.role ?? null));
+    });
+  }, []);
+
+  const navItems = allNavItems.filter(item => !item.adminOnly || role === "admin");
 
   return (
     <div className="flex min-h-screen bg-[#0b0f1a] text-white">

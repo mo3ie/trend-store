@@ -32,7 +32,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       if (error.message.includes("Invalid login credentials")) {
@@ -45,7 +45,17 @@ export default function LoginPage() {
         setError("حدث خطأ غير متوقع، حاول مرة أخرى");
       }
     } else {
-      router.push("/");
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .single();
+
+      if (profile?.role === "admin" || profile?.role === "employee") {
+        router.push("/admin");
+      } else {
+        router.push("/");
+      }
     }
 
     setLoading(false);
