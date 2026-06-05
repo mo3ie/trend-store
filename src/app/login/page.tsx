@@ -30,16 +30,17 @@ export default function LoginPage() {
 
   // Handle OAuth redirect back to this page
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!data.session) return;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!session) return;
       const { data: profile } = await supabase
-        .from("profiles").select("role").eq("id", data.session.user.id).single();
+        .from("profiles").select("role").eq("id", session.user.id).single();
       if (profile?.role === "admin" || profile?.role === "employee") {
         router.push("/admin");
-      } else {
+      } else if (event === "SIGNED_IN") {
         router.push("/");
       }
     });
+    return () => subscription.unsubscribe();
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
