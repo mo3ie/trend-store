@@ -78,7 +78,15 @@ function StoreDetailModal({ order, onClose, onStatusChange }: { order: StoreOrde
 
   async function save() {
     setSaving(true);
-    await supabase.from("store_orders").update({ status }).eq("id", order.id);
+    const { data: { session } } = await supabase.auth.getSession();
+    await fetch("/api/admin/orders", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({ table: "store", id: order.id, status }),
+    });
     onStatusChange(order.id, status);
     setSaving(false);
   }
@@ -288,7 +296,15 @@ export default function AdminOrders() {
 
   async function handleSheinStatus(id: string | number, newStatus: string) {
     setSheinUpdating(String(id));
-    await supabase.from("orders").update({ status: newStatus }).eq("id", id);
+    const { data: { session } } = await supabase.auth.getSession();
+    await fetch("/api/admin/orders", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({ table: "shein", id, status: newStatus }),
+    });
     setSheinOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
     setSheinUpdating(null);
   }
