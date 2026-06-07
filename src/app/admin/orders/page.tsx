@@ -8,10 +8,12 @@ type Order = {
   id: string;
   created_at: string;
   status: string;
-  name?: string;
-  phone?: string;
-  price?: number;
-  cart_link?: string;
+  total?: number;
+  address_text?: string;
+  notes?: string;
+  payment_method?: string;
+  payment_status?: string;
+  profiles?: { full_name?: string; phone?: string };
 };
 
 const statuses = ["الكل", "pending", "processing", "shipped", "delivered", "cancelled"];
@@ -47,20 +49,20 @@ export default function AdminOrders() {
   useEffect(() => {
     let result = orders;
     if (activeStatus !== "الكل") result = result.filter((o) => o.status === activeStatus);
-    if (search) result = result.filter((o) => o.name?.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search));
+    if (search) result = result.filter((o) => o.profiles?.full_name?.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search));
     setFiltered(result);
   }, [orders, activeStatus, search]);
 
   async function fetchOrders() {
     setLoading(true);
-    const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
+    const { data } = await supabase.from("store_orders").select("*, profiles(full_name, phone)").order("created_at", { ascending: false });
     setOrders(data || []);
     setLoading(false);
   }
 
   async function handleStatusChange(id: string, newStatus: string) {
     setUpdating(id);
-    await supabase.from("orders").update({ status: newStatus }).eq("id", id);
+    await supabase.from("store_orders").update({ status: newStatus }).eq("id", id);
     setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: newStatus } : o));
     setUpdating(null);
   }
@@ -70,7 +72,7 @@ export default function AdminOrders() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">الطلبات</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{orders.length} طلب</p>
+          <p className="text-gray-500 text-sm mt-0.5">{filtered.length} طلب</p>
         </div>
       </div>
 
@@ -125,12 +127,16 @@ export default function AdminOrders() {
                 {filtered.map((order) => (
                   <tr key={order.id} className="border-b border-white/5 hover:bg-white/2 transition-colors">
                     <td className="px-5 py-3.5 text-gray-400 font-mono text-xs">#{order.id.toString().slice(0, 8)}</td>
-                    <td className="px-5 py-3.5 text-white font-medium">{order.name || "—"}</td>
-                    <td className="px-5 py-3.5 text-gray-400 text-xs">{order.phone || "—"}</td>
-                    <td className="px-5 py-3.5 text-purple-400 font-semibold">{order.price ? `${order.price} $` : "—"}</td>
+                    <td className="px-5 py-3.5 text-white font-medium">{order.profiles?.full_name || "—"}</td>
+                    <td className="px-5 py-3.5 text-gray-400 text-xs">{order.profiles?.phone || "—"}</td>
+                    <td className="px-5 py-3.5 text-purple-400 font-semibold">{order.total ? `${order.total} د.ل` : "—"}</td>
                     <td className="px-5 py-3.5 text-gray-400 text-xs">
-                      <div>{new Date(order.created_at).toLocaleDateString("ar-LY", { day:"2-digit", month:"2-digit", year:"numeric" })}</div>
-                      <div className="text-gray-600">{new Date(order.created_at).toLocaleTimeString("ar-LY", { hour:"2-digit", minute:"2-digit" })}</div>
+                      {order.created_at ? (
+                        <>
+                          <div>{new Date(order.created_at).toLocaleDateString("ar-LY", { day:"2-digit", month:"2-digit", year:"numeric" })}</div>
+                          <div className="text-gray-600">{new Date(order.created_at).toLocaleTimeString("ar-LY", { hour:"2-digit", minute:"2-digit" })}</div>
+                        </>
+                      ) : <div className="text-gray-600">—</div>}
                     </td>
                     <td className="px-5 py-3.5">
                       <select

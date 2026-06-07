@@ -8,8 +8,8 @@ type Order = {
   id: string;
   created_at: string;
   status: string;
-  name?: string;
-  price?: number;
+  total?: number;
+  profiles?: { full_name?: string };
 };
 
 const statusColors: Record<string, string> = {
@@ -43,13 +43,13 @@ export default function AdminDashboard() {
         { data: revenueData },
       ] = await Promise.all([
         supabase.from("products").select("*", { count: "exact", head: true }),
-        supabase.from("orders").select("*", { count: "exact", head: true }),
+        supabase.from("store_orders").select("*", { count: "exact", head: true }),
         supabase.from("profiles").select("*", { count: "exact", head: true }),
-        supabase.from("orders").select("id,name,status,price,created_at").order("created_at", { ascending: false }).limit(8),
-        supabase.from("orders").select("price").eq("status", "delivered"),
+        supabase.from("store_orders").select("id,status,total,created_at,profiles(full_name)").order("created_at", { ascending: false }).limit(8),
+        supabase.from("store_orders").select("total").eq("status", "delivered"),
       ]);
 
-      const revenue = revenueData?.reduce((sum, o) => sum + (o.price || 0), 0) || 0;
+      const revenue = revenueData?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
       setStats({ products: products || 0, orders: orders || 0, users: users || 0, revenue });
       setRecentOrders(ordersData || []);
       setLoading(false);
@@ -111,11 +111,15 @@ export default function AdminDashboard() {
                 {recentOrders.map((order) => (
                   <tr key={order.id} className="border-b border-white/5 hover:bg-white/2 transition-colors">
                     <td className="px-6 py-3.5 text-gray-400 font-mono text-xs">#{order.id.toString().slice(0, 8)}</td>
-                    <td className="px-6 py-3.5 text-white">{order.name || "—"}</td>
-                    <td className="px-6 py-3.5 text-purple-400 font-semibold">{order.price ? `${order.price} $` : "—"}</td>
+                    <td className="px-6 py-3.5 text-white">{order.profiles?.full_name || "—"}</td>
+                    <td className="px-6 py-3.5 text-purple-400 font-semibold">{order.total ? `${order.total} د.ل` : "—"}</td>
                     <td className="px-6 py-3.5 text-gray-400 text-xs">
-                      <div>{new Date(order.created_at).toLocaleDateString("ar-LY", { day:"2-digit", month:"2-digit", year:"numeric" })}</div>
-                      <div className="text-gray-600">{new Date(order.created_at).toLocaleTimeString("ar-LY", { hour:"2-digit", minute:"2-digit" })}</div>
+                      {order.created_at ? (
+                        <>
+                          <div>{new Date(order.created_at).toLocaleDateString("ar-LY", { day:"2-digit", month:"2-digit", year:"numeric" })}</div>
+                          <div className="text-gray-600">{new Date(order.created_at).toLocaleTimeString("ar-LY", { hour:"2-digit", minute:"2-digit" })}</div>
+                        </>
+                      ) : <div className="text-gray-600">—</div>}
                     </td>
                     <td className="px-6 py-3.5">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[order.status] || "bg-gray-500/20 text-gray-400"}`}>
