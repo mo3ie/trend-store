@@ -9,14 +9,27 @@ export type CartItem = {
   image_url?: string;
   quantity: number;
   stock: number;
+  variants?: Record<string, string>;
+  cartKey: string;
 };
 
 const STORAGE_KEY = "trend_cart";
 
+function makeCartKey(id: string, variants?: Record<string, string>): string {
+  if (!variants || Object.keys(variants).length === 0) return id;
+  const sorted = Object.keys(variants).sort().reduce<Record<string, string>>((acc, k) => {
+    acc[k] = variants[k];
+    return acc;
+  }, {});
+  return `${id}_${JSON.stringify(sorted)}`;
+}
+
 function readStorage(): CartItem[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    // backfill cartKey for old items that don't have it
+    return raw.map((i: any) => ({ ...i, cartKey: i.cartKey || makeCartKey(i.id, i.variants) }));
   } catch {
     return [];
   }
@@ -34,34 +47,40 @@ export function useCart() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   }
 
-  const addItem = useCallback((item: Omit<CartItem, "quantity">) => {
+  const addItem = useCallback((item: Omit<CartItem, "quantity" | "cartKey">) => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
+      const key = makeCartKey(item.id, item.variants);
+      const existing = prev.find((i) => i.cartKey === key);
       const next = existing
         ? prev.map((i) =>
-            i.id === item.id
+            i.cartKey === key
               ? { ...i, quantity: Math.min(i.quantity + 1, i.stock) }
               : i
           )
-        : [...prev, { ...item, quantity: 1 }];
+        : [...prev, { ...item, quantity: 1, cartKey: key }];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   }, []);
 
-  const removeItem = useCallback((id: string) => {
+  // accepts both cartKey and id for backwards compatibility
+  const removeItem = useCallback((key: string) => {
     setItems((prev) => {
-      const next = prev.filter((i) => i.id !== id);
+      const next = prev.filter((i) => i.cartKey !== key && i.id !== key);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   }, []);
 
-  const updateQuantity = useCallback((id: string, quantity: number) => {
+  const updateQuantity = useCallback((key: string, quantity: number) => {
     setItems((prev) => {
       const next = quantity <= 0
-        ? prev.filter((i) => i.id !== id)
-        : prev.map((i) => i.id === id ? { ...i, quantity: Math.min(quantity, i.stock) } : i);
+        ? prev.filter((i) => i.cartKey !== key && i.id !== key)
+        : prev.map((i) =>
+            (i.cartKey === key || i.id === key)
+              ? { ...i, quantity: Math.min(quantity, i.stock) }
+              : i
+          );
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       return next;
     });

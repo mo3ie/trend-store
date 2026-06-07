@@ -3,19 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
-  ArrowRight,
-  ShoppingCart,
-  Package,
-  Bell,
-  User,
-  ChevronLeft,
-  ChevronRight,
-  Tag,
-  CheckCircle,
-  XCircle,
+  ArrowRight, ShoppingCart, Package, Bell, User,
+  ChevronLeft, ChevronRight, Tag, CheckCircle, XCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
+
+type Variant = {
+  name: string;
+  options: string[];
+};
 
 type Product = {
   id: string;
@@ -27,6 +24,7 @@ type Product = {
   image_url?: string;
   images?: string[];
   created_at?: string;
+  variants?: Variant[];
 };
 
 export default function ProductView() {
@@ -35,10 +33,11 @@ export default function ProductView() {
   const { user } = useAuth();
   const { addItem, count } = useCart();
 
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeImage, setActiveImage] = useState(0);
-  const [added, setAdded] = useState(false);
+  const [product,      setProduct]      = useState<Product | null>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [activeImage,  setActiveImage]  = useState(0);
+  const [added,        setAdded]        = useState(false);
+  const [selectedVars, setSelectedVars] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetch(`/api/products/${id}`)
@@ -49,7 +48,22 @@ export default function ProductView() {
 
   function handleAddToCart() {
     if (!product) return;
-    addItem({ id: product.id, name: product.name, price: product.price, image_url: product.image_url, stock: product.stock });
+    // Ensure all variants are selected
+    const variants = product.variants || [];
+    for (const v of variants) {
+      if (!selectedVars[v.name]) {
+        alert(`يرجى اختيار ${v.name}`);
+        return;
+      }
+    }
+    addItem({
+      id:        product.id,
+      name:      product.name,
+      price:     product.price,
+      image_url: product.image_url,
+      stock:     product.stock,
+      variants:  Object.keys(selectedVars).length > 0 ? selectedVars : undefined,
+    });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   }
@@ -67,24 +81,15 @@ export default function ProductView() {
 
       {/* ─── HEADER ─── */}
       <header className="flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[#0b0f1a]/90 backdrop-blur-md z-40">
-        <button
-          onClick={() => router.back()}
-          className="text-gray-400 hover:text-purple-400 transition-colors shrink-0"
-        >
+        <button onClick={() => router.back()} className="text-gray-400 hover:text-purple-400 transition-colors shrink-0">
           <ArrowRight size={22} />
         </button>
-
         <a href="/" className="text-xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
           TREND
         </a>
-
         <div className="flex-1">
-          <input
-            placeholder="ابحث عن منتج..."
-            className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-purple-500/20 text-sm focus:outline-none focus:border-purple-500/50 transition-colors placeholder:text-gray-500"
-          />
+          <input placeholder="ابحث عن منتج..." className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-purple-500/20 text-sm focus:outline-none focus:border-purple-500/50 transition-colors placeholder:text-gray-500" />
         </div>
-
         <div className="flex items-center gap-3 text-gray-400 shrink-0">
           <button className="relative hover:text-purple-400 transition-colors">
             <Bell size={20} />
@@ -112,7 +117,7 @@ export default function ProductView() {
       </header>
 
       {/* ─── CONTENT ─── */}
-      <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
+      <div className="flex-1 p-4 md:p-6 max-w-4xl mx-auto w-full">
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
@@ -127,7 +132,7 @@ export default function ProductView() {
         ) : (
           <>
             {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-xs text-gray-500 mb-6">
+            <div className="flex items-center gap-2 text-xs text-gray-500 mb-5">
               <a href="/" className="hover:text-purple-400 transition-colors">الرئيسية</a>
               <ChevronLeft size={12} />
               <span className="text-gray-400">{product.category}</span>
@@ -135,54 +140,35 @@ export default function ProductView() {
               <span className="text-white truncate max-w-[200px]">{product.name}</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
 
               {/* ─── IMAGES ─── */}
               <div className="space-y-3">
                 <div className="relative bg-[#0f1320] border border-purple-500/20 rounded-2xl overflow-hidden aspect-square">
                   {images.length > 0 ? (
-                    <img
-                      src={images[activeImage]}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={images[activeImage]} alt={product.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-purple-400/40 gap-3">
                       <Package size={64} />
                       <span className="text-sm">لا توجد صورة</span>
                     </div>
                   )}
-
                   {images.length > 1 && (
                     <>
-                      <button
-                        onClick={() => setActiveImage((p) => (p - 1 + images.length) % images.length)}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors"
-                      >
+                      <button onClick={() => setActiveImage((p) => (p - 1 + images.length) % images.length)} className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors">
                         <ChevronLeft size={16} />
                       </button>
-                      <button
-                        onClick={() => setActiveImage((p) => (p + 1) % images.length)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors"
-                      >
+                      <button onClick={() => setActiveImage((p) => (p + 1) % images.length)} className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors">
                         <ChevronRight size={16} />
                       </button>
                     </>
                   )}
                 </div>
-
                 {images.length > 1 && (
                   <div className="grid grid-cols-5 gap-2">
                     {images.map((src, i) => (
                       <button key={i} onClick={() => setActiveImage(i)}>
-                        <img
-                          src={src}
-                          className={`w-full aspect-square object-cover rounded-xl border-2 transition-all ${
-                            activeImage === i
-                              ? "border-purple-500 opacity-100"
-                              : "border-white/10 opacity-50 hover:opacity-80"
-                          }`}
-                        />
+                        <img src={src} className={`w-full aspect-square object-cover rounded-xl border-2 transition-all ${activeImage === i ? "border-purple-500 opacity-100" : "border-white/10 opacity-50 hover:opacity-80"}`} />
                       </button>
                     ))}
                   </div>
@@ -191,38 +177,62 @@ export default function ProductView() {
 
               {/* ─── INFO ─── */}
               <div className="space-y-5">
-                {/* Category */}
                 <div className="flex items-center gap-2">
                   <Tag size={13} className="text-purple-400" />
                   <span className="text-xs text-purple-400 font-medium">{product.category}</span>
                 </div>
 
-                {/* Name */}
                 <h1 className="text-2xl font-black text-white leading-tight">{product.name}</h1>
 
-                {/* Price */}
                 <div className="flex items-end gap-2">
-                  <span className="text-4xl font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                    {product.price}
-                  </span>
+                  <span className="text-4xl font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">{product.price}</span>
                   <span className="text-gray-400 text-lg mb-1">دينار</span>
                 </div>
 
-                {/* Stock */}
                 <div className={`flex items-center gap-2 text-sm font-medium ${inStock ? "text-green-400" : "text-red-400"}`}>
                   {inStock ? <CheckCircle size={16} /> : <XCircle size={16} />}
-                  {inStock
-                    ? product.stock < 5
-                      ? `متبقي ${product.stock} فقط`
-                      : "متوفر في المخزن"
-                    : "نفد من المخزن"}
+                  {inStock ? (product.stock < 5 ? `متبقي ${product.stock} فقط` : "متوفر في المخزن") : "نفد من المخزن"}
                 </div>
 
-                {/* Description */}
                 {product.description && (
                   <div className="bg-[#0f1320] border border-purple-500/15 rounded-2xl p-4">
                     <p className="text-gray-400 text-xs font-medium mb-2">وصف المنتج</p>
                     <p className="text-gray-300 text-sm leading-relaxed">{product.description}</p>
+                  </div>
+                )}
+
+                {/* ── VARIANTS ── */}
+                {product.variants && product.variants.length > 0 && (
+                  <div className="space-y-4">
+                    {product.variants.map((variant) => (
+                      <div key={variant.name}>
+                        <label className="text-gray-400 text-xs font-medium mb-2 block flex items-center gap-1.5">
+                          {variant.name}
+                          {selectedVars[variant.name] && (
+                            <span className="text-purple-400 font-bold">: {selectedVars[variant.name]}</span>
+                          )}
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {variant.options.map((option) => {
+                            const isSelected = selectedVars[variant.name] === option;
+                            const isColor = variant.name.includes("لون") || variant.name.toLowerCase().includes("color");
+                            return (
+                              <button
+                                key={option}
+                                onClick={() => setSelectedVars(prev => ({ ...prev, [variant.name]: option }))}
+                                className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
+                                  isSelected
+                                    ? "border-purple-500 bg-purple-500/20 text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]"
+                                    : "border-white/10 bg-white/5 text-gray-400 hover:border-purple-500/40 hover:text-white"
+                                }`}
+                              >
+                                {option}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -239,11 +249,7 @@ export default function ProductView() {
                         : "bg-gray-700 opacity-50 cursor-not-allowed"
                     }`}
                   >
-                    {added ? (
-                      <><CheckCircle size={18} /> تمت الإضافة!</>
-                    ) : (
-                      <><ShoppingCart size={18} /> أضف إلى السلة</>
-                    )}
+                    {added ? <><CheckCircle size={18} /> تمت الإضافة!</> : <><ShoppingCart size={18} /> أضف إلى السلة</>}
                   </button>
 
                   <a
@@ -256,24 +262,13 @@ export default function ProductView() {
                   </a>
                 </div>
 
-                {/* Meta */}
                 <div className="border-t border-purple-500/15 pt-4 space-y-2 text-xs text-gray-500">
-                  <div className="flex justify-between">
-                    <span>التصنيف</span>
-                    <span className="text-gray-300">{product.category}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>الحالة</span>
-                    <span className={inStock ? "text-green-400" : "text-red-400"}>
-                      {inStock ? "متوفر" : "غير متوفر"}
-                    </span>
-                  </div>
+                  <div className="flex justify-between"><span>التصنيف</span><span className="text-gray-300">{product.category}</span></div>
+                  <div className="flex justify-between"><span>الحالة</span><span className={inStock ? "text-green-400" : "text-red-400"}>{inStock ? "متوفر" : "غير متوفر"}</span></div>
                   {product.created_at && (
                     <div className="flex justify-between">
                       <span>تاريخ الإضافة</span>
-                      <span className="text-gray-300">
-                        {new Date(product.created_at).toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" })}
-                      </span>
+                      <span className="text-gray-300">{new Date(product.created_at).toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" })}</span>
                     </div>
                   )}
                 </div>

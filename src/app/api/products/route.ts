@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, description, price, stock, category, image_url, images } =
+    const { name, description, price, stock, category, image_url, images, variants } =
       await req.json();
 
     if (!name || price == null || stock == null) {
@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
       category,
       image_url: image_url || null,
       images: images || [],
+      variants: variants || [],
     });
 
     if (error) {

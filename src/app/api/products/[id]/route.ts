@@ -30,7 +30,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Params }) 
 export async function PATCH(req: NextRequest, { params }: { params: Params }) {
   const { id } = await params;
   try {
-    const { name, description, price, stock, category, image_url, images } =
+    const { name, description, price, stock, category, image_url, images, variants } =
       await req.json();
 
     if (!name || price == null || stock == null) {
@@ -39,7 +39,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Params }) {
 
     const { error } = await supabaseAdmin
       .from("products")
-      .update({ name, description, price, quantity: stock, category, image_url: image_url || null, images: images || [] })
+      .update({
+        name,
+        description,
+        price,
+        quantity: stock,
+        category,
+        image_url: image_url || null,
+        images: images || [],
+        variants: variants || [],
+      })
       .eq("id", id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
