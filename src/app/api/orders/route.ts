@@ -53,7 +53,6 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       items,
       total,
-      address: address || address_text || null,
       address_text: address_text || address || null,
       phone: phone || null,
       notes: notes || note || null,
