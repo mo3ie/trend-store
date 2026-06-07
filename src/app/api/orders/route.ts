@@ -51,10 +51,9 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await supabaseAdmin.from("store_orders").insert({
       user_id: user.id,
-      items,
+      products: items,
       total,
       address_text: address_text || address || null,
-      phone: phone || null,
       notes: notes || note || null,
       payment_method: payment_method || null,
       payment_status: "pending",
