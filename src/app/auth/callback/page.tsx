@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
-async function handleSession(session: any, router: ReturnType<typeof useRouter>) {
+async function redirect(session: any, router: ReturnType<typeof useRouter>) {
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
@@ -23,32 +23,38 @@ export default function AuthCallback() {
   const router = useRouter();
 
   useEffect(() => {
-    // First: check if session already exists (hash tokens already parsed)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        handleSession(session, router);
-        return;
-      }
+    const hash   = window.location.hash.substring(1);
+    const search = window.location.search.substring(1);
+    const hashParams  = new URLSearchParams(hash);
+    const queryParams = new URLSearchParams(search);
 
-      // Fallback: wait for onAuthStateChange (SIGNED_IN or INITIAL_SESSION)
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session) {
-          subscription.unsubscribe();
-          handleSession(session, router);
-        }
+    const accessToken  = hashParams.get("access_token");
+    const refreshToken = hashParams.get("refresh_token");
+    const code         = queryParams.get("code");
+
+    if (accessToken && refreshToken) {
+      // Implicit flow (magic link / old OAuth)
+      supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+        .then(({ data: { session }, error }) => {
+          if (session) redirect(session, router);
+          else { console.error(error); router.replace("/login"); }
+        });
+
+    } else if (code) {
+      // PKCE flow (Google OAuth via createBrowserClient)
+      supabase.auth.exchangeCodeForSession(code)
+        .then(({ data: { session }, error }) => {
+          if (session) redirect(session, router);
+          else { console.error(error); router.replace("/login"); }
+        });
+
+    } else {
+      // Already signed in via cookie
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) redirect(session, router);
+        else router.replace("/login");
       });
-
-      // Safety timeout — if nothing fires after 8s, redirect to login
-      const timeout = setTimeout(() => {
-        subscription.unsubscribe();
-        router.replace("/login");
-      }, 8000);
-
-      return () => {
-        clearTimeout(timeout);
-        subscription.unsubscribe();
-      };
-    });
+    }
   }, [router]);
 
   return (
