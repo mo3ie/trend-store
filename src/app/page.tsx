@@ -67,7 +67,7 @@ const navTop = [
 
 const navBottom = [
   { label: "تتبع طلبك", icon: Package,  href: "/orders"              },
-  { label: "المفضلة",   icon: Heart,    href: undefined               },
+  { label: "المفضلة",   icon: Heart,    href: "/account?tab=favorites" },
   { label: "محفظتي",    icon: Wallet,   href: undefined               },
   { label: "الإعدادات", icon: Settings, href: "/account?tab=settings" },
 ];
@@ -770,8 +770,8 @@ export default function Home() {
 
   return (
     <>
-      <DesktopLayout />
-      <MobileLayout />
+      {DesktopLayout()}
+      {MobileLayout()}
       {walletOpen && <WalletModal onClose={() => setWalletOpen(false)} />}
     </>
   );

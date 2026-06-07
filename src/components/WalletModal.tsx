@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Wallet, X, Plus, ArrowDownCircle, ArrowUpCircle, Clock, CreditCard, Smartphone, Building2, Hash } from "lucide-react";
+import { Wallet, X, ArrowDownCircle, ArrowUpCircle, Phone, Hash } from "lucide-react";
 
 type Transaction = {
   id: string;
@@ -13,26 +13,30 @@ type Transaction = {
   created_at: string;
 };
 
-const RECHARGE_METHODS = [
-  { id: "mobicash",   label: "موبي كاش",      icon: "📱", desc: "ادفع عبر موبي كاش" },
-  { id: "masrefypay", label: "مصرفي",          icon: "🏦", desc: "تحويل مصرفي" },
-  { id: "edfali",     label: "ادفع لي",        icon: "🏧", desc: "محفظة ادفع لي" },
-  { id: "prepaid_card", label: "كرت شحن",      icon: "🎫", desc: "كرت شحن مسبق الدفع" },
+const DPAY_METHODS = [
+  { id: "edfali",     label: "ادفع لي",   icon: "🏧", needsPhone: true,  desc: "محفظة ادفع لي" },
+  { id: "mobicash",   label: "موبي كاش",   icon: "📱", needsPhone: false, desc: "محفظة موبي كاش" },
+  { id: "moamalat",   label: "معاملات",    icon: "💳", needsPhone: false, desc: "بوابة معاملات" },
+  { id: "yousrpay",   label: "يسر باي",   icon: "💰", needsPhone: false, desc: "بوابة يسر باي" },
 ];
+
+const OTHER_METHODS = [
+  { id: "prepaid_card", label: "كرت شحن",  icon: "🎫", desc: "كرت شحن مسبق الدفع" },
+];
+
+const ALL_METHODS = [...DPAY_METHODS, ...OTHER_METHODS];
 
 const METHOD_LABELS: Record<string, string> = {
   mobicash: "موبي كاش", masrefypay: "مصرفي", edfali: "ادفع لي",
   prepaid_card: "كرت شحن", cash: "نقداً", moamalat: "معاملات",
-  credit: "إيداع", debit: "سحب",
+  yousrpay: "يسر باي", credit: "إيداع", debit: "سحب",
 };
 
 function timeStr(iso: string) {
   return new Date(iso).toLocaleDateString("ar-LY", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-interface Props {
-  onClose: () => void;
-}
+interface Props { onClose: () => void; }
 
 export default function WalletModal({ onClose }: Props) {
   const [balance,      setBalance]      = useState(0);
@@ -40,12 +44,12 @@ export default function WalletModal({ onClose }: Props) {
   const [loading,      setLoading]      = useState(true);
   const [tab,          setTab]          = useState<"overview" | "recharge">("overview");
 
-  // Recharge form
-  const [method,    setMethod]    = useState("");
-  const [amount,    setAmount]    = useState("");
-  const [reference, setReference] = useState("");
-  const [recharging, setRecharging] = useState(false);
-  const [rechMsg,   setRechMsg]   = useState("");
+  const [method,      setMethod]      = useState("");
+  const [amount,      setAmount]      = useState("");
+  const [phone,       setPhone]       = useState("");
+  const [reference,   setReference]   = useState("");
+  const [recharging,  setRecharging]  = useState(false);
+  const [rechMsg,     setRechMsg]     = useState("");
 
   useEffect(() => {
     fetch("/api/wallet")
@@ -54,14 +58,41 @@ export default function WalletModal({ onClose }: Props) {
       .finally(() => setLoading(false));
   }, []);
 
+  const selectedMethod = ALL_METHODS.find(m => m.id === method);
+  const isDpay = DPAY_METHODS.some(m => m.id === method);
+
   async function handleRecharge() {
+    setRechMsg("");
     if (!method) { setRechMsg("يرجى اختيار طريقة الشحن"); return; }
     const amt = parseFloat(amount);
     if (!amt || amt < 5) { setRechMsg("الحد الأدنى للشحن 5 د"); return; }
+    if (method === "edfali" && !phone.trim()) { setRechMsg("يرجى إدخال رقم هاتف ادفع لي"); return; }
     if (method === "prepaid_card" && !reference.trim()) { setRechMsg("يرجى إدخال رقم الكرت"); return; }
 
     setRecharging(true);
-    setRechMsg("");
+
+    if (isDpay) {
+      try {
+        const r = await fetch("/api/wallet/topup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: amt, method, phone: phone.trim() || undefined }),
+        });
+        const d = await r.json();
+        if (!r.ok || !d.payment_link) {
+          setRechMsg(d.error || "فشل إنشاء جلسة الدفع");
+          setRecharging(false);
+          return;
+        }
+        window.location.href = d.payment_link;
+      } catch {
+        setRechMsg("خطأ في الاتصال بالخادم");
+        setRecharging(false);
+      }
+      return;
+    }
+
+    // Prepaid card
     try {
       const r = await fetch("/api/wallet", {
         method: "POST",
@@ -70,15 +101,8 @@ export default function WalletModal({ onClose }: Props) {
       });
       const d = await r.json();
       if (!r.ok) { setRechMsg(d.error || "فشل الطلب"); return; }
-
-      setRechMsg(
-        method === "prepaid_card"
-          ? "✅ تم شحن المحفظة بنجاح!"
-          : "✅ تم إرسال طلب الشحن — سيتم مراجعته خلال 24 ساعة"
-      );
+      setRechMsg("✅ تم شحن المحفظة بنجاح!");
       setAmount(""); setReference(""); setMethod("");
-
-      // Refresh balance
       const fresh = await fetch("/api/wallet").then(r => r.json());
       setBalance(fresh.balance || 0);
       setTransactions(fresh.transactions || []);
@@ -186,16 +210,14 @@ export default function WalletModal({ onClose }: Props) {
               {/* Amount */}
               <div>
                 <label className="text-gray-400 text-xs mb-2 block">المبلغ (د.ل)</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={amount}
-                    onChange={e => setAmount(e.target.value)}
-                    placeholder="أدخل المبلغ"
-                    min="5"
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/30 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-all"
-                  />
-                </div>
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={e => setAmount(e.target.value)}
+                  placeholder="أدخل المبلغ"
+                  min="5"
+                  className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/30 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-all"
+                />
                 <div className="flex gap-2 mt-2">
                   {[20, 50, 100, 200].map(v => (
                     <button key={v} type="button" onClick={() => setAmount(v.toString())}
@@ -212,8 +234,8 @@ export default function WalletModal({ onClose }: Props) {
               <div>
                 <label className="text-gray-400 text-xs mb-2 block">طريقة الشحن</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {RECHARGE_METHODS.map(m => (
-                    <button key={m.id} type="button" onClick={() => setMethod(m.id)}
+                  {ALL_METHODS.map(m => (
+                    <button key={m.id} type="button" onClick={() => { setMethod(m.id); setRechMsg(""); setPhone(""); }}
                       className={`p-3 rounded-xl text-right transition-all border ${
                         method === m.id
                           ? "bg-purple-600/20 border-purple-500/60 text-white"
@@ -227,10 +249,26 @@ export default function WalletModal({ onClose }: Props) {
                 </div>
               </div>
 
+              {/* Phone for edfali */}
+              {method === "edfali" && (
+                <div>
+                  <label className="text-gray-400 text-xs mb-2 flex items-center gap-1 block">
+                    <Phone size={12} /> رقم هاتف ادفع لي
+                  </label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    placeholder="09xxxxxxxx"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/30 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-all"
+                  />
+                </div>
+              )}
+
               {/* Reference for prepaid card */}
               {method === "prepaid_card" && (
                 <div>
-                  <label className="text-gray-400 text-xs mb-2 block flex items-center gap-1">
+                  <label className="text-gray-400 text-xs mb-2 flex items-center gap-1 block">
                     <Hash size={12} /> رقم الكرت
                   </label>
                   <input
@@ -243,13 +281,11 @@ export default function WalletModal({ onClose }: Props) {
                 </div>
               )}
 
-              {/* Bank instructions for bank methods */}
-              {method && method !== "prepaid_card" && (
-                <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-sm text-blue-300 space-y-1">
-                  <p className="font-semibold text-blue-200">تعليمات الشحن عبر {RECHARGE_METHODS.find(m2 => m2.id === method)?.label}:</p>
-                  <p>1. أرسل المبلغ على الرقم: <strong>0945798033</strong></p>
-                  <p>2. أرسل لقطة شاشة للتحويل على واتساب</p>
-                  <p>3. سيتم إضافة الرصيد خلال ساعات</p>
+              {/* DPay info banner */}
+              {isDpay && (
+                <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 flex items-start gap-2">
+                  <span className="text-base shrink-0">⚡</span>
+                  <p>ستنتقل إلى صفحة الدفع الآمنة لإتمام عملية شحن المحفظة عبر {selectedMethod?.label}. سيتم إضافة الرصيد تلقائياً بعد التأكيد.</p>
                 </div>
               )}
 
@@ -266,9 +302,15 @@ export default function WalletModal({ onClose }: Props) {
               <button
                 onClick={handleRecharge}
                 disabled={recharging}
-                className="w-full py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="w-full py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {recharging ? "⏳ جاري الإرسال..." : `شحن ${amount ? amount + " د" : ""}`}
+                {recharging ? (
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> جاري...</>
+                ) : isDpay ? (
+                  <>⚡ انتقل للدفع {amount ? `— ${amount} د` : ""}</>
+                ) : (
+                  <>شحن {amount ? `${amount} د` : ""}</>
+                )}
               </button>
             </div>
           )}

@@ -444,7 +444,7 @@ export default function AccountPage() {
                     <div key={fav.product_id} className="bg-[#0f1320] border border-purple-500/20 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all relative group">
                       <button
                         onClick={() => removeFavorite(fav.product_id)}
-                        className="absolute top-2 left-2 z-10 w-7 h-7 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/30"
+                        className="absolute top-2 left-2 z-10 w-7 h-7 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/40 transition-all shadow-sm"
                       >
                         <Trash2 size={12} />
                       </button>
