@@ -195,14 +195,14 @@ export default function CartPage() {
       const oid = orderId || await createOrder("edfali");
       setOrderId(oid);
 
-      const res = await fetch("/api/payment/dpay", {
+      const res = await fetch("/api/edfali/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: total, orderId: oid, method: "edfali", customer_mobile: edfaliPhone }),
+        body: JSON.stringify({ customerPhone: edfaliPhone, amount: total }),
       });
       const data = await res.json();
       if (!res.ok) { setPayError(data.error || "فشل إرسال رمز التحقق"); setEdfaliStep("phone"); return; }
-      setEdfaliSession(data.session_id);
+      setEdfaliSession(data.sessionId);
       setEdfaliStep("otp");
     } catch (err: any) {
       setPayError(err.message); setEdfaliStep("phone");
