@@ -113,7 +113,10 @@ export default function AdminDashboard() {
                     <td className="px-6 py-3.5 text-gray-400 font-mono text-xs">#{order.id.toString().slice(0, 8)}</td>
                     <td className="px-6 py-3.5 text-white">{order.name || "—"}</td>
                     <td className="px-6 py-3.5 text-purple-400 font-semibold">{order.price ? `${order.price} $` : "—"}</td>
-                    <td className="px-6 py-3.5 text-gray-400 text-xs">{new Date(order.created_at).toLocaleDateString("ar-LY")}</td>
+                    <td className="px-6 py-3.5 text-gray-400 text-xs">
+                      <div>{new Date(order.created_at).toLocaleDateString("ar-LY", { day:"2-digit", month:"2-digit", year:"numeric" })}</div>
+                      <div className="text-gray-600">{new Date(order.created_at).toLocaleTimeString("ar-LY", { hour:"2-digit", minute:"2-digit" })}</div>
+                    </td>
                     <td className="px-6 py-3.5">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[order.status] || "bg-gray-500/20 text-gray-400"}`}>
                         {statusLabels[order.status] || order.status}

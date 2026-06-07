@@ -23,6 +23,7 @@ export function useAuth() {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    document.cookie = "admin_role=; path=/; max-age=0";
     window.location.href = "/";
   };
 

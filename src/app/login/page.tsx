@@ -28,19 +28,10 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Handle OAuth redirect back to this page
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!session) return;
-      const { data: profile } = await supabase
-        .from("profiles").select("role").eq("id", session.user.id).single();
-      if (profile?.role === "admin" || profile?.role === "employee") {
-        router.push("/admin");
-      } else if (event === "SIGNED_IN") {
-        router.push("/");
-      }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) router.replace("/");
     });
-    return () => subscription.unsubscribe();
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -68,6 +59,7 @@ export default function LoginPage() {
         .single();
 
       if (profile?.role === "admin" || profile?.role === "employee") {
+        document.cookie = `admin_role=${profile.role}; path=/; max-age=86400; SameSite=Lax`;
         router.push("/admin");
       } else {
         router.push("/");
@@ -81,7 +73,7 @@ export default function LoginPage() {
     setGoogleLoading(true);
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/login` },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
     setGoogleLoading(false);
   };

@@ -128,7 +128,10 @@ export default function AdminOrders() {
                     <td className="px-5 py-3.5 text-white font-medium">{order.name || "—"}</td>
                     <td className="px-5 py-3.5 text-gray-400 text-xs">{order.phone || "—"}</td>
                     <td className="px-5 py-3.5 text-purple-400 font-semibold">{order.price ? `${order.price} $` : "—"}</td>
-                    <td className="px-5 py-3.5 text-gray-400 text-xs">{new Date(order.created_at).toLocaleDateString("ar-LY")}</td>
+                    <td className="px-5 py-3.5 text-gray-400 text-xs">
+                      <div>{new Date(order.created_at).toLocaleDateString("ar-LY", { day:"2-digit", month:"2-digit", year:"numeric" })}</div>
+                      <div className="text-gray-600">{new Date(order.created_at).toLocaleTimeString("ar-LY", { hour:"2-digit", minute:"2-digit" })}</div>
+                    </td>
                     <td className="px-5 py-3.5">
                       <select
                         value={order.status}
