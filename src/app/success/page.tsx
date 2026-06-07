@@ -43,7 +43,7 @@ function SuccessContent() {
             </p>
             {via && (
               <p className="text-gray-500 text-xs mt-2">
-                طريقة الدفع: {via === "dpay" ? "بوابة DPay" : via === "moamalat" ? "معاملات" : via}
+                طريقة الدفع: {via === "cash" ? "الدفع عند الاستلام" : via === "dpay" ? "بوابة DPay" : via === "moamalat" ? "معاملات" : via}
               </p>
             )}
           </div>

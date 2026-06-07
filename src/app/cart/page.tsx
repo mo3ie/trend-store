@@ -25,11 +25,12 @@ declare global {
 }
 
 const PAYMENT_METHODS = [
-  { id: "mobicash",   name: "موبي كاش",  icon: "📱", color: "#0284c7", needsCard: true  },
-  { id: "masrefypay", name: "مصرفي",     icon: "💳", color: "#ea580c", needsCard: true  },
-  { id: "yousrpay",   name: "يسر باي",   icon: "💳", color: "#0d9488", needsCard: true  },
-  { id: "saharpay",   name: "صحارة باي", icon: "💳", color: "#ca8a04", needsCard: true  },
-  { id: "edfali",     name: "ادفع لي",   icon: "🏧", color: "#7c3aed", needsPhone: true },
+  { id: "cash",       name: "الدفع عند الاستلام", icon: "💵", color: "#16a34a"                  },
+  { id: "mobicash",   name: "موبي كاش",           icon: "📱", color: "#0284c7", needsCard: true  },
+  { id: "masrefypay", name: "مصرفي",               icon: "💳", color: "#ea580c", needsCard: true  },
+  { id: "yousrpay",   name: "يسر باي",             icon: "💳", color: "#0d9488", needsCard: true  },
+  { id: "saharpay",   name: "صحارة باي",           icon: "💳", color: "#ca8a04", needsCard: true  },
+  { id: "edfali",     name: "ادفع لي",             icon: "🏧", color: "#7c3aed", needsPhone: true },
   { id: "moamalat",   name: "بطاقة مصرفية (معاملات)", icon: "🏦", color: "#1e40af", lightbox: true },
 ];
 
@@ -102,6 +103,19 @@ export default function CartPage() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "فشل إنشاء الطلب");
     return data.id as string;
+  }
+
+  async function payWithCash() {
+    setPayError("");
+    setOrdering(true);
+    try {
+      const oid = await createOrder("cash");
+      clearCart();
+      router.push(`/success?orderId=${oid}&via=cash`);
+    } catch (err: any) {
+      setPayError(err.message);
+      setOrdering(false);
+    }
   }
 
   async function payWithDPay() {
@@ -471,6 +485,7 @@ export default function CartPage() {
                 <button
                   onClick={() => {
                     if (!method) { setPayError("يرجى اختيار طريقة الدفع"); return; }
+                    if (method === "cash") { setStep("processing"); payWithCash(); return; }
                     if (method === "edfali") { setEdfaliStep("phone"); return; }
                     if (method === "moamalat") { setStep("processing"); payWithMoamalat(); return; }
                     setStep("processing"); payWithDPay();
