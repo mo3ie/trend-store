@@ -21,8 +21,7 @@ export default function AuthCallback() {
         document.cookie = `admin_role=${profile.role}; path=/; max-age=86400; SameSite=Lax`;
         router.replace("/admin");
       } else {
-        await supabase.auth.signOut();
-        router.replace("/login?error=not_authorized");
+        router.replace("/");
       }
     });
 
