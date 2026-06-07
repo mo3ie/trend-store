@@ -15,7 +15,6 @@ import {
   Wallet,
   Settings,
   Menu,
-  Bell,
   User,
   Clock,
   Headphones,
@@ -37,6 +36,8 @@ type Product = {
   image_url?: string;
 };
 import HeroSlider from "@/components/HeroSlider";
+import NotificationBell from "@/components/NotificationBell";
+import WalletModal from "@/components/WalletModal";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
 
@@ -74,18 +75,28 @@ const navBottom = [
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [mobileSearch, setMobileSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [desktopSearch, setDesktopSearch] = useState("");
+  const [walletOpen, setWalletOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, signOut } = useAuth();
   const { count } = useCart();
 
   useEffect(() => {
-    fetch("/api/products")
+    fetch("/api/products?limit=100")
       .then((r) => r.json())
-      .then((data) => setProducts(Array.isArray(data) ? data.slice(0, 8) : []));
+      .then((data) => setAllProducts(Array.isArray(data) ? data : []));
   }, []);
+
+  const activeQuery = desktopSearch || searchQuery;
+  const products = activeQuery.trim()
+    ? allProducts.filter(p =>
+        p.name.toLowerCase().includes(activeQuery.toLowerCase()) ||
+        p.category.toLowerCase().includes(activeQuery.toLowerCase())
+      )
+    : allProducts.slice(0, 8);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -200,6 +211,12 @@ export default function Home() {
 
             {navBottom.map(({ label, icon: Icon, href }, i) => {
               const cls = `flex items-center py-2.5 rounded-xl text-gray-300 hover:text-purple-300 hover:bg-purple-500/10 cursor-pointer transition-all ${sidebarOpen ? "gap-3 px-3" : "justify-center px-0"}`;
+              if (label === "محفظتي") return (
+                <button key={i} onClick={() => user ? setWalletOpen(true) : (window.location.href="/login")} title={!sidebarOpen ? label : undefined} className={cls}>
+                  <Icon size={18} className="shrink-0" />
+                  {sidebarOpen && <span className="text-sm">{label}</span>}
+                </button>
+              );
               if (href) return (
                 <a key={i} href={href} title={!sidebarOpen ? label : undefined} className={cls}>
                   <Icon size={18} className="shrink-0" />
@@ -278,10 +295,7 @@ export default function Home() {
           )}
 
           <div className="flex items-center gap-3 text-gray-400 shrink-0">
-            <button className="relative hover:text-purple-400 transition-colors">
-              <Bell size={20} />
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full" />
-            </button>
+            {user && <NotificationBell />}
             <a href="/cart" className="relative hover:text-purple-400 transition-colors">
               <ShoppingCart size={20} />
               {count > 0 && (
@@ -292,11 +306,49 @@ export default function Home() {
             </a>
           </div>
 
-          <div className="flex-1">
-            <input
-              placeholder="ابحث عن منتج..."
-              className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-purple-500/20 text-sm focus:outline-none focus:border-purple-500/50 transition-colors placeholder:text-gray-500"
-            />
+          <div className="flex-1 relative">
+            <div className="relative">
+              <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+              <input
+                value={desktopSearch}
+                onChange={(e) => setDesktopSearch(e.target.value)}
+                placeholder="ابحث عن منتج أو تصنيف..."
+                className="w-full px-4 py-2.5 pr-9 rounded-xl bg-black/40 border border-purple-500/20 text-sm focus:outline-none focus:border-purple-500/50 transition-colors placeholder:text-gray-500"
+              />
+              {desktopSearch && (
+                <button onClick={() => setDesktopSearch("")} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            {desktopSearch && products.length > 0 && (
+              <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-[#0f1320] border border-purple-500/30 rounded-xl shadow-2xl overflow-hidden max-h-64 overflow-y-auto">
+                {products.slice(0, 8).map(p => (
+                  <a key={p.id} href={`/products/${p.id}`}
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-purple-500/10 transition-colors border-b border-white/5 last:border-b-0">
+                    {p.image_url
+                      ? <img src={p.image_url} alt="" className="w-9 h-9 rounded-lg object-cover" />
+                      : <div className="w-9 h-9 rounded-lg bg-purple-500/10 flex items-center justify-center"><Package size={14} className="text-purple-400/40" /></div>
+                    }
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{p.name}</p>
+                      <p className="text-xs text-purple-400">{p.price} د</p>
+                    </div>
+                  </a>
+                ))}
+                {products.length > 8 && (
+                  <a href={`/products?search=${encodeURIComponent(desktopSearch)}`}
+                    className="block px-4 py-2.5 text-xs text-purple-400 hover:text-purple-300 text-center hover:bg-purple-500/10 transition-colors">
+                    عرض كل النتائج ({products.length}) →
+                  </a>
+                )}
+              </div>
+            )}
+            {desktopSearch && products.length === 0 && (
+              <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-[#0f1320] border border-purple-500/30 rounded-xl shadow-2xl px-4 py-3 text-gray-500 text-sm text-center">
+                لا توجد نتائج لـ "{desktopSearch}"
+              </div>
+            )}
           </div>
         </header>
 
@@ -304,15 +356,27 @@ export default function Home() {
           <HeroSlider />
           <CategoriesGrid cols="grid-cols-2 md:grid-cols-3 lg:grid-cols-6" />
 
-          {products.length > 0 && (
+          {(products.length > 0 || desktopSearch) && (
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-white">أحدث المنتجات</h2>
-                <a href="/products" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors">
-                  عرض الكل <ArrowLeft size={14} />
-                </a>
+                <h2 className="text-xl font-bold text-white">
+                  {desktopSearch ? `نتائج البحث عن "${desktopSearch}"` : "أحدث المنتجات"}
+                  {desktopSearch && <span className="text-base font-normal text-gray-500 mr-2">({products.length} نتيجة)</span>}
+                </h2>
+                {!desktopSearch && (
+                  <a href="/products" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors">
+                    عرض الكل <ArrowLeft size={14} />
+                  </a>
+                )}
               </div>
-              <ProductsGrid cols="grid-cols-2 md:grid-cols-3 lg:grid-cols-4" />
+              {products.length === 0 && desktopSearch ? (
+                <div className="text-center py-12 text-gray-500">
+                  <Package size={48} className="mx-auto mb-3 opacity-20" />
+                  <p>لا توجد نتائج لـ "{desktopSearch}"</p>
+                </div>
+              ) : (
+                <ProductsGrid cols="grid-cols-2 md:grid-cols-3 lg:grid-cols-4" />
+              )}
             </div>
           )}
 
@@ -425,6 +489,8 @@ export default function Home() {
           <button onClick={() => setMobileSearch(!mobileSearch)} className="text-gray-400 hover:text-purple-400 transition-colors">
             {mobileSearch ? <X size={20} /> : <Search size={20} />}
           </button>
+          {/* Notifications */}
+          {user && <NotificationBell />}
           {/* Cart */}
           <a href="/cart" className="relative text-gray-400 hover:text-purple-400 transition-colors">
             <ShoppingCart size={20} />
@@ -449,14 +515,41 @@ export default function Home() {
 
       {/* Search bar (expandable) */}
       {mobileSearch && (
-        <div className="px-4 py-3 border-b border-purple-500/10 bg-[#0b0f1a]">
-          <input
-            autoFocus
-            placeholder="ابحث عن منتج..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl bg-black/50 border border-purple-500/30 text-sm text-white focus:outline-none focus:border-purple-500/60 transition-colors placeholder:text-gray-500"
-          />
+        <div className="px-4 py-3 border-b border-purple-500/10 bg-[#0b0f1a] relative z-30">
+          <div className="relative">
+            <input
+              autoFocus
+              placeholder="ابحث عن منتج أو تصنيف..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl bg-black/50 border border-purple-500/30 text-sm text-white focus:outline-none focus:border-purple-500/60 transition-colors placeholder:text-gray-500"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {searchQuery && products.length > 0 && (
+            <div className="mt-2 bg-[#0f1320] border border-purple-500/30 rounded-xl overflow-hidden">
+              {products.slice(0, 5).map(p => (
+                <a key={p.id} href={`/products/${p.id}`}
+                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-purple-500/10 border-b border-white/5 last:border-b-0">
+                  {p.image_url
+                    ? <img src={p.image_url} alt="" className="w-9 h-9 rounded-lg object-cover" />
+                    : <div className="w-9 h-9 rounded-lg bg-purple-500/10 flex items-center justify-center"><Package size={14} className="text-purple-400/40" /></div>
+                  }
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white truncate">{p.name}</p>
+                    <p className="text-xs text-purple-400">{p.price} د</p>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+          {searchQuery && products.length === 0 && (
+            <p className="mt-2 text-center text-gray-600 text-sm py-2">لا توجد نتائج</p>
+          )}
         </div>
       )}
 
@@ -635,18 +728,25 @@ export default function Home() {
 
           {[...navTop, ...navBottom].map(({ label, icon: Icon, href }, i) => {
             const cls = "flex items-center gap-4 px-4 py-3.5 rounded-2xl text-gray-300 hover:text-purple-300 hover:bg-purple-500/10 cursor-pointer transition-all";
+            const closeMenu = () => document.getElementById("mobile-menu-overlay")?.classList.add("hidden");
+            if (label === "محفظتي") return (
+              <button key={i} onClick={() => { closeMenu(); user ? setWalletOpen(true) : (window.location.href="/login"); }} className={cls + " w-full text-right"}>
+                <Icon size={20} />
+                <span className="text-sm font-medium">{label}</span>
+              </button>
+            );
             if (href) {
               const isExternal = href.startsWith("http");
               return (
                 <a key={i} href={href} target={isExternal ? "_blank" : undefined} rel={isExternal ? "noopener noreferrer" : undefined} className={cls}
-                  onClick={() => document.getElementById("mobile-menu-overlay")?.classList.add("hidden")}>
+                  onClick={closeMenu}>
                   <Icon size={20} />
                   <span className="text-sm font-medium">{label}</span>
                 </a>
               );
             }
             return (
-              <div key={i} className={cls} onClick={() => document.getElementById("mobile-menu-overlay")?.classList.add("hidden")}>
+              <div key={i} className={cls} onClick={closeMenu}>
                 <Icon size={20} />
                 <span className="text-sm font-medium">{label}</span>
               </div>
@@ -672,6 +772,7 @@ export default function Home() {
     <>
       <DesktopLayout />
       <MobileLayout />
+      {walletOpen && <WalletModal onClose={() => setWalletOpen(false)} />}
     </>
   );
 }

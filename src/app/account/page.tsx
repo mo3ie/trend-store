@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { User, Phone, MapPin, Mail, Package, Heart, LogOut, Edit3, Check, X, ShoppingBag, ArrowLeft, ShoppingCart, Settings, Camera } from "lucide-react";
+import { User, Phone, MapPin, Mail, Package, Heart, LogOut, Edit3, Check, X, ShoppingBag, ArrowLeft, ShoppingCart, Settings, Camera, Wallet, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
+import MapPicker from "@/components/MapPicker";
+import WalletModal from "@/components/WalletModal";
 
 type Profile = {
   full_name: string;
@@ -59,7 +61,7 @@ export default function AccountPage() {
   const [saving,     setSaving]     = useState(false);
   const [storeOrders, setStoreOrders] = useState<Order[]>([]);
   const [sheinOrders, setSheinOrders] = useState<Order[]>([]);
-  const [activeTab,  setActiveTab]  = useState<"profile" | "store" | "shein" | "favorites" | "addresses" | "settings">("profile");
+  const [activeTab,  setActiveTab]  = useState<"profile" | "store" | "shein" | "favorites" | "addresses" | "settings" | "wallet">("profile");
   const [avatarUrl,  setAvatarUrl]  = useState<string>("");
   const [uploading,  setUploading]  = useState(false);
 
@@ -71,6 +73,18 @@ export default function AccountPage() {
   const [addrForm,      setAddrForm]      = useState({ label: "المنزل", address_text: "", lat: "", lng: "", is_default: false });
   const [addrSaving,    setAddrSaving]    = useState(false);
   const [geoLoading,    setGeoLoading]    = useState(false);
+
+  // Favorites
+  type FavoriteItem = { product_id: string; products: { id: string; name: string; price: number; image_url?: string; category: string } };
+  const [favorites,    setFavorites]    = useState<FavoriteItem[]>([]);
+  const [favLoading,   setFavLoading]   = useState(false);
+
+  // Wallet
+  const [walletOpen,   setWalletOpen]   = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+
+  // Map in address modal
+  const [showMap,      setShowMap]      = useState(false);
 
   // Settings
   const [pwData,   setPwData]   = useState({ next: "", confirm: "" });
@@ -110,7 +124,32 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (activeTab === "addresses" && user) fetchAddresses();
+    if (activeTab === "favorites" && user) fetchFavorites();
+    if (activeTab === "wallet" && user) fetchWalletBalance();
   }, [activeTab, user]);
+
+  async function fetchFavorites() {
+    setFavLoading(true);
+    const res = await fetch("/api/favorites");
+    const data = await res.json();
+    setFavorites(Array.isArray(data) ? data : []);
+    setFavLoading(false);
+  }
+
+  async function removeFavorite(product_id: string) {
+    await fetch("/api/favorites", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product_id }),
+    });
+    setFavorites(prev => prev.filter(f => f.product_id !== product_id));
+  }
+
+  async function fetchWalletBalance() {
+    const res = await fetch("/api/wallet");
+    const data = await res.json();
+    setWalletBalance(data.balance || 0);
+  }
 
   async function fetchAddresses() {
     setAddrLoading(true);
@@ -213,11 +252,13 @@ export default function AccountPage() {
     { key: "store",     label: "طلبات المتجر", icon: ShoppingBag },
     { key: "shein",     label: "طلبات شي إن",  icon: Package     },
     { key: "favorites", label: "المفضلة",      icon: Heart       },
+    { key: "wallet",    label: "محفظتي",       icon: Wallet      },
     { key: "addresses", label: "مواقعي",       icon: MapPin      },
     { key: "settings",  label: "الإعدادات",    icon: Settings    },
   ] as const;
 
   return (
+    <>
     <div className="min-h-screen bg-[#0b0f1a] text-white">
       <div className="fixed top-[-150px] right-[-150px] w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[140px] pointer-events-none" />
 
@@ -377,9 +418,77 @@ export default function AccountPage() {
 
         {/* ── FAVORITES ── */}
         {activeTab === "favorites" && (
-          <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-10 text-center text-gray-500">
-            <Heart size={40} className="mx-auto mb-3 text-purple-500/40" />
-            المفضلة فارغة — أضف منتجات تعجبك!
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-gray-500 text-sm">{favorites.length} منتج محفوظ</p>
+              <a href="/products" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors">
+                تصفح المنتجات <ArrowLeft size={14} />
+              </a>
+            </div>
+            {favLoading ? (
+              <div className="flex justify-center py-10">
+                <span className="w-7 h-7 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+              </div>
+            ) : favorites.length === 0 ? (
+              <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-10 text-center text-gray-500">
+                <Heart size={40} className="mx-auto mb-3 text-purple-500/40" />
+                <p>المفضلة فارغة</p>
+                <p className="text-xs mt-1 text-gray-600">أضف منتجات تعجبك من صفحة المنتج</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {favorites.map(fav => {
+                  const p = fav.products;
+                  if (!p) return null;
+                  return (
+                    <div key={fav.product_id} className="bg-[#0f1320] border border-purple-500/20 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all relative group">
+                      <button
+                        onClick={() => removeFavorite(fav.product_id)}
+                        className="absolute top-2 left-2 z-10 w-7 h-7 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/30"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                      <a href={`/products/${p.id}`}>
+                        <div className="aspect-square bg-black/30 overflow-hidden">
+                          {p.image_url
+                            ? <img src={p.image_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                            : <div className="w-full h-full flex items-center justify-center text-purple-400/20"><Package size={28} /></div>
+                          }
+                        </div>
+                        <div className="p-2.5 space-y-1">
+                          <p className="text-xs font-semibold text-white leading-tight line-clamp-2">{p.name}</p>
+                          <div className="flex items-center justify-between">
+                            <span className="font-black text-sm bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">{p.price} د</span>
+                            <span className="text-[10px] text-purple-400/60">{p.category}</span>
+                          </div>
+                        </div>
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── WALLET ── */}
+        {activeTab === "wallet" && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-br from-purple-900/60 to-blue-900/40 border border-purple-500/30 rounded-2xl p-6">
+              <p className="text-gray-400 text-xs mb-1">الرصيد الحالي</p>
+              <p className="text-3xl font-black bg-gradient-to-r from-purple-300 to-blue-300 bg-clip-text text-transparent">
+                {walletBalance !== null ? walletBalance.toFixed(2) : "—"} <span className="text-lg">د</span>
+              </p>
+              <p className="text-gray-500 text-xs mt-1">دينار ليبي</p>
+            </div>
+            <button
+              onClick={() => setWalletOpen(true)}
+              className="w-full py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+            >
+              <Wallet size={18} />
+              شحن الرصيد
+            </button>
+            <p className="text-gray-600 text-xs text-center">يمكنك شحن رصيد المحفظة واستخدامه لتسديد طلباتك</p>
           </div>
         )}
 
@@ -480,43 +589,39 @@ export default function AccountPage() {
                       />
                     </div>
 
-                    {/* GPS */}
+                    {/* GPS / Map */}
                     <div>
-                      <label className="text-gray-400 text-xs mb-2 block">الموقع الجغرافي (اختياري)</label>
-                      <button type="button" onClick={handleGetGeo} disabled={geoLoading}
-                        className="w-full py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500/20 text-sm font-medium transition-all flex items-center justify-center gap-2 mb-3">
-                        {geoLoading
-                          ? <><span className="w-4 h-4 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" /> جاري تحديد الموقع...</>
-                          : <><MapPin size={15} /> استخدام موقعي الحالي</>}
-                      </button>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-gray-400 text-xs">الموقع الجغرافي (اختياري)</label>
+                        <button type="button" onClick={() => setShowMap(!showMap)}
+                          className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors">
+                          <MapPin size={12} />
+                          {showMap ? "إخفاء الخريطة" : "اختيار من الخريطة"}
+                        </button>
+                      </div>
 
-                      {addrForm.lat && addrForm.lng && (
-                        <div className="space-y-2 mb-2">
-                          <div className="flex gap-2 items-center text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded-xl px-3 py-2">
-                            ✅ تم تحديد الموقع — خط العرض: {addrForm.lat}، خط الطول: {addrForm.lng}
-                          </div>
-                          <iframe
-                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(addrForm.lng)-0.01},${parseFloat(addrForm.lat)-0.01},${parseFloat(addrForm.lng)+0.01},${parseFloat(addrForm.lat)+0.01}&layer=mapnik&marker=${addrForm.lat},${addrForm.lng}`}
-                            className="w-full rounded-xl border border-purple-500/20"
-                            height="160"
-                            style={{ border: "none" }}
-                            title="map"
+                      {showMap && (
+                        <div className="mb-3">
+                          <MapPicker
+                            lat={addrForm.lat ? parseFloat(addrForm.lat) : undefined}
+                            lng={addrForm.lng ? parseFloat(addrForm.lng) : undefined}
+                            onSelect={({ lat, lng, address }) => {
+                              setAddrForm(f => ({
+                                ...f,
+                                lat: lat.toFixed(6),
+                                lng: lng.toFixed(6),
+                                address_text: address && !f.address_text ? address.split(",")[0] : f.address_text,
+                              }));
+                            }}
                           />
                         </div>
                       )}
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-gray-600 text-xs mb-1 block">خط العرض (Lat)</label>
-                          <input type="number" step="any" value={addrForm.lat} onChange={(e) => setAddrForm(f => ({ ...f, lat: e.target.value }))}
-                            placeholder="32.8872" className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500/50" />
+                      {addrForm.lat && addrForm.lng && (
+                        <div className="flex gap-2 items-center text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded-xl px-3 py-2 mb-2">
+                          ✅ موقع محدد: {parseFloat(addrForm.lat).toFixed(4)}، {parseFloat(addrForm.lng).toFixed(4)}
                         </div>
-                        <div>
-                          <label className="text-gray-600 text-xs mb-1 block">خط الطول (Lng)</label>
-                          <input type="number" step="any" value={addrForm.lng} onChange={(e) => setAddrForm(f => ({ ...f, lng: e.target.value }))}
-                            placeholder="13.1913" className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500/50" />
-                        </div>
-                      </div>
+                      )}
                     </div>
 
                     {/* Default */}
@@ -622,5 +727,7 @@ export default function AccountPage() {
 
       </div>
     </div>
+    {walletOpen && <WalletModal onClose={() => setWalletOpen(false)} />}
+    </>
   );
 }

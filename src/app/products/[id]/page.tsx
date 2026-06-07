@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   ArrowRight, ShoppingCart, Package, Bell, User,
-  ChevronLeft, ChevronRight, Tag, CheckCircle, XCircle,
+  ChevronLeft, ChevronRight, Tag, CheckCircle, XCircle, Heart,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
+import NotificationBell from "@/components/NotificationBell";
 
 type Variant = {
   name: string;
@@ -38,6 +39,8 @@ export default function ProductView() {
   const [activeImage,  setActiveImage]  = useState(0);
   const [added,        setAdded]        = useState(false);
   const [selectedVars, setSelectedVars] = useState<Record<string, string>>({});
+  const [isFav,        setIsFav]        = useState(false);
+  const [favLoading,   setFavLoading]   = useState(false);
 
   useEffect(() => {
     fetch(`/api/products/${id}`)
@@ -45,6 +48,36 @@ export default function ProductView() {
       .then((data) => { setProduct(data?.error ? null : data); setLoading(false); })
       .catch(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!user || !id) return;
+    fetch("/api/favorites")
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) setIsFav(data.some((f: any) => f.product_id === id));
+      });
+  }, [user, id]);
+
+  async function toggleFavorite() {
+    if (!user) { router.push("/login"); return; }
+    setFavLoading(true);
+    if (isFav) {
+      await fetch("/api/favorites", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: id }),
+      });
+      setIsFav(false);
+    } else {
+      await fetch("/api/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: id }),
+      });
+      setIsFav(true);
+    }
+    setFavLoading(false);
+  }
 
   function handleAddToCart() {
     if (!product) return;
@@ -91,10 +124,15 @@ export default function ProductView() {
           <input placeholder="ابحث عن منتج..." className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-purple-500/20 text-sm focus:outline-none focus:border-purple-500/50 transition-colors placeholder:text-gray-500" />
         </div>
         <div className="flex items-center gap-3 text-gray-400 shrink-0">
-          <button className="relative hover:text-purple-400 transition-colors">
-            <Bell size={20} />
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full" />
+          <button
+            onClick={toggleFavorite}
+            disabled={favLoading}
+            className={`relative hover:text-purple-400 transition-colors ${isFav ? "text-red-400" : ""}`}
+            title={isFav ? "إزالة من المفضلة" : "إضافة للمفضلة"}
+          >
+            <Heart size={20} className={isFav ? "fill-current" : ""} />
           </button>
+          {user && <NotificationBell />}
           <a href="/cart" className="relative hover:text-purple-400 transition-colors">
             <ShoppingCart size={20} />
             {count > 0 && (

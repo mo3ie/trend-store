@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight, ShoppingCart, Bell, User, Package,
+  ArrowRight, ShoppingCart, User, Package,
   Trash2, Plus, Minus, ShoppingBag, MapPin, CreditCard, X,
 } from "lucide-react";
+import dynamic from "next/dynamic";
+const MapPicker = dynamic(() => import("@/components/MapPicker"), { ssr: false });
+import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
 
@@ -50,6 +53,9 @@ export default function CartPage() {
   const [addresses,     setAddresses]     = useState<UserAddress[]>([]);
   const [selectedAddr,  setSelectedAddr]  = useState<string | null>(null);
   const [newAddrText,   setNewAddrText]   = useState("");
+  const [newAddrLat,    setNewAddrLat]    = useState<number | undefined>(undefined);
+  const [newAddrLng,    setNewAddrLng]    = useState<number | undefined>(undefined);
+  const [showCartMap,   setShowCartMap]   = useState(false);
   const [method,        setMethod]        = useState<string | null>(null);
   const [cardNumber,    setCardNumber]    = useState("");
   const [edfaliStep,    setEdfaliStep]    = useState<EdfaliStep>(null);
@@ -239,10 +245,7 @@ export default function CartPage() {
         </a>
         <div className="flex-1" />
         <div className="flex items-center gap-3 text-gray-400 shrink-0">
-          <button className="relative hover:text-purple-400 transition-colors">
-            <Bell size={20} />
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full" />
-          </button>
+          {user && <NotificationBell />}
           <a href="/cart" className="relative text-purple-400">
             <ShoppingCart size={20} />
             {count > 0 && (
@@ -425,13 +428,41 @@ export default function CartPage() {
 
                 {/* New address input */}
                 {(selectedAddr === "__new" || addresses.length === 0) && (
-                  <textarea
-                    value={newAddrText}
-                    onChange={e => setNewAddrText(e.target.value)}
-                    placeholder="أدخل عنوان التسليم التفصيلي..."
-                    rows={3}
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-sm focus:outline-none focus:border-purple-400 transition-all resize-none placeholder:text-gray-400"
-                  />
+                  <div className="space-y-3">
+                    <textarea
+                      value={newAddrText}
+                      onChange={e => setNewAddrText(e.target.value)}
+                      placeholder="أدخل عنوان التسليم التفصيلي..."
+                      rows={3}
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-sm focus:outline-none focus:border-purple-400 transition-all resize-none placeholder:text-gray-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCartMap(!showCartMap)}
+                      className="w-full py-2.5 rounded-xl border border-dashed border-purple-300 text-purple-600 text-sm font-medium flex items-center justify-center gap-2 hover:bg-purple-50 transition-colors"
+                    >
+                      <MapPin size={15} />
+                      {showCartMap ? "إخفاء الخريطة" : "تحديد الموقع على الخريطة (اختياري)"}
+                    </button>
+                    {showCartMap && (
+                      <div>
+                        <MapPicker
+                          lat={newAddrLat}
+                          lng={newAddrLng}
+                          onSelect={({ lat, lng, address }) => {
+                            setNewAddrLat(lat);
+                            setNewAddrLng(lng);
+                            if (address && !newAddrText) setNewAddrText(address.split(",")[0]);
+                          }}
+                        />
+                        {newAddrLat && (
+                          <p className="text-xs text-green-600 bg-green-50 rounded-xl px-3 py-2 mt-2">
+                            ✅ تم تحديد الموقع: {newAddrLat.toFixed(4)}، {newAddrLng?.toFixed(4)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {payError && <p className="text-red-500 text-sm mt-3">⚠️ {payError}</p>}

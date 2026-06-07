@@ -9,12 +9,13 @@ const supabaseAdmin = createClient(
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category");
-  const search = searchParams.get("search");
+  const search   = searchParams.get("search");
+  const limit    = parseInt(searchParams.get("limit") || "50");
 
-  let query = supabaseAdmin.from("products").select("*").order("created_at", { ascending: false });
+  let query = supabaseAdmin.from("products").select("*").order("created_at", { ascending: false }).limit(limit);
 
   if (category) query = query.eq("category", category);
-  if (search) query = query.ilike("name", `%${search}%`);
+  if (search)   query = query.or(`name.ilike.%${search}%,category.ilike.%${search}%`);
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
