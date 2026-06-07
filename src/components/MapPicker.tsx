@@ -24,7 +24,7 @@ export default function MapPicker({ lat, lng, onSelect }: Props) {
 
     import("leaflet").then((L) => {
       const Lf = L.default || L as any;
-      delete Lf.Icon.Default.prototype._getIconUrl;
+      delete (Lf.Icon.Default.prototype as any)._getIconUrl;
       Lf.Icon.Default.mergeOptions({
         iconUrl:       "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
         iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
