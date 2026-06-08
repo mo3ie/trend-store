@@ -58,7 +58,7 @@ export default function AdminAdsPage() {
   async function setStatus(id: string, status: string) {
     if (!token) return;
     setUpdating(id);
-    await fetch(`/api/ads/campaigns/${id}`, {
+    await fetch(`/api/promo/campaigns/${id}`, {
       method:  "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ status }),
@@ -70,7 +70,7 @@ export default function AdminAdsPage() {
   async function triggerBoost(campaignId: string) {
     if (!token || !confirm("تشغيل إعلان Meta يدويًا؟")) return;
     setUpdating(campaignId);
-    const res  = await fetch("/api/ads/boost", {
+    const res  = await fetch("/api/promo/boost", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ campaignId }),

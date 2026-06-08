@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
 
   const base = process.env.NEXT_PUBLIC_BASE_URL || "https://trendstore-ly.com";
-  const redirectUri = `${base}/api/ads/pages/callback`;
+  const redirectUri = `${base}/api/promo/pages/callback`;
 
   // state = base64(userId) for verification
   const state = Buffer.from(user.id).toString("base64");

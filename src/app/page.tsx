@@ -47,7 +47,7 @@ const categories = [
   { title: "بلايستيشن",      sub: "PLAYSTATION",     icon: Gamepad2,    href: "/products?category=بلايستيشن"  },
   { title: "خدمات إلكترونية", sub: "E-SERVICES",      icon: Globe,       href: "/products"                     },
   { title: "طلب من المواقع", sub: "ONLINE SHOPPING", icon: ShoppingCart, href: "https://order.trendstore-ly.com" },
-  { title: "إعلانات",         sub: "MARKETING",       icon: Megaphone,   href: "/products"                     },
+  { title: "إعلانات",         sub: "MARKETING",       icon: Megaphone,   href: "/ads"                          },
 ];
 
 const services = [

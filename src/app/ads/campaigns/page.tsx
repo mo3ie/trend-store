@@ -52,7 +52,7 @@ function CampaignsInner() {
 
   async function loadCampaigns() {
     setLoading(true);
-    const res  = await fetch("/api/ads/campaigns");
+    const res  = await fetch("/api/promo/campaigns");
     const data = await res.json();
     setCampaigns(data.campaigns || []);
     setLoading(false);

@@ -45,7 +45,7 @@ function CheckoutInner() {
 
   useEffect(() => {
     if (!campaignId) { router.push("/ads/create"); return; }
-    fetch(`/api/ads/campaigns/${campaignId}`)
+    fetch(`/api/promo/campaigns/${campaignId}`)
       .then((r) => r.json())
       .then((d) => { setCampaign(d.campaign); setLoading(false); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -58,7 +58,7 @@ function CheckoutInner() {
     if (needsPhone && !phone) { setError("رقم الهاتف مطلوب لهذه الطريقة"); return; }
 
     setPaying(true);
-    const res  = await fetch("/api/ads/checkout", {
+    const res  = await fetch("/api/promo/checkout", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ campaignId: campaign.id, method, phone }),

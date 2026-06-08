@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const redirectUri = `${base}/api/ads/pages/callback`;
+    const redirectUri = `${base}/api/promo/pages/callback`;
     const userToken   = await exchangeCodeForToken(code, redirectUri);
     const pages       = await getUserPages(userToken);
 

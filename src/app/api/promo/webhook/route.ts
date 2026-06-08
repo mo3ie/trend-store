@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
 
   // Trigger Meta boost async
   const base = process.env.NEXT_PUBLIC_BASE_URL || "https://trendstore-ly.com";
-  fetch(`${base}/api/ads/boost`, {
+  fetch(`${base}/api/promo/boost`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ campaignId: payment.campaign_id }),

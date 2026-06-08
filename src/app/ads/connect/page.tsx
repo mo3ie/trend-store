@@ -37,7 +37,7 @@ function ConnectPageInner() {
 
   async function loadPages() {
     setLoading(true);
-    const res  = await fetch("/api/ads/pages");
+    const res  = await fetch("/api/promo/pages");
     const data = await res.json();
     setPages(data.pages || []);
     setLoading(false);
@@ -46,7 +46,7 @@ function ConnectPageInner() {
   async function connectMeta() {
     setConnecting(true);
     setError("");
-    const res  = await fetch("/api/ads/pages/connect");
+    const res  = await fetch("/api/promo/pages/connect");
     const data = await res.json();
     if (data.url) {
       window.location.href = data.url;
@@ -58,7 +58,7 @@ function ConnectPageInner() {
 
   async function deletePage(id: string) {
     if (!confirm("هل تريد إلغاء ربط هذه الصفحة؟")) return;
-    await fetch(`/api/ads/pages?id=${id}`, { method: "DELETE" });
+    await fetch(`/api/promo/pages?id=${id}`, { method: "DELETE" });
     setPages((p) => p.filter((x) => x.id !== id));
   }
 

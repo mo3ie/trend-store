@@ -75,7 +75,7 @@ export async function POST(req: Request) {
       .eq("id", campaignId);
 
     // Trigger boost async (fire-and-forget from client side)
-    const boostUrl = `${base}/api/ads/boost`;
+    const boostUrl = `${base}/api/promo/boost`;
     fetch(boostUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
       userId:      user.id,
       method,
       phone,
-      callbackUrl: `${base}/api/ads/webhook`,
+      callbackUrl: `${base}/api/promo/webhook`,
       returnUrl:   `${base}/ads/campaigns?paid=1`,
     });
 

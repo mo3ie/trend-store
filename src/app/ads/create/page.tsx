@@ -42,7 +42,7 @@ function CreateCampaignInner() {
     : budget ? calculateFees(Number(budget)) : null;
 
   useEffect(() => {
-    fetch("/api/ads/pages")
+    fetch("/api/promo/pages")
       .then((r) => r.json())
       .then((d) => {
         const p = d.pages || [];
@@ -65,7 +65,7 @@ function CreateCampaignInner() {
 
     setSaving(true);
     const page = pages.find((p) => p.page_id === selectedPage);
-    const res  = await fetch("/api/ads/campaigns", {
+    const res  = await fetch("/api/promo/campaigns", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
