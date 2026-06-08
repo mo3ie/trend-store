@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { doPTrans } from "@/lib/adfali";
+import { doPTrans, normalizePhone } from "@/lib/adfali";
 
 function getUser(req: NextRequest) {
   return createServerClient(
@@ -22,10 +22,14 @@ export async function POST(req: NextRequest) {
   if (!customerPhone) return NextResponse.json({ error: "رقم الهاتف مطلوب" }, { status: 400 });
   if (!amount || Number(amount) <= 0) return NextResponse.json({ error: "المبلغ غير صحيح" }, { status: 400 });
 
+  const normalized = normalizePhone(customerPhone);
+  console.log(`[edfali/initiate] phone: ${customerPhone} → normalized: ${normalized}, amount: ${amount}`);
+
   try {
     const sessionId = await doPTrans(customerPhone, Number(amount));
     return NextResponse.json({ sessionId });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 400 });
+    console.error(`[edfali/initiate] error for phone ${normalized}:`, err.message);
+    return NextResponse.json({ error: err.message, phone: normalized }, { status: 400 });
   }
 }

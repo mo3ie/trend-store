@@ -9,7 +9,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   LIMIT: "المبلغ خارج الحدود المسموح بها — تواصل مع البنك لتعديل الحدود",
   PW1:   "خطأ في إعداد الخدمة",
   PW:    "خطأ في إعداد الخدمة",
-  ACC:   "رقم الهاتف غير مسجل في ادفع لي",
+  ACC:   "تعذّر معالجة الطلب — تحقق من إعدادات حساب ادفع لي التاجر",
   BAL:   "تعذّر إتمام العملية",
 };
 
@@ -29,17 +29,34 @@ function soapBody(method: string, params: Record<string, string | number>): stri
 }
 
 async function soapCall(method: string, params: Record<string, string | number>): Promise<string> {
-  const res = await fetch(ADFALI_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "text/xml; charset=utf-8",
-      "SOAPAction":   `http://tempuri.org/${method}`,
-    },
-    body: soapBody(method, params),
-    cache: "no-store",
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  let res: Response;
+  try {
+    res = await fetch(ADFALI_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        "SOAPAction":   `http://tempuri.org/${method}`,
+      },
+      body: soapBody(method, params),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    if (err.name === "AbortError") throw new Error("انتهت مهلة الاتصال بخدمة ادفع لي");
+    throw new Error(`تعذّر الاتصال بخدمة ادفع لي: ${err.message}`);
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!res.ok) throw new Error(`خدمة ادفع لي أعادت خطأ: ${res.status}`);
+
   const xml = await res.text();
-  return extractResult(xml, method);
+  const value = extractResult(xml, method);
+  if (!value) console.error(`[adfali] empty result for ${method}, xml:`, xml.slice(0, 500));
+  return value;
 }
 
 // Normalize phone for Edfali: strip leading 0 (no +218 prefix needed)
@@ -53,15 +70,19 @@ export function normalizePhone(phone: string): string {
 
 // Step 1 — DoPTrans: initiates charge, sends OTP SMS to customer, returns sessionID
 export async function doPTrans(customerPhone: string, amount: number): Promise<string> {
+  if (!process.env.EDFALI_MOBILE || !process.env.EDFALI_PIN) {
+    throw new Error("إعدادات ادفع لي غير مكتملة — تواصل مع الدعم");
+  }
+
   const value = await soapCall("DoPTrans", {
-    Mobile:  process.env.EDFALI_MOBILE!,
-    Pin:     process.env.EDFALI_PIN!,
+    Mobile:  process.env.EDFALI_MOBILE,
+    Pin:     process.env.EDFALI_PIN,
     Cmobile: normalizePhone(customerPhone),
     Amount:  amount,
     PW,
   });
 
-  if (!value) throw new Error("لم يتم الاتصال بخدمة ادفع لي");
+  if (!value) throw new Error("لم يستجب سيرفر ادفع لي — حاول مرة أخرى أو تواصل مع الدعم");
   const upper = value.toUpperCase();
   if (ERROR_MESSAGES[upper]) throw new Error(ERROR_MESSAGES[upper]);
 

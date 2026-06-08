@@ -23,7 +23,12 @@ type UserAddress = {
 
 declare global {
   interface Window {
-    Lightbox?: { showPaymentForm: (p: object) => void };
+    Lightbox?: {
+      Checkout: {
+        configure: object;
+        showLightbox: () => void;
+      };
+    };
   }
 }
 
@@ -164,21 +169,40 @@ export default function CartPage() {
       // load Moamalat lightbox
       const script = document.createElement("script");
       script.src = p.scriptUrl;
+      script.onerror = () => {
+        setPayError("تعذّر تحميل نافذة الدفع — تأكد من اتصالك بالإنترنت وحاول مرة أخرى");
+        setOrdering(false);
+        setStep("payment");
+      };
       script.onload = () => {
-        if (window.Lightbox) {
-          window.Lightbox.showPaymentForm({
-            MID: p.MID, TID: p.TID,
-            AmountTrxn: p.AmountTrxn,
+        if (window.Lightbox?.Checkout) {
+          window.Lightbox.Checkout.configure = {
+            MID:               p.MID,
+            TID:               p.TID,
+            AmountTrxn:        p.AmountTrxn,
             MerchantReference: p.MerchantReference,
-            TrxDateTime: p.TrxDateTime,
-            SecureHash: p.SecureHash,
+            TrxDateTime:       p.TrxDateTime,
+            SecureHash:        p.SecureHash,
             completeCallback: () => {
               clearCart();
               router.push(`/success?orderId=${oid}&via=moamalat`);
             },
-            errorCallback: (err: any) => { setPayError("فشل الدفع: " + JSON.stringify(err)); setOrdering(false); },
-            cancelCallback: () => { setPayError("تم إلغاء الدفع"); setOrdering(false); },
-          });
+            errorCallback: (err: any) => {
+              setPayError("فشل الدفع: " + JSON.stringify(err));
+              setOrdering(false);
+              setStep("payment");
+            },
+            cancelCallback: () => {
+              setPayError("تم إلغاء الدفع");
+              setOrdering(false);
+              setStep("payment");
+            },
+          };
+          window.Lightbox.Checkout.showLightbox();
+        } else {
+          setPayError("نافذة الدفع غير متاحة — يرجى تعطيل مانع الإعلانات وإعادة المحاولة");
+          setOrdering(false);
+          setStep("payment");
         }
       };
       document.head.appendChild(script);
