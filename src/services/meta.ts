@@ -35,7 +35,7 @@ async function graph<T = Record<string, unknown>>(
 
 export function buildOAuthUrl(redirectUri: string, state: string): string {
   const params = new URLSearchParams({
-    client_id:    process.env.NEXT_PUBLIC_META_APP_ID!,
+    client_id:    process.env.META_APP_ID || process.env.NEXT_PUBLIC_META_APP_ID || "",
     redirect_uri:  redirectUri,
     state,
     scope: "pages_manage_ads,pages_read_engagement,pages_show_list,ads_management",
