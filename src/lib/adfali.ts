@@ -54,10 +54,10 @@ export function normalizePhone(phone: string): string {
 // Step 1 — DoPTrans: initiates charge, sends OTP SMS to customer, returns sessionID
 export async function doPTrans(customerPhone: string, amount: number): Promise<string> {
   const value = await soapCall("DoPTrans", {
-    Mobile:        process.env.EDFALI_MOBILE!,
-    Pin:           process.env.EDFALI_PIN!,
-    Cmobile:       normalizePhone(customerPhone),
-    decimalAmount: amount,
+    Mobile:  process.env.EDFALI_MOBILE!,
+    Pin:     process.env.EDFALI_PIN!,
+    Cmobile: normalizePhone(customerPhone),
+    Amount:  amount,
     PW,
   });
 
