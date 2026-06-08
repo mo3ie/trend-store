@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   const { amount, method, phone } = await req.json();
 
   const amt = parseFloat(amount);
-  if (!amt || amt < 5) return NextResponse.json({ error: "الحد الأدنى للشحن 5 د.ل" }, { status: 400 });
+  if (!amt || amt < 10) return NextResponse.json({ error: "الحد الأدنى للشحن 10 د.ل" }, { status: 400 });
   if (!method)         return NextResponse.json({ error: "يرجى اختيار طريقة الدفع" }, { status: 400 });
   if (method === "edfali" && !phone) return NextResponse.json({ error: "رقم الهاتف مطلوب" }, { status: 400 });
 

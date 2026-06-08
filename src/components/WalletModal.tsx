@@ -73,7 +73,7 @@ export default function WalletModal({ onClose }: Props) {
     setRechMsg("");
     if (!method) { setRechMsg("يرجى اختيار طريقة الشحن"); return; }
     const amt = parseFloat(amount);
-    if (!amt || amt < 5) { setRechMsg("الحد الأدنى للشحن 5 د"); return; }
+    if (!amt || amt < 10) { setRechMsg("الحد الأدنى للشحن 10 د"); return; }
     if (method === "edfali" && !phone.trim()) { setRechMsg("يرجى إدخال رقم هاتف ادفع لي"); return; }
     if (method === "prepaid_card" && !reference.trim()) { setRechMsg("يرجى إدخال رقم الكرت"); return; }
 

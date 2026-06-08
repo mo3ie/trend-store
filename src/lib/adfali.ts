@@ -42,12 +42,13 @@ async function soapCall(method: string, params: Record<string, string | number>)
   return extractResult(xml, method);
 }
 
-// Normalize Libyan phone → +218XXXXXXXXX (13 chars)
+// Normalize phone for Edfali: strip leading 0 (no +218 prefix needed)
+// e.g. 0918621511 → 918621511
 export function normalizePhone(phone: string): string {
   let d = phone.replace(/\D/g, "");
   if (d.startsWith("218")) d = d.slice(3);
   if (d.startsWith("0"))   d = d.slice(1);
-  return `+218${d}`;
+  return d;
 }
 
 // Step 1 — DoPTrans: initiates charge, sends OTP SMS to customer, returns sessionID
