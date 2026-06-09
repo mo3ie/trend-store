@@ -1,3 +1,4 @@
+import { createHmac } from "crypto";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -62,6 +63,46 @@ export async function POST(req: Request) {
     }
   }
 
+  // ── Moamalat: direct Lightbox ──────────────────────────────────────────────
+  if (method === "moamalat") {
+    const MID = process.env.MOAMALAT_MERCHANT_ID!;
+    const TID = process.env.MOAMALAT_TERMINAL_ID!;
+    const KEY = process.env.MOAMALAT_SECURE_KEY!;
+
+    const amountUnit        = Math.round(amt * 1000).toString();
+    const dateTimeLocalTrxn = Math.floor(Date.now() / 1000).toString();
+
+    const hashString = [
+      `Amount=${amountUnit}`,
+      `DateTimeLocalTrxn=${dateTimeLocalTrxn}`,
+      `MerchantId=${MID}`,
+      `MerchantReference=${tx.id}`,
+      `TerminalId=${TID}`,
+    ].join("&");
+
+    const secureHash = createHmac("sha256", Buffer.from(KEY, "hex"))
+      .update(hashString)
+      .digest("hex")
+      .toUpperCase();
+
+    const isProduction = process.env.MOAMALAT_MODE === "Production";
+    const scriptUrl    = isProduction
+      ? "https://npg.moamalat.net:6006/js/lightbox.js"
+      : "https://tnpg.moamalat.net:6006/js/lightbox.js";
+
+    return NextResponse.json({
+      lightbox:          true,
+      MID,
+      TID,
+      AmountTrxn:        amountUnit,
+      MerchantReference: tx.id,
+      TrxDateTime:       dateTimeLocalTrxn,
+      SecureHash:        secureHash,
+      scriptUrl,
+      txId:              tx.id,
+    });
+  }
+
   // ── DPay methods ───────────────────────────────────────────────────────────
   const BASE = process.env.NEXT_PUBLIC_BASE_URL || "https://trendstore-ly.com";
 
@@ -73,11 +114,6 @@ export async function POST(req: Request) {
     callback_url: `${BASE}/api/wallet/webhook`,
     return_url:   `${BASE}/account?tab=wallet&topup=success`,
   };
-
-  if (method === "moamalat") {
-    payload.customer_name  = user.user_metadata?.full_name || "customer";
-    payload.customer_phone = phone || "0910000000";
-  }
 
   const res = await fetch(DPAY_URL, {
     method:  "POST",

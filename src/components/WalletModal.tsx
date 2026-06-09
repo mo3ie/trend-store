@@ -14,11 +14,12 @@ type Transaction = {
 };
 
 // ادفع لي: direct Adfali (2-step OTP)
+// معاملات: direct Moamalat Lightbox
 // باقي الطرق: DPay redirect
 const PAYMENT_METHODS = [
   { id: "edfali",     label: "ادفع لي",   icon: "🏧", desc: "محفظة ادفع لي",         dpay: false },
   { id: "mobicash",   label: "موبي كاش",   icon: "📱", desc: "محفظة موبي كاش",       dpay: true  },
-  { id: "moamalat",   label: "معاملات",    icon: "💳", desc: "بوابة معاملات",        dpay: true  },
+  { id: "moamalat",   label: "معاملات",    icon: "💳", desc: "بوابة معاملات",        dpay: false },
   { id: "yousrpay",   label: "يسر باي",   icon: "💰", desc: "بوابة يسر باي",        dpay: true  },
   { id: "prepaid_card", label: "كرت شحن", icon: "🎫", desc: "كرت شحن مسبق الدفع",  dpay: false },
 ];
@@ -104,6 +105,68 @@ export default function WalletModal({ onClose }: Props) {
         setRecharging(false);
       }
       setRecharging(false);
+      return;
+    }
+
+    // ── Moamalat Lightbox ────────────────────────────────────────────────────
+    if (method === "moamalat") {
+      try {
+        const r = await fetch("/api/wallet/topup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: amt, method: "moamalat" }),
+        });
+        const d = await r.json();
+        if (!r.ok || !d.lightbox) { setRechMsg(d.error || "فشل إنشاء جلسة الدفع"); setRecharging(false); return; }
+
+        await new Promise<void>((resolve, reject) => {
+          if (document.getElementById("moamalat-lb-wallet")) { resolve(); return; }
+          const script = document.createElement("script");
+          script.id = "moamalat-lb-wallet";
+          script.src = d.scriptUrl;
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error("فشل تحميل بوابة معاملات"));
+          document.head.appendChild(script);
+        });
+
+        await new Promise(r => setTimeout(r, 300));
+
+        const lb = (window as any).Lightbox;
+        if (!lb?.Checkout) {
+          setRechMsg("نافذة الدفع غير متاحة — يرجى تعطيل مانع الإعلانات وإعادة المحاولة");
+          setRecharging(false);
+          return;
+        }
+
+        lb.Checkout.configure = {
+          MID:               d.MID,
+          TID:               d.TID,
+          AmountTrxn:        d.AmountTrxn,
+          MerchantReference: d.MerchantReference,
+          TrxDateTime:       d.TrxDateTime,
+          SecureHash:        d.SecureHash,
+          completeCallback:  async () => {
+            const fresh = await fetch("/api/wallet").then(r => r.json());
+            setBalance(fresh.balance || 0);
+            setTransactions(fresh.transactions || []);
+            setRechMsg("✅ تم شحن المحفظة بنجاح!");
+            setAmount(""); setMethod("");
+            setTimeout(() => setTab("overview"), 1500);
+          },
+          errorCallback: () => {
+            setRechMsg("فشل الدفع — يرجى المحاولة مجدداً");
+            setRecharging(false);
+          },
+          cancelCallback: () => {
+            setRecharging(false);
+          },
+        };
+        lb.Checkout.showLightbox();
+        setRecharging(false);
+      } catch (err: any) {
+        setRechMsg(err.message || "خطأ في تحميل بوابة الدفع");
+        setRecharging(false);
+      }
       return;
     }
 
