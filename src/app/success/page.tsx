@@ -5,15 +5,27 @@ import { useSearchParams } from "next/navigation";
 import { CheckCircle, Package, ArrowLeft, ShoppingCart } from "lucide-react";
 
 function SuccessContent() {
-  const params = useSearchParams();
+  const params  = useSearchParams();
   const orderId = params.get("orderId");
   const via     = params.get("via");
+  const paid    = params.get("paid");
 
   const [dots, setDots] = useState(".");
   useEffect(() => {
     const t = setInterval(() => setDots((d) => (d.length < 3 ? d + "." : ".")), 500);
     return () => clearInterval(t);
   }, []);
+
+  // Confirm Moamalat payment immediately after returning from trendstore-ly.com/moamalat-pay
+  useEffect(() => {
+    if (via === "moamalat" && paid === "1" && orderId) {
+      fetch("/api/payment/moamalat/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      }).catch(() => {});
+    }
+  }, [via, paid, orderId]);
 
   return (
     <div className="min-h-screen bg-[#0b0f1a] text-white flex flex-col items-center justify-center p-6" dir="rtl">

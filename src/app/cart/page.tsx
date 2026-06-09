@@ -21,16 +21,6 @@ type UserAddress = {
   is_default: boolean;
 };
 
-declare global {
-  interface Window {
-    Lightbox?: {
-      Checkout: {
-        configure: object;
-        showLightbox: () => void;
-      };
-    };
-  }
-}
 
 const PAYMENT_METHODS = [
   { id: "cash",     name: "الدفع عند الاستلام",        icon: "💵", color: "#16a34a"                  },
@@ -130,52 +120,29 @@ export default function CartPage() {
     setOrdering(true);
     try {
       const oid = await createOrder("moamalat");
-      setOrderId(oid);
 
       const res = await fetch("/api/payment/moamalat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId: oid, amountLYD: total }) });
       const p = await res.json();
       if (!res.ok || !p.success) { setPayError(p.error || "فشل إعداد الدفع"); setOrdering(false); return; }
 
-      // load Moamalat lightbox
-      const script = document.createElement("script");
-      script.src = p.scriptUrl;
-      script.onerror = () => {
-        setPayError("تعذّر تحميل نافذة الدفع — تأكد من اتصالك بالإنترنت وحاول مرة أخرى");
-        setOrdering(false);
-        setStep("payment");
-      };
-      script.onload = () => {
-        if (window.Lightbox?.Checkout) {
-          window.Lightbox.Checkout.configure = {
-            MID:               p.MID,
-            TID:               p.TID,
-            AmountTrxn:        p.AmountTrxn,
-            MerchantReference: p.MerchantReference,
-            TrxDateTime:       p.TrxDateTime,
-            SecureHash:        p.SecureHash,
-            completeCallback: () => {
-              clearCart();
-              router.push(`/success?orderId=${oid}&via=moamalat`);
-            },
-            errorCallback: (err: any) => {
-              setPayError("فشل الدفع: " + JSON.stringify(err));
-              setOrdering(false);
-              setStep("payment");
-            },
-            cancelCallback: () => {
-              setPayError("تم إلغاء الدفع");
-              setOrdering(false);
-              setStep("payment");
-            },
-          };
-          window.Lightbox.Checkout.showLightbox();
-        } else {
-          setPayError("نافذة الدفع غير متاحة — يرجى تعطيل مانع الإعلانات وإعادة المحاولة");
-          setOrdering(false);
-          setStep("payment");
-        }
-      };
-      document.head.appendChild(script);
+      clearCart();
+
+      const returnUrl = `${window.location.origin}/success?orderId=${oid}&via=moamalat`;
+      const cancelUrl = `${window.location.origin}/cart`;
+
+      const qs = new URLSearchParams({
+        mid:      p.MID,
+        tid:      p.TID,
+        amount:   p.AmountTrxn,
+        ref:      p.MerchantReference,
+        datetime: p.TrxDateTime,
+        hash:     p.SecureHash,
+        script:   p.scriptUrl,
+        return:   returnUrl,
+        cancel:   cancelUrl,
+      }).toString();
+
+      window.location.href = `/moamalat-pay?${qs}`;
     } catch (err: any) {
       setPayError(err.message);
       setOrdering(false);
