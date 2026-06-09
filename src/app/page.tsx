@@ -25,6 +25,7 @@ import {
   ArrowLeft,
   Search,
   X,
+  Building2,
 } from "lucide-react";
 
 type Product = {
@@ -48,6 +49,7 @@ const categories = [
   { title: "خدمات إلكترونية", sub: "E-SERVICES",      icon: Globe,       href: "/products"                     },
   { title: "طلب من المواقع", sub: "ONLINE SHOPPING", icon: ShoppingCart, href: "https://order.trendstore-ly.com" },
   { title: "إعلانات",         sub: "MARKETING",       icon: Megaphone,   href: "/ads"                          },
+  { title: "مواقعنا",         sub: "OUR SITES",       icon: Building2,   href: "/our-sites"                       },
 ];
 
 const services = [
@@ -63,6 +65,7 @@ const navTop = [
   { label: "متجر الإلكترونيات", icon: Smartphone,  href: "/products" },
   { label: "الصيانة",           icon: Wrench,      href: undefined },
   { label: "خدمات رقمية",      icon: Megaphone,   href: undefined },
+  { label: "مواقعنا",           icon: Building2,   href: "/our-sites" },
 ];
 
 const navBottom = [
@@ -180,10 +183,10 @@ export default function Home() {
       >
           <div className={`mb-8 ${!sidebarOpen ? "text-center" : ""}`}>
             <h1 className="text-2xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent leading-tight">
-              {sidebarOpen ? "TREND" : "T"}
+              {sidebarOpen ? "ترند" : "ت"}
             </h1>
             {sidebarOpen && (
-              <p className="text-xs text-gray-500 mt-0.5">ترند للإلكترونيات</p>
+              <p className="text-xs text-gray-400 mt-0.5 font-semibold">للإلكترونيات</p>
             )}
           </div>
 
@@ -429,7 +432,7 @@ export default function Home() {
           <footer className="rounded-2xl bg-[#090c16] border border-purple-500/20 p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-6">
               <div>
-                <h3 className="text-xl font-bold text-purple-400 mb-2 tracking-widest">TREND STORE</h3>
+                <h3 className="text-xl font-bold text-purple-400 mb-2">ترند للإلكترونيات</h3>
                 <p className="text-gray-400 text-sm leading-relaxed">متجرك الأول للإلكترونيات والخدمات الرقمية في ليبيا</p>
               </div>
               <div>
@@ -462,7 +465,7 @@ export default function Home() {
               </div>
             </div>
             <div className="border-t border-purple-500/15 pt-4 text-center text-xs text-gray-500">
-              © 2024 Trend Store — جميع الحقوق محفوظة
+              © 2025 ترند للإلكترونيات — جميع الحقوق محفوظة
             </div>
           </footer>
         </div>
@@ -479,8 +482,9 @@ export default function Home() {
       {/* ── Mobile Top Bar ── */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-purple-500/20 sticky top-0 bg-[#0b0f1a]/95 backdrop-blur-md z-40">
         {/* Logo */}
-        <a href="/" className="text-xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-          TREND
+        <a href="/" className="flex flex-col leading-tight">
+          <span className="text-lg font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">ترند</span>
+          <span className="text-[10px] text-gray-500 font-medium tracking-wide">للإلكترونيات</span>
         </a>
 
         {/* Right actions */}
@@ -601,6 +605,21 @@ export default function Home() {
           </div>
         </a>
 
+        {/* Our sites banner */}
+        <a href="/our-sites"
+          className="block rounded-2xl overflow-hidden border border-yellow-500/30 hover:border-yellow-500/60 transition-all"
+          style={{ background: "linear-gradient(135deg,#1B3A6B,#2A5298)" }}>
+          <div className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-white font-black text-base">مواقعنا وخدماتنا 🌐</p>
+              <p className="text-blue-200 text-xs mt-0.5">Trendy للحجوزات وخدمات أخرى</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: "rgba(201,168,76,0.25)" }}>
+              <Building2 size={24} className="text-yellow-400" />
+            </div>
+          </div>
+        </a>
+
         {/* Products */}
         {products.length > 0 && (
           <div>
@@ -667,8 +686,8 @@ export default function Home() {
 
         {/* Footer */}
         <div className="rounded-2xl bg-[#090c16] border border-purple-500/20 p-4 text-center">
-          <p className="text-purple-400 font-bold text-sm mb-1">TREND STORE</p>
-          <p className="text-gray-500 text-xs">© 2024 — جميع الحقوق محفوظة</p>
+          <p className="text-purple-400 font-bold text-sm mb-1">ترند للإلكترونيات</p>
+          <p className="text-gray-500 text-xs">© 2025 — جميع الحقوق محفوظة</p>
           <div className="flex justify-center gap-4 mt-3">
             {["0945798033", "0943579690"].map((num) => (
               <a key={num} href={`https://wa.me/218${num.slice(1)}`} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:text-green-300 transition-colors" dir="ltr">

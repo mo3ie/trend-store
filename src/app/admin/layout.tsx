@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Package, ShoppingBag, Users, Settings, LogOut, ChevronRight, Menu, X, Megaphone } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, Users, Settings, LogOut, ChevronRight, Menu, X, Megaphone, Building2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -39,10 +39,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <>
       <div className="mb-8 px-2 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-            TREND
+          <h1 className="text-xl font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+            ترند
           </h1>
-          <p className="text-xs text-gray-600 mt-0.5">لوحة الإدارة</p>
+          <p className="text-xs text-gray-500 mt-0.5">لوحة الإدارة</p>
         </div>
         <button
           onClick={() => setSidebarOpen(false)}
@@ -72,6 +72,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           );
         })}
       </nav>
+
+      {/* External services */}
+      <div className="mb-3 border-t border-purple-500/10 pt-3">
+        <p className="text-xs text-gray-600 px-3 mb-2">مواقع وخدمات</p>
+        <a href="https://trendy.trendstore-ly.com" target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all">
+          <Building2 size={17} className="shrink-0" />
+          Trendy — الحجوزات
+        </a>
+      </div>
 
       <button
         onClick={signOut}
@@ -112,8 +122,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <main className="flex-1 overflow-y-auto min-w-0">
         {/* Mobile top bar */}
         <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-purple-500/20 sticky top-0 bg-[#0b0f1a]/90 backdrop-blur z-30">
-          <h1 className="flex-1 text-sm font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-            TREND — لوحة الإدارة
+          <h1 className="flex-1 text-sm font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+            ترند — لوحة الإدارة
           </h1>
           <button
             onClick={() => setSidebarOpen(true)}
