@@ -8,7 +8,7 @@ const cairo = Cairo({
 });
 
 export const metadata: Metadata = {
-  title: "متجر ترند للإلكترونيات",
+  title: "محل ترند للإلكترونيات",
   description: "كل ما تحتاجه من عالم التقنية في مكان واحد",
 };
 

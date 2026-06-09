@@ -182,11 +182,11 @@ export default function Home() {
         } flex flex-col py-6 border-r border-purple-500/20 min-h-screen shrink-0 transition-all duration-300 overflow-hidden`}
       >
           <div className={`mb-8 ${!sidebarOpen ? "text-center" : ""}`}>
-            <h1 className="text-2xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent leading-tight">
-              {sidebarOpen ? "ترند" : "ت"}
+            <h1 className="text-xl font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent leading-tight">
+              {sidebarOpen ? "محل ترند" : "ت"}
             </h1>
             {sidebarOpen && (
-              <p className="text-xs text-gray-400 mt-0.5 font-semibold">للإلكترونيات</p>
+              <p className="text-xs text-gray-500 mt-0.5">للإلكترونيات</p>
             )}
           </div>
 
@@ -432,7 +432,10 @@ export default function Home() {
           <footer className="rounded-2xl bg-[#090c16] border border-purple-500/20 p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-6">
               <div>
-                <h3 className="text-xl font-bold text-purple-400 mb-2">ترند للإلكترونيات</h3>
+                <div className="mb-2">
+                <h3 className="text-xl font-bold text-purple-400">محل ترند</h3>
+                <p className="text-xs text-gray-500">للإلكترونيات</p>
+              </div>
                 <p className="text-gray-400 text-sm leading-relaxed">متجرك الأول للإلكترونيات والخدمات الرقمية في ليبيا</p>
               </div>
               <div>
@@ -465,7 +468,7 @@ export default function Home() {
               </div>
             </div>
             <div className="border-t border-purple-500/15 pt-4 text-center text-xs text-gray-500">
-              © 2025 ترند للإلكترونيات — جميع الحقوق محفوظة
+              © 2025 محل ترند للإلكترونيات — جميع الحقوق محفوظة
             </div>
           </footer>
         </div>
@@ -483,8 +486,8 @@ export default function Home() {
       <header className="flex items-center justify-between px-4 py-3 border-b border-purple-500/20 sticky top-0 bg-[#0b0f1a]/95 backdrop-blur-md z-40">
         {/* Logo */}
         <a href="/" className="flex flex-col leading-tight">
-          <span className="text-lg font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">ترند</span>
-          <span className="text-[10px] text-gray-500 font-medium tracking-wide">للإلكترونيات</span>
+          <span className="text-lg font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">محل ترند</span>
+          <span className="text-[10px] text-gray-500 font-medium">للإلكترونيات</span>
         </a>
 
         {/* Right actions */}
@@ -686,7 +689,8 @@ export default function Home() {
 
         {/* Footer */}
         <div className="rounded-2xl bg-[#090c16] border border-purple-500/20 p-4 text-center">
-          <p className="text-purple-400 font-bold text-sm mb-1">ترند للإلكترونيات</p>
+          <p className="text-purple-400 font-bold text-sm">محل ترند</p>
+          <p className="text-gray-600 text-xs mb-1">للإلكترونيات</p>
           <p className="text-gray-500 text-xs">© 2025 — جميع الحقوق محفوظة</p>
           <div className="flex justify-center gap-4 mt-3">
             {["0945798033", "0943579690"].map((num) => (

@@ -40,9 +40,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="mb-8 px-2 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-            ترند
+            محل ترند
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">لوحة الإدارة</p>
+          <p className="text-xs text-gray-500 mt-0.5">للإلكترونيات — لوحة الإدارة</p>
         </div>
         <button
           onClick={() => setSidebarOpen(false)}
@@ -123,7 +123,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Mobile top bar */}
         <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-purple-500/20 sticky top-0 bg-[#0b0f1a]/90 backdrop-blur z-30">
           <h1 className="flex-1 text-sm font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-            ترند — لوحة الإدارة
+            محل ترند — لوحة الإدارة
           </h1>
           <button
             onClick={() => setSidebarOpen(true)}
