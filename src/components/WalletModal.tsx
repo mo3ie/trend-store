@@ -13,15 +13,10 @@ type Transaction = {
   created_at: string;
 };
 
-// ادفع لي: direct Adfali (2-step OTP)
-// معاملات: direct Moamalat Lightbox
-// باقي الطرق: DPay redirect
 const PAYMENT_METHODS = [
-  { id: "edfali",     label: "ادفع لي",   icon: "🏧", desc: "محفظة ادفع لي",         dpay: false },
-  { id: "mobicash",   label: "موبي كاش",   icon: "📱", desc: "محفظة موبي كاش",       dpay: true  },
-  { id: "moamalat",   label: "معاملات",    icon: "💳", desc: "بوابة معاملات",        dpay: false },
-  { id: "yousrpay",   label: "يسر باي",   icon: "💰", desc: "بوابة يسر باي",        dpay: true  },
-  { id: "prepaid_card", label: "كرت شحن", icon: "🎫", desc: "كرت شحن مسبق الدفع",  dpay: false },
+  { id: "edfali",       label: "ادفع لي",  icon: "🏧", desc: "محفظة ادفع لي"        },
+  { id: "moamalat",     label: "معاملات",   icon: "💳", desc: "بوابة معاملات"        },
+  { id: "prepaid_card", label: "كرت شحن", icon: "🎫", desc: "كرت شحن مسبق الدفع"  },
 ];
 
 const METHOD_LABELS: Record<string, string> = {
@@ -64,7 +59,6 @@ export default function WalletModal({ onClose }: Props) {
   }, []);
 
   const selectedMethod = PAYMENT_METHODS.find(m => m.id === method);
-  const isDpay = selectedMethod?.dpay === true;
 
   function resetEdfali() {
     setEdfaliStep(null); setEdfaliSession(""); setEdfaliTxId(""); setEdfaliOtp("");
@@ -165,24 +159,6 @@ export default function WalletModal({ onClose }: Props) {
         setRecharging(false);
       } catch (err: any) {
         setRechMsg(err.message || "خطأ في تحميل بوابة الدفع");
-        setRecharging(false);
-      }
-      return;
-    }
-
-    // ── DPay redirect ────────────────────────────────────────────────────────
-    if (isDpay) {
-      try {
-        const r = await fetch("/api/wallet/topup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: amt, method }),
-        });
-        const d = await r.json();
-        if (!r.ok || !d.payment_link) { setRechMsg(d.error || "فشل إنشاء جلسة الدفع"); setRecharging(false); return; }
-        window.location.href = d.payment_link;
-      } catch {
-        setRechMsg("خطأ في الاتصال بالخادم");
         setRecharging(false);
       }
       return;
@@ -382,10 +358,11 @@ export default function WalletModal({ onClose }: Props) {
                     type="tel"
                     value={phone}
                     onChange={e => setPhone(e.target.value)}
-                    placeholder="09xxxxxxxx"
+                    placeholder="9xxxxxxxx"
+                    maxLength={9}
                     className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/30 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-all"
                   />
-                  <p className="text-gray-600 text-xs mt-1">سيصلك رمز تأكيد على هاتفك</p>
+                  <p className="text-gray-600 text-xs mt-1">بدون الصفر — مثال: 918621511</p>
                 </div>
               )}
 
@@ -405,15 +382,7 @@ export default function WalletModal({ onClose }: Props) {
                 </div>
               )}
 
-              {/* DPay info banner */}
-              {isDpay && (
-                <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 flex items-start gap-2">
-                  <span className="text-base shrink-0">⚡</span>
-                  <p>ستنتقل إلى صفحة الدفع الآمنة لإتمام عملية شحن المحفظة عبر {selectedMethod?.label}.</p>
-                </div>
-              )}
-
-              {rechMsg && (
+{rechMsg && (
                 <p className={`text-sm p-3 rounded-xl border ${
                   rechMsg.startsWith("✅")
                     ? "bg-green-500/10 border-green-500/20 text-green-400"
@@ -432,8 +401,6 @@ export default function WalletModal({ onClose }: Props) {
                   <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> جاري...</>
                 ) : method === "edfali" ? (
                   <>🏧 إرسال رمز التحقق {amount ? `— ${amount} د` : ""}</>
-                ) : isDpay ? (
-                  <>⚡ انتقل للدفع {amount ? `— ${amount} د` : ""}</>
                 ) : (
                   <>شحن {amount ? `${amount} د` : ""}</>
                 )}

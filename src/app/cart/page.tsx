@@ -33,13 +33,9 @@ declare global {
 }
 
 const PAYMENT_METHODS = [
-  { id: "cash",       name: "الدفع عند الاستلام", icon: "💵", color: "#16a34a"                  },
-  { id: "mobicash",   name: "موبي كاش",           icon: "📱", color: "#0284c7", needsCard: true  },
-  { id: "masrefypay", name: "مصرفي",               icon: "💳", color: "#ea580c", needsCard: true  },
-  { id: "yousrpay",   name: "يسر باي",             icon: "💳", color: "#0d9488", needsCard: true  },
-  { id: "saharpay",   name: "صحارة باي",           icon: "💳", color: "#ca8a04", needsCard: true  },
-  { id: "edfali",     name: "ادفع لي",             icon: "🏧", color: "#7c3aed", needsPhone: true },
-  { id: "moamalat",   name: "بطاقة مصرفية (معاملات)", icon: "🏦", color: "#1e40af", lightbox: true },
+  { id: "cash",     name: "الدفع عند الاستلام",        icon: "💵", color: "#16a34a"                  },
+  { id: "edfali",   name: "ادفع لي",                   icon: "🏧", color: "#7c3aed", needsPhone: true },
+  { id: "moamalat", name: "بطاقة مصرفية (معاملات)", icon: "🏦", color: "#1e40af", lightbox: true },
 ];
 
 type CheckoutStep = null | "address" | "payment" | "processing";
@@ -123,32 +119,6 @@ export default function CartPage() {
       const oid = await createOrder("cash");
       clearCart();
       router.push(`/success?orderId=${oid}&via=cash`);
-    } catch (err: any) {
-      setPayError(err.message);
-      setOrdering(false);
-    }
-  }
-
-  async function payWithDPay() {
-    if (!method) return;
-    setPayError("");
-    setOrdering(true);
-    try {
-      const oid = await createOrder(method);
-      setOrderId(oid);
-
-      const body: any = { amount: total, orderId: oid, method };
-      if (["mobicash","masrefypay","yousrpay","saharpay"].includes(method)) {
-        if (!cardNumber.trim()) { setPayError("يرجى إدخال رقم البطاقة"); setOrdering(false); return; }
-        body.card_number = cardNumber;
-      }
-
-      const res = await fetch("/api/payment/dpay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const data = await res.json();
-      if (!res.ok || !data.payment_link) { setPayError(data.error || "فشل إنشاء جلسة الدفع"); setOrdering(false); return; }
-
-      clearCart();
-      window.location.href = data.payment_link;
     } catch (err: any) {
       setPayError(err.message);
       setOrdering(false);
@@ -520,22 +490,7 @@ export default function CartPage() {
                   ))}
                 </div>
 
-                {/* Card number for DPay methods */}
-                {method && PAYMENT_METHODS.find(p => p.id === method)?.needsCard && (
-                  <div className="mb-4">
-                    <label className="text-gray-600 text-xs mb-2 block flex items-center gap-1.5"><CreditCard size={12} /> رقم البطاقة</label>
-                    <input
-                      type="text"
-                      placeholder="أدخل رقم البطاقة"
-                      value={cardNumber}
-                      onChange={e => setCardNumber(e.target.value.replace(/\D/g, ""))}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:outline-none focus:border-purple-400 transition-all"
-                      style={{ direction: "ltr", letterSpacing: 2 }}
-                    />
-                  </div>
-                )}
-
-                {payError && <p className="text-red-500 text-sm mb-3">⚠️ {payError}</p>}
+{payError && <p className="text-red-500 text-sm mb-3">⚠️ {payError}</p>}
 
                 <button
                   onClick={() => {
@@ -543,7 +498,6 @@ export default function CartPage() {
                     if (method === "cash") { setStep("processing"); payWithCash(); return; }
                     if (method === "edfali") { setEdfaliStep("phone"); return; }
                     if (method === "moamalat") { setStep("processing"); payWithMoamalat(); return; }
-                    setStep("processing"); payWithDPay();
                   }}
                   disabled={ordering || !method}
                   className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:opacity-90 transition-opacity disabled:opacity-50 text-sm"
@@ -565,13 +519,14 @@ export default function CartPage() {
                 <p className="text-gray-500 text-sm mb-5">أدخل رقم هاتفك المرتبط بحساب <strong>ادفع لي</strong></p>
                 <input
                   type="tel"
-                  placeholder="0912345678"
+                  placeholder="9xxxxxxxx"
                   value={edfaliPhone}
-                  onChange={e => setEdfaliPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  onChange={e => setEdfaliPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 text-gray-900 text-xl text-center font-bold tracking-widest focus:outline-none focus:border-purple-400 transition-all mb-4"
                   style={{ direction: "ltr" }}
                   autoFocus
                 />
+                <p className="text-gray-400 text-xs mb-3 text-center">بدون الصفر — مثال: 918621511</p>
                 {payError && <p className="text-red-500 text-sm mb-3">⚠️ {payError}</p>}
                 <button onClick={startEdfali} disabled={edfaliPhone.length < 9}
                   className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 disabled:opacity-50 mb-3 text-sm">

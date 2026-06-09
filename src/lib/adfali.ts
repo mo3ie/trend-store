@@ -32,11 +32,11 @@ function extractResult(xml: string, method: string): string {
 }
 
 async function soapCall(method: string, params: Record<string, string | number>): Promise<string> {
-  const body = buildSoap(method, params);
-  console.log(`[edfali] → ${method}`, JSON.stringify(params));
+  const safeParams = { ...params, Pin: "***", PW: "***" };
+  console.log(`[edfali:${method}] start params=${JSON.stringify(safeParams)}`);
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  const timer = setTimeout(() => controller.abort(), 15000);
 
   let res: Response;
   try {
@@ -46,26 +46,45 @@ async function soapCall(method: string, params: Record<string, string | number>)
         "Content-Type": "text/xml; charset=utf-8",
         "SOAPAction":   `"http://tempuri.org/${method}"`,
       },
-      body,
+      body:   buildSoap(method, params),
       cache:  "no-store",
       signal: controller.signal,
     });
   } catch (err: any) {
     clearTimeout(timer);
-    if (err.name === "AbortError") throw new Error("انتهت مهلة الاتصال بسيرفر ادفع لي (20 ث)");
-    throw new Error(`تعذّر الاتصال بسيرفر ادفع لي: ${err.message}`);
+    const msg = err.name === "AbortError"
+      ? "انتهت مهلة الاتصال بسيرفر ادفع لي (15 ث)"
+      : `تعذّر الاتصال بسيرفر ادفع لي: ${err.message}`;
+    console.log(`[edfali:${method}] fetch-error: ${err.message}`);
+    throw new Error(msg);
+  }
+
+  console.log(`[edfali:${method}] http-status=${res.status}`);
+
+  let xml = "";
+  try {
+    xml = await res.text();
+  } catch (err: any) {
+    clearTimeout(timer);
+    console.log(`[edfali:${method}] body-read-error: ${err.message}`);
+    throw new Error(`تعذّر قراءة رد سيرفر ادفع لي: ${err.message}`);
   }
   clearTimeout(timer);
 
-  const xml = await res.text();
-  console.log(`[edfali] ← ${method} HTTP ${res.status} | raw:`, xml);
+  const compact = xml.replace(/\s+/g, " ").slice(0, 500);
+  console.log(`[edfali:${method}] xml=${compact}`);
 
   if (!res.ok) throw new Error(`سيرفر ادفع لي أعاد خطأ HTTP ${res.status}`);
 
   const value = extractResult(xml, method);
-  if (!value) throw new Error("رقم الهاتف غير مسجل في ادفع لي أو تعذّر إرسال رمز التحقق");
+  console.log(`[edfali:${method}] result="${value}"`);
 
-  console.log(`[edfali] result for ${method}:`, value);
+  if (!value) throw new Error(`رقم الهاتف غير مسجّل في تطبيق ادفع لي`);
+
+  const upper = value.toUpperCase();
+  const errMsg = ERRORS[upper];
+  if (errMsg) throw new Error(`[${upper}] ${errMsg}`);
+
   return value;
 }
 
@@ -82,7 +101,8 @@ export async function doPTrans(customerPhone: string, amountLYD: number): Promis
   if (!process.env.EDFALI_MOBILE || !process.env.EDFALI_PIN)
     throw new Error("متغيرات البيئة EDFALI_MOBILE / EDFALI_PIN غير موجودة");
 
-  const normalized = normalizePhone(customerPhone);
+  // Cmobile must be +218XXXXXXXXX (13 chars) per Edfali API docs
+  const normalized = "+218" + normalizePhone(customerPhone);
   const amount     = Math.round(amountLYD);
 
   console.log(`[edfali] DoPTrans — merchant: ${process.env.EDFALI_MOBILE}, customer: ${normalized}, amount: ${amount}`);

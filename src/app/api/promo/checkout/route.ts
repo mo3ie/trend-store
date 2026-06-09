@@ -2,7 +2,6 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getProvider } from "@/services/payments";
 
 async function getUser() {
   const store = await cookies();
@@ -85,32 +84,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, redirect: `${base}/ads/campaigns?paid=1` });
   }
 
-  // External payment (DPay)
-  try {
-    const provider = getProvider(method);
-    const session  = await provider.createSession({
-      amount:      campaign.total_price,
-      campaignId,
-      userId:      user.id,
-      method,
-      phone,
-      callbackUrl: `${base}/api/promo/webhook`,
-      returnUrl:   `${base}/ads/campaigns?paid=1`,
-    });
-
-    // Record pending payment
-    await supabaseAdmin.from("ad_payments").insert({
-      user_id:          user.id,
-      campaign_id:      campaignId,
-      amount:           campaign.total_price,
-      provider:         method,
-      provider_session: session.sessionId,
-      status:           "pending",
-    });
-
-    return NextResponse.json({ paymentLink: session.paymentLink, sessionId: session.sessionId });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "خطأ في الدفع";
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
+  return NextResponse.json({ error: "طريقة الدفع غير متاحة، يرجى استخدام المحفظة" }, { status: 400 });
 }
