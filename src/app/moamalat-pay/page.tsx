@@ -31,7 +31,10 @@ export default function MoamalatPayPage() {
         MerchantReference,
         TrxDateTime,
         SecureHash,
-        completeCallback: () => { window.location.href = returnUrl; },
+        completeCallback: () => {
+          const sep = returnUrl.includes("?") ? "&" : "?";
+          window.location.href = returnUrl + sep + "paid=1";
+        },
         errorCallback:    () => { window.location.href = cancelUrl + (cancelUrl.includes("?") ? "&" : "?") + "err=payment"; },
         cancelCallback:   () => { window.location.href = cancelUrl; },
       };
