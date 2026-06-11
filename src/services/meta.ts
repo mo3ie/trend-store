@@ -44,7 +44,9 @@ export function buildOAuthUrl(redirectUri: string, state: string): string {
   // Business-type apps must use Facebook Login for Business: a config_id
   // (created in the app dashboard) replaces the scope list. Plain scope-based
   // OAuth shows "this app isn't available" for Business apps.
-  const configId = process.env.META_LOGIN_CONFIG_ID;
+  // BOM strip: env values added via PowerShell pipes carry an invisible U+FEFF
+  // prefix that makes Facebook reject the config_id with a generic login error.
+  const configId = process.env.META_LOGIN_CONFIG_ID?.replace(/^\uFEFF/, "").trim();
   if (configId) {
     params.set("config_id", configId);
   } else {
