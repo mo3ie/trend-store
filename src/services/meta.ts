@@ -23,7 +23,10 @@ async function graph<T = Record<string, unknown>>(
   token?: string
 ): Promise<T> {
   const t = token || SYS_TOKEN;
-  const url = `${BASE}/${path}${method === "GET" ? `?access_token=${t}` : ""}`;
+  // path may already carry a query string (e.g. "me/accounts?fields=...") —
+  // a second "?" would swallow the access_token and Facebook rejects the call
+  const sep = path.includes("?") ? "&" : "?";
+  const url = `${BASE}/${path}${method === "GET" ? `${sep}access_token=${t}` : ""}`;
   const res = await fetch(url, {
     method,
     headers: { "Content-Type": "application/json" },

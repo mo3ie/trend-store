@@ -51,6 +51,8 @@ export async function GET(req: NextRequest) {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "error";
     console.error("Meta OAuth callback error:", msg);
-    return NextResponse.redirect(`${base}/ads/connect?error=oauth_failed`);
+    // Surface the real Graph error in the URL so failures are diagnosable
+    const reason = encodeURIComponent(msg.slice(0, 180));
+    return NextResponse.redirect(`${base}/ads/connect?error=oauth_failed&reason=${reason}`);
   }
 }

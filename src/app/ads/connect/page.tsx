@@ -30,7 +30,10 @@ function ConnectPageInner() {
     if (s === "1") setSuccess("تم ربط الصفحات بنجاح!");
     if (e === "cancelled")    setError("تم إلغاء الربط");
     if (e === "no_pages")     setError("لم نجد صفحات متاحة في حسابك");
-    if (e === "oauth_failed") setError("فشل الربط — تأكد من صلاحيات التطبيق");
+    if (e === "oauth_failed") {
+      const reason = searchParams.get("reason");
+      setError(`فشل الربط${reason ? ` — ${reason}` : " — تأكد من صلاحيات التطبيق"}`);
+    }
     loadPages();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
