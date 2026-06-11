@@ -1,11 +1,18 @@
 // Meta Graph Marketing API service
 // Handles: OAuth, Pages, Campaigns, AdSets, Ads
 
-const META_VERSION = process.env.META_API_VERSION || "v19.0";
+// Strip BOM/whitespace — env values added via PowerShell pipes or pasted into
+// the Vercel dashboard can carry an invisible U+FEFF prefix that makes Meta
+// reject every request (same incident previously broke the WhatsApp vars).
+function cleanEnv(v: string | undefined): string {
+  return (v ?? "").replace(/^\uFEFF/, "").trim();
+}
+
+const META_VERSION = cleanEnv(process.env.META_API_VERSION) || "v19.0";
 const BASE = `https://graph.facebook.com/${META_VERSION}`;
-const AD_ACCOUNT = process.env.META_AD_ACCOUNT_ID!; // e.g. "act_123456789"
-const SYS_TOKEN = process.env.META_ACCESS_TOKEN!;    // system user long-lived token
-const LYD_TO_USD = parseFloat(process.env.META_LYD_TO_USD_RATE || "5");
+const AD_ACCOUNT = cleanEnv(process.env.META_AD_ACCOUNT_ID); // e.g. "act_123456789"
+const SYS_TOKEN = cleanEnv(process.env.META_ACCESS_TOKEN);   // system user long-lived token
+const LYD_TO_USD = parseFloat(cleanEnv(process.env.META_LYD_TO_USD_RATE) || "5");
 
 // ── Graph API helper ─────────────────────────────────────────────────────────
 
@@ -35,7 +42,7 @@ async function graph<T = Record<string, unknown>>(
 
 export function buildOAuthUrl(redirectUri: string, state: string): string {
   const params = new URLSearchParams({
-    client_id:    process.env.META_APP_ID || process.env.NEXT_PUBLIC_META_APP_ID || "",
+    client_id:    cleanEnv(process.env.META_APP_ID) || cleanEnv(process.env.NEXT_PUBLIC_META_APP_ID),
     redirect_uri:  redirectUri,
     state,
     response_type: "code",
@@ -44,9 +51,7 @@ export function buildOAuthUrl(redirectUri: string, state: string): string {
   // Business-type apps must use Facebook Login for Business: a config_id
   // (created in the app dashboard) replaces the scope list. Plain scope-based
   // OAuth shows "this app isn't available" for Business apps.
-  // BOM strip: env values added via PowerShell pipes carry an invisible U+FEFF
-  // prefix that makes Facebook reject the config_id with a generic login error.
-  const configId = process.env.META_LOGIN_CONFIG_ID?.replace(/^\uFEFF/, "").trim();
+  const configId = cleanEnv(process.env.META_LOGIN_CONFIG_ID);
   if (configId) {
     params.set("config_id", configId);
   } else {
@@ -61,8 +66,8 @@ export async function exchangeCodeForToken(
   redirectUri: string
 ): Promise<string> {
   const params = new URLSearchParams({
-    client_id:     process.env.NEXT_PUBLIC_META_APP_ID!,
-    client_secret: process.env.META_APP_SECRET!,
+    client_id:     cleanEnv(process.env.META_APP_ID) || cleanEnv(process.env.NEXT_PUBLIC_META_APP_ID),
+    client_secret: cleanEnv(process.env.META_APP_SECRET),
     redirect_uri:  redirectUri,
     code,
   });
