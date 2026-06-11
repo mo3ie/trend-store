@@ -38,9 +38,19 @@ export function buildOAuthUrl(redirectUri: string, state: string): string {
     client_id:    process.env.META_APP_ID || process.env.NEXT_PUBLIC_META_APP_ID || "",
     redirect_uri:  redirectUri,
     state,
-    scope: "pages_manage_ads,pages_read_engagement,pages_show_list,ads_management",
     response_type: "code",
   });
+
+  // Business-type apps must use Facebook Login for Business: a config_id
+  // (created in the app dashboard) replaces the scope list. Plain scope-based
+  // OAuth shows "this app isn't available" for Business apps.
+  const configId = process.env.META_LOGIN_CONFIG_ID;
+  if (configId) {
+    params.set("config_id", configId);
+  } else {
+    params.set("scope", "pages_manage_ads,pages_read_engagement,pages_show_list,ads_management");
+  }
+
   return `https://www.facebook.com/dialog/oauth?${params}`;
 }
 
