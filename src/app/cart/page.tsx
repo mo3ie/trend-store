@@ -22,9 +22,13 @@ type UserAddress = {
 };
 
 
+// يسر باي مخفي عن الزبائن حتى الإطلاق الرسمي: يظهر فقط للأدمن (للاختبار)
+// أو عند ضبط NEXT_PUBLIC_YUSOR_ENABLED=true (إطلاق للجميع).
+const ADMIN_EMAIL = "mo3iemohamed@gmail.com";
+
 const PAYMENT_METHODS = [
   { id: "cash",     name: "الدفع عند الاستلام",        icon: "💵", color: "#16a34a"                  },
-  { id: "yusor",    name: "يسر باي (بطاقة مصرفية)",   icon: "💳", color: "#0ea5e9", needsCard: true },
+  { id: "yusor",    name: "يسر باي (بطاقة مصرفية)",   icon: "💳", color: "#0ea5e9", needsCard: true, gated: true },
   { id: "edfali",   name: "ادفع لي",                   icon: "🏧", color: "#7c3aed", needsPhone: true },
   { id: "moamalat", name: "بطاقة مصرفية (معاملات)", icon: "🏦", color: "#1e40af", lightbox: true },
 ];
@@ -68,6 +72,10 @@ export default function CartPage() {
         .then(data => { if (Array.isArray(data)) setAddresses(data); });
     }
   }, [user]);
+
+  const yusorVisible =
+    process.env.NEXT_PUBLIC_YUSOR_ENABLED === "true" || user?.email === ADMIN_EMAIL;
+  const visibleMethods = PAYMENT_METHODS.filter(pm => !("gated" in pm && pm.gated) || yusorVisible);
 
   const chosenAddress = selectedAddr === "__new"
     ? newAddrText
@@ -492,7 +500,7 @@ export default function CartPage() {
                 <p className="text-sm text-gray-400 mb-5">المبلغ الإجمالي: <strong className="text-gray-900">{total} د.ل</strong></p>
 
                 <div className="space-y-2 mb-4">
-                  {PAYMENT_METHODS.map((pm) => (
+                  {visibleMethods.map((pm) => (
                     <button key={pm.id} onClick={() => { setMethod(pm.id); setCardNumber(""); setPayError(""); }}
                       className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-right transition-all ${method === pm.id ? "border-purple-500 bg-purple-50" : "border-gray-100 bg-gray-50 hover:border-purple-200"}`}>
                       <span className="text-2xl w-9 text-center shrink-0">{pm.icon}</span>
