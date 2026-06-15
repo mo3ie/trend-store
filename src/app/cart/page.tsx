@@ -22,14 +22,20 @@ type UserAddress = {
 };
 
 
+// يسر باي مخفي عن الزبائن حتى الإطلاق الرسمي: يظهر فقط للأدمن (للاختبار)
+// أو عند ضبط NEXT_PUBLIC_YUSOR_ENABLED=true (إطلاق للجميع).
+const ADMIN_EMAIL = "mo3iemohamed@gmail.com";
+
 const PAYMENT_METHODS = [
   { id: "cash",     name: "الدفع عند الاستلام",        icon: "💵", color: "#16a34a"                  },
+  { id: "yusor",    name: "يسر باي (بطاقة مصرفية)",   icon: "💳", color: "#0ea5e9", needsCard: true, gated: true },
   { id: "edfali",   name: "ادفع لي",                   icon: "🏧", color: "#7c3aed", needsPhone: true },
   { id: "moamalat", name: "بطاقة مصرفية (معاملات)", icon: "🏦", color: "#1e40af", lightbox: true },
 ];
 
 type CheckoutStep = null | "address" | "payment" | "processing";
 type EdfaliStep   = null | "phone" | "sending" | "otp";
+type YusorStep    = null | "card" | "sending" | "otp";
 
 export default function CartPage() {
   const router = useRouter();
@@ -53,6 +59,9 @@ export default function CartPage() {
   const [edfaliPhone,   setEdfaliPhone]   = useState("");
   const [edfaliOtp,     setEdfaliOtp]     = useState("");
   const [edfaliSession, setEdfaliSession] = useState<string | null>(null);
+  const [yusorStep,     setYusorStep]     = useState<YusorStep>(null);
+  const [yusorCard,     setYusorCard]     = useState("");
+  const [yusorOtp,      setYusorOtp]      = useState("");
   const [orderId,       setOrderId]       = useState<string | null>(null);
   const [payError,      setPayError]      = useState("");
 
@@ -63,6 +72,10 @@ export default function CartPage() {
         .then(data => { if (Array.isArray(data)) setAddresses(data); });
     }
   }, [user]);
+
+  const yusorVisible =
+    process.env.NEXT_PUBLIC_YUSOR_ENABLED === "true" || user?.email === ADMIN_EMAIL;
+  const visibleMethods = PAYMENT_METHODS.filter(pm => !("gated" in pm && pm.gated) || yusorVisible);
 
   const chosenAddress = selectedAddr === "__new"
     ? newAddrText
@@ -188,9 +201,49 @@ export default function CartPage() {
     }
   }
 
+  async function startYusor() {
+    if (yusorCard.replace(/\D/g, "").length < 9) { setPayError("رقم البطاقة يجب أن يكون 9 أرقام على الأقل"); return; }
+    setYusorStep("sending");
+    setPayError("");
+    try {
+      const oid = orderId || await createOrder("yusor");
+      setOrderId(oid);
+
+      const res = await fetch("/api/yusor/initiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: oid, identityCard: yusorCard, amount: total }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) { setPayError(data.error || "فشل بدء عملية الدفع"); setYusorStep("card"); return; }
+      setYusorStep("otp");
+    } catch (err: any) {
+      setPayError(err.message); setYusorStep("card");
+    }
+  }
+
+  async function verifyYusor() {
+    if (!yusorOtp || !orderId) return;
+    setOrdering(true);
+    try {
+      const res = await fetch("/api/yusor/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderId, otp: yusorOtp }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) { setPayError(data.error || "رمز التحقق غير صحيح"); setOrdering(false); return; }
+      clearCart();
+      router.push(`/success?orderId=${orderId}&via=yusor`);
+    } catch (err: any) {
+      setPayError(err.message); setOrdering(false);
+    }
+  }
+
   const closeModal = () => {
     setStep(null); setMethod(null); setCardNumber(""); setEdfaliStep(null);
-    setEdfaliPhone(""); setEdfaliOtp(""); setPayError(""); setOrdering(false);
+    setEdfaliPhone(""); setEdfaliOtp(""); setYusorStep(null); setYusorCard("");
+    setYusorOtp(""); setPayError(""); setOrdering(false);
   };
 
   return (
@@ -436,7 +489,7 @@ export default function CartPage() {
             )}
 
             {/* ── STEP 2: Payment ── */}
-            {step === "payment" && !edfaliStep && (
+            {step === "payment" && !edfaliStep && !yusorStep && (
               <div className="p-6">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-black text-gray-900">اختر طريقة الدفع</h3>
@@ -447,7 +500,7 @@ export default function CartPage() {
                 <p className="text-sm text-gray-400 mb-5">المبلغ الإجمالي: <strong className="text-gray-900">{total} د.ل</strong></p>
 
                 <div className="space-y-2 mb-4">
-                  {PAYMENT_METHODS.map((pm) => (
+                  {visibleMethods.map((pm) => (
                     <button key={pm.id} onClick={() => { setMethod(pm.id); setCardNumber(""); setPayError(""); }}
                       className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-right transition-all ${method === pm.id ? "border-purple-500 bg-purple-50" : "border-gray-100 bg-gray-50 hover:border-purple-200"}`}>
                       <span className="text-2xl w-9 text-center shrink-0">{pm.icon}</span>
@@ -463,6 +516,7 @@ export default function CartPage() {
                   onClick={() => {
                     if (!method) { setPayError("يرجى اختيار طريقة الدفع"); return; }
                     if (method === "cash") { setStep("processing"); payWithCash(); return; }
+                    if (method === "yusor") { setYusorStep("card"); return; }
                     if (method === "edfali") { setEdfaliStep("phone"); return; }
                     if (method === "moamalat") { setStep("processing"); payWithMoamalat(); return; }
                   }}
@@ -535,6 +589,69 @@ export default function CartPage() {
                   {ordering ? <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "تأكيد الدفع ✓"}
                 </button>
                 <button onClick={() => { setEdfaliStep(null); setEdfaliOtp(""); setOrdering(false); }} className="w-full py-2.5 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+                  ← رجوع
+                </button>
+              </div>
+            )}
+
+            {/* ── YUSOR: Card step ── */}
+            {step === "payment" && yusorStep === "card" && (
+              <div className="p-6 text-center">
+                <div className="text-4xl mb-4">💳</div>
+                <h3 className="text-lg font-black text-gray-900 mb-1">يسر باي</h3>
+                <p className="text-gray-500 text-sm mb-5">أدخل رقم بطاقتك المصرفية لإتمام الدفع</p>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="رقم البطاقة"
+                  value={yusorCard}
+                  onChange={e => setYusorCard(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-gray-900 text-xl text-center font-bold tracking-widest focus:outline-none focus:border-sky-400 transition-all mb-3"
+                  style={{ direction: "ltr" }}
+                  autoFocus
+                />
+                <p className="text-gray-400 text-xs mb-3 text-center">9 أرقام (رقم البطاقة + البادئة) — أو 10 أرقام لمصرف التجارة والتنمية</p>
+                {payError && <p className="text-red-500 text-sm mb-3">⚠️ {payError}</p>}
+                <button onClick={startYusor} disabled={yusorCard.replace(/\D/g, "").length < 9}
+                  className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-sky-600 to-blue-500 disabled:opacity-50 mb-3 text-sm">
+                  إرسال رمز التحقق →
+                </button>
+                <button onClick={() => { setYusorStep(null); setYusorCard(""); setPayError(""); }} className="w-full py-2.5 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+                  ← رجوع
+                </button>
+              </div>
+            )}
+
+            {/* ── YUSOR: Sending ── */}
+            {step === "payment" && yusorStep === "sending" && (
+              <div className="p-10 text-center">
+                <div className="w-14 h-14 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin mx-auto mb-5" />
+                <p className="text-gray-500 text-sm">⏳ جاري إرسال رمز التحقق...</p>
+              </div>
+            )}
+
+            {/* ── YUSOR: OTP ── */}
+            {step === "payment" && yusorStep === "otp" && (
+              <div className="p-6 text-center">
+                <div className="text-4xl mb-4">🔐</div>
+                <h3 className="text-lg font-black text-gray-900 mb-1">رمز التحقق</h3>
+                <p className="text-gray-500 text-sm mb-5">أُرسل رمز التحقق إلى هاتفك المرتبط بالبطاقة المصرفية</p>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="رمز التحقق"
+                  value={yusorOtp}
+                  onChange={e => setYusorOtp(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                  className="w-full px-4 py-4 rounded-xl border border-gray-200 text-gray-900 text-3xl text-center font-black tracking-widest focus:outline-none focus:border-sky-400 transition-all mb-4"
+                  style={{ direction: "ltr" }}
+                  autoFocus
+                />
+                {payError && <p className="text-red-500 text-sm mb-3">⚠️ {payError}</p>}
+                <button onClick={verifyYusor} disabled={ordering || yusorOtp.length < 4}
+                  className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-sky-600 to-blue-500 disabled:opacity-50 mb-3 text-sm">
+                  {ordering ? <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "تأكيد الدفع ✓"}
+                </button>
+                <button onClick={() => { setYusorStep("card"); setYusorOtp(""); setOrdering(false); }} className="w-full py-2.5 text-sm text-gray-400 hover:text-gray-700 transition-colors">
                   ← رجوع
                 </button>
               </div>
