@@ -29,25 +29,29 @@ export async function POST(req: NextRequest) {
 
   const { data: order, error: orderErr } = await supabaseAdmin
     .from("store_orders")
-    .select("id, user_id, yusor_token, yusor_valid_to")
+    .select("id, user_id, dpay_session_id")
     .eq("id", order_id)
     .eq("user_id", user.id)
     .single();
   if (orderErr || !order) return NextResponse.json({ error: "الطلب غير موجود" }, { status: 404 });
-  if (!order.yusor_token) return NextResponse.json({ error: "لم تبدأ عملية الدفع لهذا الطلب" }, { status: 400 });
-  if (order.yusor_valid_to && new Date(order.yusor_valid_to) < new Date()) {
+
+  // Yusor session was stashed as JSON in dpay_session_id at initiate (see route there)
+  let session: { token?: string; validTo?: string } = {};
+  try { session = JSON.parse(order.dpay_session_id || "{}"); } catch { /* not a yusor session */ }
+  if (!session.token) return NextResponse.json({ error: "لم تبدأ عملية الدفع لهذا الطلب" }, { status: 400 });
+  if (session.validTo && new Date(session.validTo) < new Date()) {
     return NextResponse.json({ error: "انتهت صلاحية جلسة الدفع، يرجى إعادة المحاولة" }, { status: 400 });
   }
 
   try {
-    await completeSession(order.yusor_token, otp);
+    await completeSession(session.token, otp);
 
     await supabaseAdmin
       .from("store_orders")
       .update({
         payment_status: "paid",
         status: "processing",
-        yusor_token: null, // single-use — clear after confirmation
+        dpay_session_id: null, // single-use — clear the token after confirmation
       })
       .eq("id", order_id);
 

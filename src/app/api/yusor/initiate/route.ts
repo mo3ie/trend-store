@@ -45,13 +45,13 @@ export async function POST(req: NextRequest) {
     const transactionId = randomUUID();
     await openSession(token, { amount: Number(amount), identityCard, transactionId });
 
+    // Persist the merchant token between OpenSession and CompleteSession.
+    // We reuse the existing (now-retired) dpay_session_id column to avoid a DB
+    // migration — DPay is disabled, so the column is free. Stored as JSON.
+    const yusorSession = JSON.stringify({ token, transactionId, validTo });
     const { error: updErr } = await supabaseAdmin
       .from("store_orders")
-      .update({
-        yusor_token: token,
-        yusor_transaction_id: transactionId,
-        yusor_valid_to: validTo,
-      })
+      .update({ dpay_session_id: yusorSession })
       .eq("id", order_id);
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
 

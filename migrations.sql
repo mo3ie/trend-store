@@ -10,11 +10,8 @@ ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS payment_status   TEXT DEFAULT 
 ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS notes            TEXT;
 ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS address_text     TEXT;
 ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS dpay_session_id  TEXT;
-
--- 2b. Yusor Pay (يسر باي) — merchant token persisted between OpenSession and CompleteSession
-ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS yusor_token          TEXT;
-ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS yusor_transaction_id TEXT;
-ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS yusor_valid_to       TIMESTAMPTZ;
+-- NOTE: Yusor Pay (يسر باي) reuses dpay_session_id to stash its session JSON —
+-- no extra columns needed (DPay is retired). See src/app/api/yusor/*.
 
 -- 3. Create user_addresses table
 CREATE TABLE IF NOT EXISTS user_addresses (
