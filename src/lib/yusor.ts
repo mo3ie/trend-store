@@ -59,6 +59,10 @@ async function call<T>(
     Accept: "application/json",
   };
   if (token) headers.Authorization = `Bearer ${token}`;
+  // When YUSOR_BASE_URL points at our static-IP relay (relay/), this shared
+  // secret authorises the proxy hop. Ignored when calling Yusor directly.
+  const relayKey = cleanEnv(process.env.YUSOR_RELAY_KEY);
+  if (relayKey) headers["x-relay-key"] = relayKey;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);

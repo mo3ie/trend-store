@@ -1,0 +1,12 @@
+# Optional TLS front for the relay (recommended before real cards).
+# Requires a subdomain A-record pointing at this server's IP, e.g.
+#   relay.trendstore-ly.com  A  66.23.237.231
+# Caddy then fetches a free Let's Encrypt cert automatically and Vercel can
+# call https://relay.trendstore-ly.com/... instead of plain http://IP:8080.
+#
+# Install Caddy:  https://caddyserver.com/docs/install
+# Run:            caddy run --config ./Caddyfile
+
+relay.trendstore-ly.com {
+	reverse_proxy localhost:8080
+}

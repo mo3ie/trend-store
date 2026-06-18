@@ -1,0 +1,13 @@
+{
+  "name": "yusor-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static-IP relay so Vercel can reach the Yusor Pay (Masarat) endpoint behind an IP whitelist",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}

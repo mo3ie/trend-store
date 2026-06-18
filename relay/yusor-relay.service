@@ -1,0 +1,23 @@
+[Unit]
+Description=Yusor Pay static-IP relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/yusor-relay
+ExecStart=/usr/bin/node /opt/yusor-relay/server.js
+Restart=always
+RestartSec=3
+# --- config: edit these ---
+Environment=RELAY_PORT=8080
+Environment=UPSTREAM_ORIGIN=http://160.19.103.122:40120
+# Put the real secret here (same value you set as YUSOR_RELAY_KEY on Vercel):
+Environment=RELAY_KEY=CHANGE_ME
+# hardening
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
