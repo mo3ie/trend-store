@@ -74,11 +74,27 @@ async function call<T>(
     });
   } catch (err) {
     clearTimeout(timer);
-    const e = err as Error;
-    const msg = e.name === "AbortError"
-      ? "انتهت مهلة الاتصال بخدمة يسر باي (20 ث)"
-      : `تعذّر الاتصال بخدمة يسر باي: ${e.message}`;
-    console.log(`[yusor:${path}] fetch-error: ${e.message}`);
+    const e = err as Error & {
+      cause?: { code?: string; errno?: number; message?: string; address?: string; port?: number };
+    };
+    const code = e.cause?.code || "";
+    let msg: string;
+    if (e.name === "AbortError") {
+      msg = "انتهت مهلة الاتصال بخدمة يسر باي (20 ث) — الخادم لم يستجب (غالبًا IP خادمنا غير مضاف في قائمة مسارات)";
+    } else if (code === "ETIMEDOUT") {
+      msg = "انتهت مهلة الاتصال — IP خادمنا غير مسموح به في قائمة مسارات (whitelist)";
+    } else if (code === "ECONNREFUSED") {
+      msg = "رُفض الاتصال بخدمة يسر باي — المنفذ مغلق أو الاتصال مرفوض من جهة الخادم";
+    } else if (code === "ENOTFOUND" || code === "EAI_AGAIN") {
+      msg = "تعذّر العثور على خادم يسر باي (مشكلة DNS في عنوان الخدمة)";
+    } else {
+      msg = `تعذّر الاتصال بخدمة يسر باي: ${e.cause?.message || e.message}`;
+    }
+    console.log(
+      `[yusor:${path}] fetch-error name=${e.name} msg=${e.message} ` +
+      `cause.code=${code || "?"} cause.msg=${e.cause?.message || "?"} ` +
+      `addr=${e.cause?.address || "?"}:${e.cause?.port || "?"}`,
+    );
     throw new Error(msg);
   }
   clearTimeout(timer);
