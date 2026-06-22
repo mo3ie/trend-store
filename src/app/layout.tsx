@@ -8,8 +8,26 @@ const cairo = Cairo({
 });
 
 export const metadata: Metadata = {
-  title: "محل ترند للإلكترونيات",
-  description: "كل ما تحتاجه من عالم التقنية في مكان واحد",
+  metadataBase: new URL("https://trendstore-ly.com"),
+  title: {
+    default: "محل ترند للإلكترونيات",
+    template: "%s | ترند للإلكترونيات",
+  },
+  description: "كل ما تحتاجه من عالم التقنية في مكان واحد — هواتف، إكسسوارات وأجهزة بأفضل الأسعار وتوصيل لكل ليبيا.",
+  keywords: ["ترند", "إلكترونيات", "ليبيا", "هواتف", "إكسسوارات", "متجر"],
+  openGraph: {
+    title: "محل ترند للإلكترونيات",
+    description: "كل ما تحتاجه من عالم التقنية في مكان واحد — توصيل لكل ليبيا.",
+    url: "https://trendstore-ly.com",
+    siteName: "ترند للإلكترونيات",
+    locale: "ar_LY",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "محل ترند للإلكترونيات",
+    description: "كل ما تحتاجه من عالم التقنية في مكان واحد.",
+  },
 };
 
 export default function RootLayout({
