@@ -40,15 +40,21 @@ export async function POST(req: NextRequest) {
   if (orderErr || !order) return NextResponse.json({ error: "الطلب غير موجود" }, { status: 404 });
 
   try {
-    const { token, validTo } = await signin();
+    const { token: signinToken } = await signin();
 
     const transactionId = randomUUID();
-    await openSession(token, { amount: Number(amount), identityCard, transactionId });
+    // OpenSession returns its OWN token; CompleteSession must use THAT token,
+    // not the signin token (using the signin token there → HTTP 403).
+    const { token: sessionToken, validTo } = await openSession(signinToken, {
+      amount: Number(amount),
+      identityCard,
+      transactionId,
+    });
 
-    // Persist the merchant token between OpenSession and CompleteSession.
+    // Persist the OpenSession token between OpenSession and CompleteSession.
     // We reuse the existing (now-retired) dpay_session_id column to avoid a DB
     // migration — DPay is disabled, so the column is free. Stored as JSON.
-    const yusorSession = JSON.stringify({ token, transactionId, validTo });
+    const yusorSession = JSON.stringify({ token: sessionToken, transactionId, validTo });
     const { error: updErr } = await supabaseAdmin
       .from("store_orders")
       .update({ dpay_session_id: yusorSession })

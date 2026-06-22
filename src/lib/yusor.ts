@@ -150,10 +150,15 @@ export async function signin(): Promise<{ token: string; validTo: string }> {
 // amount is in whole Libyan dinars (integer per the API spec).
 // identityCard: 9 digits (card number + prefix) for most banks,
 //               10 digits (card number only) for Trade & Development Bank.
+//
+// IMPORTANT: OpenSession returns its OWN bearer token (content.value), scoped to
+// this sale session. CompleteSession MUST be authenticated with THIS token, not
+// the Signin token — using the Signin token there returns HTTP 403 (confirmed
+// with Masarat). So we return it for the caller to persist until CompleteSession.
 export async function openSession(
   token: string,
   opts: { amount: number; identityCard: string; transactionId: string },
-): Promise<void> {
+): Promise<{ token: string; validTo: string }> {
   const amount = Math.round(Number(opts.amount));
   if (!amount || amount <= 0) throw new Error("المبلغ غير صحيح");
 
@@ -162,15 +167,21 @@ export async function openSession(
     throw new Error("رقم البطاقة يجب أن يكون 9 أرقام (أو 10 لمصرف التجارة والتنمية)");
   }
 
-  await call<unknown>("OpenSession", {
+  const env = await call<SigninContent>("OpenSession", {
     amount,
     identityCard,
     transactionId: opts.transactionId,
     onlineOperation: ONLINE_OPERATION_SELL,
   }, token);
+
+  const sessionToken = env.content?.value;
+  if (!sessionToken) throw new Error("لم تُرجع خدمة يسر باي رمز الجلسة");
+
+  return { token: sessionToken, validTo: env.content.validTo };
 }
 
 // Step 2 — confirm the sale with the OTP the customer received.
+// `token` MUST be the token returned by openSession (not the signin token).
 export async function completeSession(token: string, otp: string): Promise<void> {
   const code = (otp || "").trim();
   if (!code) throw new Error("رمز التحقق مطلوب");
