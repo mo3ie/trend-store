@@ -1,8 +1,22 @@
 @import "tailwindcss";
 
+/* Light/Dark theming — DARK is the default (root). Adding the `.light` class on
+   <html> activates light mode. The `light:` variant lets components add light
+   overrides on top of existing dark classes WITHOUT touching them (zero
+   regression: pages that don't opt in simply stay dark). */
+@custom-variant light (&:where(.light, .light *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --page-bg: radial-gradient(circle at top, #0f0f0f, #000);
+  --dot-opacity: 0.1;
+}
+
+.light {
+  --page-bg: radial-gradient(circle at top, #ffffff, #eef1f7);
+  --dot-opacity: 0.04;
+  color-scheme: light;
 }
 
 @theme inline {
@@ -21,7 +35,7 @@
 
 /* خلفية نيون */
 body {
-  background: radial-gradient(circle at top, #0f0f0f, #000);
+  background: var(--page-bg);
 }
 
 .category-card, .shein-wrapper, .offer-card, .hero-btn, .neon-btn, .card-hover {
@@ -47,10 +61,21 @@ body::after {
     radial-gradient(#a855f7 1px, transparent 1px),
     radial-gradient(#3b82f6 1px, transparent 1px);
   background-size: 40px 40px;
-  opacity: 0.1;
+  opacity: var(--dot-opacity);
   z-index: -1;
   pointer-events: none;
 }
+
+/* ── Light-mode overrides for the neon/dark global classes ────────────────── */
+.light .category-card { background: rgba(255, 255, 255, 0.85); border-color: rgba(124, 58, 237, 0.25); }
+.light .category-card h3 { color: #1e1b2e; }
+.light .category-card p { color: #6b7280; }
+.light .neon-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(168, 85, 247, 0.25);
+  box-shadow: 0 4px 20px rgba(168, 85, 247, 0.12);
+}
+.light .neon-text { color: #1e1b2e; text-shadow: 0 0 6px rgba(168, 85, 247, 0.25); }
 
 /* Neon Glow Effects */
 

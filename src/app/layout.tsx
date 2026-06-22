@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Cairo } from "next/font/google";
 import "./globals.css";
+import ThemeToggle from "@/components/ThemeToggle";
+
+// Applied before paint to avoid a theme flash. Default is dark.
+const noFlashScript = `(function(){try{if(localStorage.getItem('theme')==='light'){document.documentElement.classList.add('light');}}catch(e){}})();`;
 
 const cairo = Cairo({
   subsets: ["arabic"],
@@ -37,8 +41,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl" className="h-full antialiased">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: noFlashScript }} />
+      </head>
       <body className={`${cairo.className} min-h-full flex flex-col`}>
         {children}
+        <ThemeToggle />
       </body>
     </html>
   );
