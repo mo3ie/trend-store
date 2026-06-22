@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, ShoppingCart, ArrowLeft, ExternalLink, Globe } from "lucide-react";
+import { Building2, ShoppingCart, ArrowLeft, ExternalLink, Globe, Stethoscope } from "lucide-react";
 
 const SITES = [
   {
@@ -24,6 +24,17 @@ const SITES = [
     accent: "#a78bfa",
     badge: null,
     features: ["أي منتج من شي إن", "توصيل لليبيا", "دفع محلي", "تتبع الطلب"],
+  },
+  {
+    name: "MedSprint",
+    tagline: "منصة التعليم الطبي الذكية",
+    desc: "تعلّم الطب بذكاء — شروحات مبسّطة وعميقة، أسئلة وحالات سريرية ومحاكاة امتحانات، مبنية على مصادر موثوقة.",
+    href: "https://medsprint.trendstore-ly.com",
+    icon: Stethoscope,
+    color: "#0d9488",
+    accent: "#2dd4bf",
+    badge: "جديد",
+    features: ["شروحات ذكية", "أسئلة وحالات سريرية", "محاكاة امتحانات", "للطلاب والأطباء"],
   },
 ];
 
