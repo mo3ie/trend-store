@@ -16,14 +16,14 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-[#0b0f1a] flex items-center justify-center px-4 relative overflow-hidden" dir="rtl">
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center px-4 relative overflow-hidden" dir="rtl">
       <div className="fixed top-[-100px] left-[-100px] w-[400px] h-[400px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="fixed bottom-[-100px] right-[-100px] w-[400px] h-[400px] bg-red-600/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="text-center relative max-w-sm">
         <div className="text-6xl mb-4">⚠️</div>
-        <p className="text-white text-xl font-bold mb-2">حدث خطأ غير متوقع</p>
-        <p className="text-gray-500 text-sm mb-8">
+        <p className="text-[var(--text)] text-xl font-bold mb-2">حدث خطأ غير متوقع</p>
+        <p className="text-[var(--muted-2)] text-sm mb-8">
           نعتذر عن ذلك. يمكنك المحاولة مرة أخرى أو العودة للرئيسية.
         </p>
         <div className="flex items-center justify-center gap-3">

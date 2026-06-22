@@ -28,7 +28,7 @@ function SuccessContent() {
   }, [via, paid, orderId]);
 
   return (
-    <div className="min-h-screen bg-[#0b0f1a] text-white flex flex-col items-center justify-center p-6" dir="rtl">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col items-center justify-center p-6" dir="rtl">
       <div className="fixed top-[-150px] right-[-150px] w-[500px] h-[500px] bg-green-600/10 rounded-full blur-[140px] pointer-events-none" />
 
       <div className="max-w-md w-full space-y-6 text-center relative z-10">
@@ -40,21 +40,21 @@ function SuccessContent() {
 
         {/* Title */}
         <div>
-          <h1 className="text-3xl font-black text-white mb-2">تم الطلب بنجاح! 🎉</h1>
-          <p className="text-gray-400 text-sm leading-relaxed">
+          <h1 className="text-3xl font-black text-[var(--text)] mb-2">تم الطلب بنجاح! 🎉</h1>
+          <p className="text-[var(--muted)] text-sm leading-relaxed">
             شكراً لك! تم استلام طلبك وسنتواصل معك قريباً لتأكيد التسليم.
           </p>
         </div>
 
         {/* Order ID */}
         {orderId && (
-          <div className="bg-[#0f1320] border border-green-500/20 rounded-2xl p-5">
-            <p className="text-gray-500 text-xs mb-1">رقم الطلب</p>
-            <p className="text-white font-black text-lg tracking-widest">
+          <div className="bg-[var(--surface)] border border-green-500/20 rounded-2xl p-5">
+            <p className="text-[var(--muted-2)] text-xs mb-1">رقم الطلب</p>
+            <p className="text-[var(--text)] font-black text-lg tracking-widest">
               #{orderId.slice(0, 12).toUpperCase()}
             </p>
             {via && (
-              <p className="text-gray-500 text-xs mt-2">
+              <p className="text-[var(--muted-2)] text-xs mt-2">
                 طريقة الدفع: {via === "cash" ? "الدفع عند الاستلام" : via === "dpay" ? "بوابة DPay" : via === "moamalat" ? "معاملات" : via === "yusor" ? "يسر باي" : via === "edfali" ? "ادفع لي" : via}
               </p>
             )}
@@ -62,7 +62,7 @@ function SuccessContent() {
         )}
 
         {/* Steps */}
-        <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-5 text-right">
+        <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 text-right">
           <h3 className="font-bold text-sm text-purple-300 mb-4">ماذا يحدث بعد ذلك؟</h3>
           <div className="space-y-3">
             {[
@@ -71,10 +71,10 @@ function SuccessContent() {
               { step: "3", text: "يمكنك تتبع حالة طلبك في أي وقت", done: false },
             ].map(({ step, text, done }) => (
               <div key={step} className="flex items-start gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5 ${done ? "bg-green-500 text-white" : "bg-purple-500/20 border border-purple-500/30 text-purple-400"}`}>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5 ${done ? "bg-green-500 text-[var(--text)]" : "bg-purple-500/20 border border-purple-500/30 text-purple-400"}`}>
                   {step}
                 </div>
-                <p className="text-sm text-gray-400 leading-relaxed">{text}</p>
+                <p className="text-sm text-[var(--muted)] leading-relaxed">{text}</p>
               </div>
             ))}
           </div>
@@ -90,7 +90,7 @@ function SuccessContent() {
           </a>
           <a
             href="/products"
-            className="w-full py-3 rounded-2xl font-medium text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center gap-2 transition-all text-sm"
+            className="w-full py-3 rounded-2xl font-medium text-[var(--muted)] hover:text-[var(--text)] bg-white/5 hover:bg-white/10 border border-[var(--border)] flex items-center justify-center gap-2 transition-all text-sm"
           >
             <ShoppingCart size={16} /> مواصلة التسوق
           </a>
@@ -109,7 +109,7 @@ function SuccessContent() {
 export default function SuccessPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#0b0f1a] flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
         <span className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
       </div>
     }>

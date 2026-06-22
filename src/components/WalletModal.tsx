@@ -215,7 +215,7 @@ export default function WalletModal({ onClose }: Props) {
       className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget && !edfaliStep) onClose(); }}
     >
-      <div className="bg-[#0f1320] border border-purple-500/30 rounded-3xl w-full max-w-md shadow-[0_20px_60px_rgba(0,0,0,0.7)] flex flex-col max-h-[90vh] overflow-hidden">
+      <div className="bg-[var(--surface)] border border-purple-500/30 rounded-3xl w-full max-w-md shadow-[0_20px_60px_rgba(0,0,0,0.7)] flex flex-col max-h-[90vh] overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-purple-500/15 shrink-0">
@@ -223,14 +223,14 @@ export default function WalletModal({ onClose }: Props) {
             <Wallet size={18} className="text-purple-400" />
             <span className="font-bold">محفظتي</span>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-[var(--muted-2)] hover:text-[var(--text)] transition-colors">
             <X size={20} />
           </button>
         </div>
 
         {/* Balance card */}
         <div className="mx-5 mt-4 p-5 rounded-2xl bg-gradient-to-br from-purple-900/60 to-blue-900/40 border border-purple-500/30 shrink-0">
-          <p className="text-gray-400 text-xs mb-1">الرصيد الحالي</p>
+          <p className="text-[var(--muted)] text-xs mb-1">الرصيد الحالي</p>
           {loading ? (
             <div className="h-9 w-24 bg-white/10 rounded-xl animate-pulse" />
           ) : (
@@ -238,7 +238,7 @@ export default function WalletModal({ onClose }: Props) {
               {balance.toFixed(2)} <span className="text-lg">د</span>
             </p>
           )}
-          <p className="text-gray-500 text-xs mt-2">دينار ليبي</p>
+          <p className="text-[var(--muted-2)] text-xs mt-2">دينار ليبي</p>
         </div>
 
         {/* Tabs */}
@@ -248,7 +248,7 @@ export default function WalletModal({ onClose }: Props) {
               key={t}
               onClick={() => { if (!edfaliStep) setTab(t); }}
               className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
-                tab === t ? "bg-purple-600 text-white" : "bg-white/5 text-gray-400 hover:text-white border border-white/10"
+                tab === t ? "bg-purple-600 text-[var(--text)]" : "bg-white/5 text-[var(--muted)] hover:text-[var(--text)] border border-[var(--border)]"
               }`}
             >
               {t === "overview" ? "المعاملات" : "شحن الرصيد"}
@@ -262,9 +262,9 @@ export default function WalletModal({ onClose }: Props) {
           {tab === "overview" && (
             <>
               {loading ? (
-                <div className="py-8 text-center text-gray-600 text-sm">جاري التحميل...</div>
+                <div className="py-8 text-center text-[var(--muted-2)] text-sm">جاري التحميل...</div>
               ) : transactions.length === 0 ? (
-                <div className="py-10 text-center text-gray-600">
+                <div className="py-10 text-center text-[var(--muted-2)]">
                   <Wallet size={36} className="mx-auto mb-3 opacity-20" />
                   <p className="text-sm">لا توجد معاملات بعد</p>
                   <button onClick={() => setTab("recharge")}
@@ -274,7 +274,7 @@ export default function WalletModal({ onClose }: Props) {
                 </div>
               ) : (
                 transactions.map(tx => (
-                  <div key={tx.id} className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                  <div key={tx.id} className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/5 border border-[var(--border)]">
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
                       tx.type === "credit" ? "bg-green-500/15" : "bg-red-500/15"
                     }`}>
@@ -283,8 +283,8 @@ export default function WalletModal({ onClose }: Props) {
                         : <ArrowUpCircle size={18} className="text-red-400" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white">{tx.note || METHOD_LABELS[tx.method] || tx.method}</p>
-                      <p className="text-xs text-gray-500">{timeStr(tx.created_at)}</p>
+                      <p className="text-sm font-medium text-[var(--text)]">{tx.note || METHOD_LABELS[tx.method] || tx.method}</p>
+                      <p className="text-xs text-[var(--muted-2)]">{timeStr(tx.created_at)}</p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className={`font-black text-sm ${tx.type === "credit" ? "text-green-400" : "text-red-400"}`}>
@@ -308,20 +308,20 @@ export default function WalletModal({ onClose }: Props) {
             <div className="space-y-4">
               {/* Amount */}
               <div>
-                <label className="text-gray-400 text-xs mb-2 block">المبلغ (د.ل)</label>
+                <label className="text-[var(--muted)] text-xs mb-2 block">المبلغ (د.ل)</label>
                 <input
                   type="number"
                   value={amount}
                   onChange={e => setAmount(e.target.value)}
                   placeholder="أدخل المبلغ"
                   min="5"
-                  className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/30 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-all"
+                  className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all"
                 />
                 <div className="flex gap-2 mt-2">
                   {[20, 50, 100, 200].map(v => (
                     <button key={v} type="button" onClick={() => setAmount(v.toString())}
                       className={`flex-1 py-1.5 rounded-xl text-xs font-medium transition-all ${
-                        amount === v.toString() ? "bg-purple-600 text-white" : "bg-white/5 text-gray-400 border border-white/10 hover:text-white"
+                        amount === v.toString() ? "bg-purple-600 text-[var(--text)]" : "bg-white/5 text-[var(--muted)] border border-[var(--border)] hover:text-[var(--text)]"
                       }`}>
                       {v} د
                     </button>
@@ -331,19 +331,19 @@ export default function WalletModal({ onClose }: Props) {
 
               {/* Method */}
               <div>
-                <label className="text-gray-400 text-xs mb-2 block">طريقة الشحن</label>
+                <label className="text-[var(--muted)] text-xs mb-2 block">طريقة الشحن</label>
                 <div className="grid grid-cols-2 gap-2">
                   {PAYMENT_METHODS.map(m => (
                     <button key={m.id} type="button"
                       onClick={() => { setMethod(m.id); setRechMsg(""); setPhone(""); }}
                       className={`p-3 rounded-xl text-right transition-all border ${
                         method === m.id
-                          ? "bg-purple-600/20 border-purple-500/60 text-white"
-                          : "bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10"
+                          ? "bg-purple-600/20 border-purple-500/60 text-[var(--text)]"
+                          : "bg-white/5 border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-white/10"
                       }`}>
                       <span className="text-lg">{m.icon}</span>
                       <p className="text-xs font-semibold mt-1">{m.label}</p>
-                      <p className="text-[10px] text-gray-500">{m.desc}</p>
+                      <p className="text-[10px] text-[var(--muted-2)]">{m.desc}</p>
                     </button>
                   ))}
                 </div>
@@ -352,7 +352,7 @@ export default function WalletModal({ onClose }: Props) {
               {/* Phone for edfali */}
               {method === "edfali" && (
                 <div>
-                  <label className="text-gray-400 text-xs mb-2 flex items-center gap-1 block">
+                  <label className="text-[var(--muted)] text-xs mb-2 flex items-center gap-1 block">
                     <Phone size={12} /> رقم هاتف ادفع لي
                   </label>
                   <input
@@ -361,16 +361,16 @@ export default function WalletModal({ onClose }: Props) {
                     onChange={e => setPhone(e.target.value)}
                     placeholder="9xxxxxxxx"
                     maxLength={9}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/30 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-all"
+                    className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all"
                   />
-                  <p className="text-gray-600 text-xs mt-1">بدون الصفر — مثال: 918621511</p>
+                  <p className="text-[var(--muted-2)] text-xs mt-1">بدون الصفر — مثال: 918621511</p>
                 </div>
               )}
 
               {/* Reference for prepaid card */}
               {method === "prepaid_card" && (
                 <div>
-                  <label className="text-gray-400 text-xs mb-2 flex items-center gap-1 block">
+                  <label className="text-[var(--muted)] text-xs mb-2 flex items-center gap-1 block">
                     <Hash size={12} /> رقم الكرت
                   </label>
                   <input
@@ -378,7 +378,7 @@ export default function WalletModal({ onClose }: Props) {
                     value={reference}
                     onChange={e => setReference(e.target.value)}
                     placeholder="أدخل رقم كرت الشحن"
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/30 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-all font-mono"
+                    className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all font-mono"
                   />
                 </div>
               )}
@@ -413,7 +413,7 @@ export default function WalletModal({ onClose }: Props) {
           {tab === "recharge" && edfaliStep === "sending" && (
             <div className="py-16 text-center">
               <div className="w-14 h-14 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto mb-5" />
-              <p className="text-gray-400 text-sm">جاري إرسال رمز التحقق...</p>
+              <p className="text-[var(--muted)] text-sm">جاري إرسال رمز التحقق...</p>
             </div>
           )}
 
@@ -421,8 +421,8 @@ export default function WalletModal({ onClose }: Props) {
             <div className="space-y-5 py-4">
               <div className="text-center">
                 <div className="text-5xl mb-3">🔐</div>
-                <h3 className="font-bold text-white mb-1">رمز التحقق</h3>
-                <p className="text-gray-400 text-sm">
+                <h3 className="font-bold text-[var(--text)] mb-1">رمز التحقق</h3>
+                <p className="text-[var(--muted)] text-sm">
                   أُرسل رمز مكوّن من <strong>4 أرقام</strong> إلى هاتفك{" "}
                   <strong className="text-purple-400">{phone}</strong>
                 </p>
@@ -434,7 +434,7 @@ export default function WalletModal({ onClose }: Props) {
                 placeholder="0000"
                 value={edfaliOtp}
                 onChange={e => setEdfaliOtp(e.target.value.slice(0, 4))}
-                className="w-full px-4 py-4 rounded-2xl bg-black/40 border border-purple-500/40 text-white text-3xl text-center font-black tracking-widest focus:outline-none focus:border-purple-500 transition-all"
+                className="w-full px-4 py-4 rounded-2xl bg-[var(--input)] border border-purple-500/40 text-[var(--text)] text-3xl text-center font-black tracking-widest focus:outline-none focus:border-purple-500 transition-all"
                 style={{ direction: "ltr" }}
                 autoFocus
               />
@@ -458,7 +458,7 @@ export default function WalletModal({ onClose }: Props) {
 
               <button
                 onClick={() => { resetEdfali(); setRechMsg(""); }}
-                className="w-full py-2.5 text-sm text-gray-500 hover:text-gray-300 transition-colors"
+                className="w-full py-2.5 text-sm text-[var(--muted-2)] hover:text-[var(--muted)] transition-colors"
               >
                 ← رجوع لتغيير الرقم
               </button>

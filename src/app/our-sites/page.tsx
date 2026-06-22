@@ -40,23 +40,23 @@ const SITES = [
 
 export default function OurSitesPage() {
   return (
-    <div className="min-h-screen bg-[#0b0f1a] text-white" dir="rtl">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]" dir="rtl">
       {/* Header */}
-      <div className="border-b border-purple-500/20 px-6 py-4 flex items-center gap-4 sticky top-0 bg-[#0b0f1a]/90 backdrop-blur z-10">
-        <a href="/" className="text-gray-400 hover:text-purple-400 transition-colors">
+      <div className="border-b border-purple-500/20 px-6 py-4 flex items-center gap-4 sticky top-0 bg-[var(--glass)] backdrop-blur z-10">
+        <a href="/" className="text-[var(--muted)] hover:text-purple-400 transition-colors">
           <ArrowLeft size={20} />
         </a>
         <div>
           <h1 className="text-lg font-black tracking-wide bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
             مواقعنا وخدماتنا
           </h1>
-          <p className="text-xs text-gray-500">مشاريع من تصميم وتطوير فريق Trend</p>
+          <p className="text-xs text-[var(--muted-2)]">مشاريع من تصميم وتطوير فريق Trend</p>
         </div>
       </div>
 
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-6">
 
-        <p className="text-gray-400 text-sm leading-relaxed">
+        <p className="text-[var(--muted)] text-sm leading-relaxed">
           نطوّر منصات رقمية متخصصة لخدمة السوق الليبي. كل مشروع مصمم بعناية ليقدم تجربة سلسة وآمنة.
         </p>
 
@@ -68,7 +68,7 @@ export default function OurSitesPage() {
               href={site.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="block rounded-3xl border border-white/10 overflow-hidden hover:border-white/20 transition-all hover:shadow-[0_0_40px_rgba(168,85,247,0.12)] group"
+              className="block rounded-3xl border border-[var(--border)] overflow-hidden hover:border-white/20 transition-all hover:shadow-[0_0_40px_rgba(168,85,247,0.12)] group"
               style={{ background: `linear-gradient(135deg, ${site.color}22, ${site.color}11)` }}
             >
               <div className="p-6">
@@ -81,7 +81,7 @@ export default function OurSitesPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h2 className="text-xl font-black text-white">{site.name}</h2>
+                        <h2 className="text-xl font-black text-[var(--text)]">{site.name}</h2>
                         {site.badge && (
                           <span className="text-xs font-bold px-2 py-0.5 rounded-full"
                             style={{ background: `${site.accent}33`, color: site.accent }}>
@@ -92,11 +92,11 @@ export default function OurSitesPage() {
                       <p className="text-sm font-medium" style={{ color: site.accent }}>{site.tagline}</p>
                     </div>
                   </div>
-                  <ExternalLink size={16} className="text-gray-500 group-hover:text-white transition-colors mt-1 shrink-0" />
+                  <ExternalLink size={16} className="text-[var(--muted-2)] group-hover:text-[var(--text)] transition-colors mt-1 shrink-0" />
                 </div>
 
                 {/* Description */}
-                <p className="text-gray-300 text-sm leading-relaxed mb-5">{site.desc}</p>
+                <p className="text-[var(--muted)] text-sm leading-relaxed mb-5">{site.desc}</p>
 
                 {/* Features */}
                 <div className="flex flex-wrap gap-2 mb-5">
@@ -125,8 +125,8 @@ export default function OurSitesPage() {
           <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center mx-auto mb-3">
             <Globe size={22} className="text-purple-400/50" />
           </div>
-          <p className="text-gray-500 font-bold text-sm">مشاريع قادمة قريباً</p>
-          <p className="text-gray-600 text-xs mt-1">نعمل على مزيد من المنصات لخدمة السوق الليبي</p>
+          <p className="text-[var(--muted-2)] font-bold text-sm">مشاريع قادمة قريباً</p>
+          <p className="text-[var(--muted-2)] text-xs mt-1">نعمل على مزيد من المنصات لخدمة السوق الليبي</p>
         </div>
 
       </div>

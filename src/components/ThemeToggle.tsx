@@ -26,7 +26,7 @@ export default function ThemeToggle() {
       onClick={toggle}
       aria-label={light ? "تفعيل الوضع الداكن" : "تفعيل الوضع الفاتح"}
       title={light ? "الوضع الداكن" : "الوضع الفاتح"}
-      className="fixed bottom-5 left-5 z-50 w-11 h-11 rounded-full flex items-center justify-center border border-purple-500/30 bg-[#0f1320]/80 light:bg-white/90 light:border-purple-300 backdrop-blur shadow-lg hover:scale-105 transition-transform"
+      className="fixed left-4 bottom-24 md:bottom-6 z-[55] w-11 h-11 rounded-full flex items-center justify-center border border-purple-500/30 bg-[var(--surface-glass)] light:border-purple-300 backdrop-blur shadow-lg hover:scale-105 transition-transform"
     >
       {light
         ? <Moon size={18} className="text-purple-600" />

@@ -93,33 +93,33 @@ function PrintReceipt({ order, onClose }: { order: Order; onClose: () => void })
         {/* Store header */}
         <div className="text-center mb-6 border-b pb-4">
           <h1 className="text-2xl font-black tracking-widest">TREND</h1>
-          <p className="text-gray-500 text-xs">ترند للإلكترونيات</p>
-          <p className="text-gray-400 text-[10px] mt-1">trendstore-ly.com</p>
+          <p className="text-[var(--muted-2)] text-xs">ترند للإلكترونيات</p>
+          <p className="text-[var(--muted)] text-[10px] mt-1">trendstore-ly.com</p>
         </div>
 
         {/* Order info */}
         <div className="space-y-1 text-xs mb-4">
           <div className="flex justify-between">
-            <span className="text-gray-500">رقم الطلب</span>
+            <span className="text-[var(--muted-2)]">رقم الطلب</span>
             <span className="font-mono font-bold">#{order.id.slice(0, 8).toUpperCase()}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">التاريخ</span>
+            <span className="text-[var(--muted-2)]">التاريخ</span>
             <span>{new Date(order.created_at).toLocaleDateString("ar-LY", { year: "numeric", month: "long", day: "numeric" })}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">الحالة</span>
+            <span className="text-[var(--muted-2)]">الحالة</span>
             <span className="font-medium">{cfg.label}</span>
           </div>
           {(order.address || order.address_text) && (
             <div className="flex justify-between">
-              <span className="text-gray-500">التسليم</span>
+              <span className="text-[var(--muted-2)]">التسليم</span>
               <span className="text-right max-w-[180px]">{order.address || order.address_text}</span>
             </div>
           )}
           {order.payment_method && (
             <div className="flex justify-between">
-              <span className="text-gray-500">الدفع</span>
+              <span className="text-[var(--muted-2)]">الدفع</span>
               <span>{paymentLabels[order.payment_method] || order.payment_method}</span>
             </div>
           )}
@@ -132,11 +132,11 @@ function PrintReceipt({ order, onClose }: { order: Order; onClose: () => void })
               <div className="flex-1">
                 <p className="font-medium">{item.name}</p>
                 {item.variants && Object.entries(item.variants).length > 0 && (
-                  <p className="text-gray-400 text-[10px]">
+                  <p className="text-[var(--muted)] text-[10px]">
                     {Object.entries(item.variants).map(([k, v]) => `${k}: ${v}`).join(" · ")}
                   </p>
                 )}
-                <p className="text-gray-500">× {item.quantity}</p>
+                <p className="text-[var(--muted-2)]">× {item.quantity}</p>
               </div>
               <p className="font-bold shrink-0">{(item.price * item.quantity).toLocaleString()} د</p>
             </div>
@@ -150,13 +150,13 @@ function PrintReceipt({ order, onClose }: { order: Order; onClose: () => void })
         </div>
 
         {(order.note || order.notes) && (
-          <div className="mt-3 text-xs text-gray-500">
+          <div className="mt-3 text-xs text-[var(--muted-2)]">
             <p className="font-medium text-gray-700 mb-0.5">ملاحظات:</p>
             <p>{order.note || order.notes}</p>
           </div>
         )}
 
-        <div className="text-center mt-5 text-[10px] text-gray-400">
+        <div className="text-center mt-5 text-[10px] text-[var(--muted)]">
           <p>شكراً لثقتكم بترند للإلكترونيات</p>
           <p>للاستفسار: trendstore-ly.com</p>
         </div>
@@ -186,7 +186,7 @@ function OrderCard({ order }: { order: Order }) {
     <>
       {printing && <PrintReceipt order={order} onClose={() => setPrinting(false)} />}
 
-      <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl overflow-hidden">
+      <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl overflow-hidden">
         {/* Header Row */}
         <div
           className="flex items-center justify-between p-5 cursor-pointer hover:bg-white/[0.02] transition-colors"
@@ -197,8 +197,8 @@ function OrderCard({ order }: { order: Order }) {
               <ShoppingBag size={18} className="text-purple-400" />
             </div>
             <div>
-              <p className="text-sm font-bold text-white">طلب #{order.id.slice(0, 8).toUpperCase()}</p>
-              <p className="text-gray-500 text-xs mt-0.5">
+              <p className="text-sm font-bold text-[var(--text)]">طلب #{order.id.slice(0, 8).toUpperCase()}</p>
+              <p className="text-[var(--muted-2)] text-xs mt-0.5">
                 {new Date(order.created_at).toLocaleDateString("ar-LY", { year: "numeric", month: "long", day: "numeric" })}
               </p>
             </div>
@@ -214,13 +214,13 @@ function OrderCard({ order }: { order: Order }) {
               <StatusIcon size={12} />
               {cfg.label}
             </span>
-            {expanded ? <ChevronUp size={16} className="text-gray-500" /> : <ChevronDown size={16} className="text-gray-500" />}
+            {expanded ? <ChevronUp size={16} className="text-[var(--muted-2)]" /> : <ChevronDown size={16} className="text-[var(--muted-2)]" />}
           </div>
         </div>
 
         {/* Expanded Details */}
         {expanded && (
-          <div className="border-t border-white/5 p-5 space-y-5">
+          <div className="border-t border-[var(--border)] p-5 space-y-5">
 
             {/* Status Timeline */}
             {!isCancelled && (
@@ -237,11 +237,11 @@ function OrderCard({ order }: { order: Order }) {
                       <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
                         active ? "border-purple-500 bg-purple-500/20 shadow-[0_0_12px_rgba(168,85,247,0.4)]"
                         : done ? "border-purple-500 bg-purple-500"
-                        : "border-white/10 bg-white/5"
+                        : "border-[var(--border)] bg-white/5"
                       }`}>
-                        <Icon size={14} className={active || done ? "text-white" : "text-gray-600"} />
+                        <Icon size={14} className={active || done ? "text-[var(--text)]" : "text-[var(--muted-2)]"} />
                       </div>
-                      <span className={`text-xs text-center ${active ? "text-purple-400 font-medium" : done ? "text-gray-400" : "text-gray-600"}`}>
+                      <span className={`text-xs text-center ${active ? "text-purple-400 font-medium" : done ? "text-[var(--muted)]" : "text-[var(--muted-2)]"}`}>
                         {step.label}
                       </span>
                     </div>
@@ -260,18 +260,18 @@ function OrderCard({ order }: { order: Order }) {
             {/* Items */}
             {items.length > 0 && (
               <div className="space-y-2">
-                <p className="text-gray-500 text-xs mb-2">المنتجات ({items.length})</p>
+                <p className="text-[var(--muted-2)] text-xs mb-2">المنتجات ({items.length})</p>
                 {items.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-3 bg-black/20 rounded-xl p-3">
                     {item.image_url ? (
-                      <img src={item.image_url} className="w-12 h-12 rounded-lg object-cover border border-white/10 shrink-0" alt={item.name} />
+                      <img src={item.image_url} className="w-12 h-12 rounded-lg object-cover border border-[var(--border)] shrink-0" alt={item.name} />
                     ) : (
                       <div className="w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
                         <Package size={16} className="text-purple-400/50" />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white font-medium leading-tight">{item.name}</p>
+                      <p className="text-sm text-[var(--text)] font-medium leading-tight">{item.name}</p>
                       {item.variants && Object.entries(item.variants).length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {Object.entries(item.variants).map(([k, v]) => (
@@ -281,15 +281,15 @@ function OrderCard({ order }: { order: Order }) {
                           ))}
                         </div>
                       )}
-                      <p className="text-xs text-gray-500 mt-0.5">الكمية: {item.quantity}</p>
+                      <p className="text-xs text-[var(--muted-2)] mt-0.5">الكمية: {item.quantity}</p>
                     </div>
                     <span className="text-sm font-bold text-purple-400 shrink-0">{(item.price * item.quantity).toLocaleString()} د</span>
                   </div>
                 ))}
 
                 {/* Subtotals */}
-                <div className="flex justify-between items-center pt-2 border-t border-white/5 text-sm">
-                  <span className="text-gray-500">المجموع</span>
+                <div className="flex justify-between items-center pt-2 border-t border-[var(--border)] text-sm">
+                  <span className="text-[var(--muted-2)]">المجموع</span>
                   <span className="font-black text-base bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
                     {total?.toLocaleString() || "—"} د.ل
                   </span>
@@ -301,26 +301,26 @@ function OrderCard({ order }: { order: Order }) {
             <div className="grid grid-cols-2 gap-3 text-xs">
               {(order.address || order.address_text) && (
                 <div className="bg-black/20 rounded-xl p-3">
-                  <p className="text-gray-500 mb-1 flex items-center gap-1"><MapPin size={10} /> عنوان التسليم</p>
-                  <p className="text-gray-300">{order.address || order.address_text}</p>
+                  <p className="text-[var(--muted-2)] mb-1 flex items-center gap-1"><MapPin size={10} /> عنوان التسليم</p>
+                  <p className="text-[var(--muted)]">{order.address || order.address_text}</p>
                 </div>
               )}
               {order.phone && (
                 <div className="bg-black/20 rounded-xl p-3">
-                  <p className="text-gray-500 mb-1 flex items-center gap-1"><Phone size={10} /> رقم التواصل</p>
-                  <p className="text-gray-300">{order.phone}</p>
+                  <p className="text-[var(--muted-2)] mb-1 flex items-center gap-1"><Phone size={10} /> رقم التواصل</p>
+                  <p className="text-[var(--muted)]">{order.phone}</p>
                 </div>
               )}
               {order.payment_method && (
                 <div className="bg-black/20 rounded-xl p-3">
-                  <p className="text-gray-500 mb-1 flex items-center gap-1"><CreditCard size={10} /> طريقة الدفع</p>
-                  <p className="text-gray-300">{paymentLabels[order.payment_method] || order.payment_method}</p>
+                  <p className="text-[var(--muted-2)] mb-1 flex items-center gap-1"><CreditCard size={10} /> طريقة الدفع</p>
+                  <p className="text-[var(--muted)]">{paymentLabels[order.payment_method] || order.payment_method}</p>
                 </div>
               )}
               {(order.note || order.notes) && (
                 <div className="bg-black/20 rounded-xl p-3 col-span-2">
-                  <p className="text-gray-500 mb-1">ملاحظة</p>
-                  <p className="text-gray-300">{order.note || order.notes}</p>
+                  <p className="text-[var(--muted-2)] mb-1">ملاحظة</p>
+                  <p className="text-[var(--muted)]">{order.note || order.notes}</p>
                 </div>
               )}
             </div>
@@ -328,7 +328,7 @@ function OrderCard({ order }: { order: Order }) {
             {/* Print button */}
             <button
               onClick={(e) => { e.stopPropagation(); setPrinting(true); }}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 transition-all text-sm"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-white/10 transition-all text-sm"
             >
               <Printer size={14} />
               طباعة الوصل
@@ -366,28 +366,28 @@ export default function OrdersPage() {
     : orders.filter((o) => statusConfig[o.status]?.label === activeFilter);
 
   if (authLoading) return (
-    <div className="min-h-screen bg-[#0b0f1a] flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
       <span className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
     </div>
   );
 
   return (
-    <div className="flex flex-col bg-[#0b0f1a] text-white min-h-screen">
+    <div className="flex flex-col bg-[var(--bg)] text-[var(--text)] min-h-screen">
 
       {/* ─── HEADER ─── */}
-      <header className="flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[#0b0f1a]/90 backdrop-blur-md z-40">
-        <button onClick={() => router.back()} className="text-gray-400 hover:text-purple-400 transition-colors shrink-0">
+      <header className="flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[var(--glass)] backdrop-blur-md z-40">
+        <button onClick={() => router.back()} className="text-[var(--muted)] hover:text-purple-400 transition-colors shrink-0">
           <ArrowRight size={22} />
         </button>
         <a href="/" className="text-xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent shrink-0">
           TREND
         </a>
         <div className="flex-1" />
-        <div className="flex items-center gap-3 text-gray-400 shrink-0">
+        <div className="flex items-center gap-3 text-[var(--muted)] shrink-0">
           <a href="/cart" className="relative hover:text-purple-400 transition-colors">
             <ShoppingCart size={20} />
             {count > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-[var(--text)] flex items-center justify-center">
                 {count > 9 ? "9+" : count}
               </span>
             )}
@@ -397,7 +397,7 @@ export default function OrdersPage() {
               {(user.user_metadata?.full_name?.[0] || user.email?.[0] || "؟").toUpperCase()}
             </a>
           ) : (
-            <a href="/login" className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-gray-300 text-sm">
+            <a href="/login" className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-[var(--muted)] text-sm">
               <User size={16} /> دخول
             </a>
           )}
@@ -410,7 +410,7 @@ export default function OrdersPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-black">طلباتي</h1>
-            <p className="text-gray-500 text-sm mt-0.5">
+            <p className="text-[var(--muted-2)] text-sm mt-0.5">
               {loading ? "جاري التحميل..." : `${orders.length} طلب`}
             </p>
           </div>
@@ -430,8 +430,8 @@ export default function OrdersPage() {
               onClick={() => setActiveFilter(f)}
               className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
                 activeFilter === f
-                  ? "bg-purple-600 text-white shadow-[0_0_10px_rgba(168,85,247,0.4)]"
-                  : "bg-[#0f1320] border border-purple-500/20 text-gray-400 hover:text-white"
+                  ? "bg-purple-600 text-[var(--text)] shadow-[0_0_10px_rgba(168,85,247,0.4)]"
+                  : "bg-[var(--surface)] border border-purple-500/20 text-[var(--muted)] hover:text-[var(--text)]"
               }`}
             >
               {f}
@@ -443,7 +443,7 @@ export default function OrdersPage() {
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-[#0f1320] border border-purple-500/10 rounded-2xl p-5 animate-pulse">
+              <div key={i} className="bg-[var(--surface)] border border-purple-500/10 rounded-2xl p-5 animate-pulse">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-white/5" />
                   <div className="space-y-2 flex-1">
@@ -455,7 +455,7 @@ export default function OrdersPage() {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4 text-gray-500">
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-[var(--muted-2)]">
             <ShoppingBag size={56} className="text-purple-500/20" />
             <p className="text-lg font-medium">لا توجد طلبات</p>
             <a href="/products" className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-500 text-white text-sm font-bold hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all">

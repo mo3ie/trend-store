@@ -3,7 +3,7 @@ import { Home, Search } from "lucide-react";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-[#0b0f1a] flex items-center justify-center px-4 relative overflow-hidden" dir="rtl">
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center px-4 relative overflow-hidden" dir="rtl">
       <div className="fixed top-[-100px] left-[-100px] w-[400px] h-[400px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="fixed bottom-[-100px] right-[-100px] w-[400px] h-[400px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
 
@@ -11,8 +11,8 @@ export default function NotFound() {
         <h1 className="text-[110px] leading-none font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
           404
         </h1>
-        <p className="text-white text-xl font-bold mb-2">الصفحة غير موجودة</p>
-        <p className="text-gray-500 text-sm mb-8 max-w-sm mx-auto">
+        <p className="text-[var(--text)] text-xl font-bold mb-2">الصفحة غير موجودة</p>
+        <p className="text-[var(--muted-2)] text-sm mb-8 max-w-sm mx-auto">
           ربما حُذف هذا الرابط أو تغيّر عنوانه. لنعدك إلى المسار الصحيح.
         </p>
         <div className="flex items-center justify-center gap-3">

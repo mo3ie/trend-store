@@ -133,7 +133,7 @@ export default function MapPicker({ lat, lng, onSelect }: Props) {
               onChange={(e) => setSearchText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               placeholder="ابحث عن موقع... (مثال: قاريونس، بنغازي)"
-              className="w-full px-4 py-2.5 pr-10 rounded-xl bg-black/40 border border-purple-500/30 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-all placeholder:text-gray-600"
+              className="w-full px-4 py-2.5 pr-10 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all placeholder:text-[var(--muted-2)]"
             />
             {searching && (
               <Loader size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-400 animate-spin" />
@@ -143,7 +143,7 @@ export default function MapPicker({ lat, lng, onSelect }: Props) {
             type="button"
             onClick={handleSearch}
             disabled={searching}
-            className="px-3 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-all flex items-center gap-1.5 shrink-0"
+            className="px-3 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-[var(--text)] text-sm font-medium transition-all flex items-center gap-1.5 shrink-0"
           >
             <Search size={15} />
             بحث
@@ -152,7 +152,7 @@ export default function MapPicker({ lat, lng, onSelect }: Props) {
             type="button"
             onClick={handleLocateMe}
             disabled={locating}
-            className="px-3 py-2.5 rounded-xl bg-blue-600/80 hover:bg-blue-500 text-white text-sm font-medium transition-all flex items-center gap-1.5 shrink-0"
+            className="px-3 py-2.5 rounded-xl bg-blue-600/80 hover:bg-blue-500 text-[var(--text)] text-sm font-medium transition-all flex items-center gap-1.5 shrink-0"
             title="موقعي الحالي"
           >
             {locating
@@ -164,13 +164,13 @@ export default function MapPicker({ lat, lng, onSelect }: Props) {
 
         {/* Search results dropdown */}
         {searchResults.length > 0 && (
-          <div className="absolute top-full left-0 right-0 z-[1000] mt-1 bg-[#0f1320] border border-purple-500/30 rounded-xl shadow-2xl overflow-hidden">
+          <div className="absolute top-full left-0 right-0 z-[1000] mt-1 bg-[var(--surface)] border border-purple-500/30 rounded-xl shadow-2xl overflow-hidden">
             {searchResults.map((r, i) => (
               <button
                 key={i}
                 type="button"
                 onClick={() => selectResult(r)}
-                className="w-full px-4 py-2.5 text-right text-sm text-gray-300 hover:bg-purple-500/10 hover:text-white transition-colors flex items-start gap-2 border-b border-white/5 last:border-b-0"
+                className="w-full px-4 py-2.5 text-right text-sm text-[var(--muted)] hover:bg-purple-500/10 hover:text-[var(--text)] transition-colors flex items-start gap-2 border-b border-[var(--border)] last:border-b-0"
               >
                 <MapPin size={14} className="text-purple-400 mt-0.5 shrink-0" />
                 <span className="truncate">{r.display_name}</span>
@@ -182,7 +182,7 @@ export default function MapPicker({ lat, lng, onSelect }: Props) {
 
       {/* Map */}
       <div ref={mapRef} className="rounded-xl overflow-hidden border border-purple-500/30" style={{ height: 260 }} />
-      <p className="text-gray-600 text-xs text-center">🗺️ ابحث عن موقع أو انقر على الخريطة لتحديده</p>
+      <p className="text-[var(--muted-2)] text-xs text-center">🗺️ ابحث عن موقع أو انقر على الخريطة لتحديده</p>
     </div>
   );
 }

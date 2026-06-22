@@ -56,7 +56,7 @@ export default function AdminProducts() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">المنتجات</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{products.length} منتج</p>
+          <p className="text-[var(--muted-2)] text-sm mt-0.5">{products.length} منتج</p>
         </div>
         <a
           href="/admin/products/new"
@@ -70,12 +70,12 @@ export default function AdminProducts() {
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-2)]" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="بحث عن منتج..."
-            className="w-full pr-9 pl-4 py-2.5 rounded-xl bg-[#0f1320] border border-purple-500/20 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/50 transition-all"
+            className="w-full pr-9 pl-4 py-2.5 rounded-xl bg-[var(--surface)] border border-purple-500/20 text-sm text-[var(--text)] placeholder:text-[var(--muted-2)] focus:outline-none focus:border-purple-500/50 transition-all"
           />
         </div>
         <div className="flex gap-2">
@@ -85,8 +85,8 @@ export default function AdminProducts() {
               onClick={() => setActiveCategory(cat)}
               className={`px-3 py-2 rounded-xl text-xs font-medium transition-all ${
                 activeCategory === cat
-                  ? "bg-purple-600 text-white"
-                  : "bg-[#0f1320] border border-purple-500/20 text-gray-400 hover:text-white"
+                  ? "bg-purple-600 text-[var(--text)]"
+                  : "bg-[var(--surface)] border border-purple-500/20 text-[var(--muted)] hover:text-[var(--text)]"
               }`}
             >
               {cat}
@@ -96,16 +96,16 @@ export default function AdminProducts() {
       </div>
 
       {/* Table */}
-      <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl overflow-hidden">
+      <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl overflow-hidden">
         {loading ? (
-          <div className="p-10 text-center text-gray-600">جاري التحميل...</div>
+          <div className="p-10 text-center text-[var(--muted-2)]">جاري التحميل...</div>
         ) : filtered.length === 0 ? (
-          <div className="p-10 text-center text-gray-600">لا توجد منتجات</div>
+          <div className="p-10 text-center text-[var(--muted-2)]">لا توجد منتجات</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-gray-500 text-xs border-b border-white/5">
+                <tr className="text-[var(--muted-2)] text-xs border-b border-[var(--border)]">
                   <th className="text-right px-5 py-3 font-medium">المنتج</th>
                   <th className="text-right px-5 py-3 font-medium">التصنيف</th>
                   <th className="text-right px-5 py-3 font-medium">السعر</th>
@@ -115,24 +115,24 @@ export default function AdminProducts() {
               </thead>
               <tbody>
                 {filtered.map((product) => (
-                  <tr key={product.id} className="border-b border-white/5 hover:bg-white/2 transition-colors">
+                  <tr key={product.id} className="border-b border-[var(--border)] hover:bg-white/2 transition-colors">
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
                         {product.image_url ? (
-                          <img src={product.image_url} alt={product.name} className="w-10 h-10 rounded-xl object-cover border border-white/10" />
+                          <img src={product.image_url} alt={product.name} className="w-10 h-10 rounded-xl object-cover border border-[var(--border)]" />
                         ) : (
                           <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 text-xs">صورة</div>
                         )}
                         <div>
-                          <p className="font-medium text-white">{product.name}</p>
-                          {product.description && <p className="text-gray-500 text-xs truncate max-w-[180px]">{product.description}</p>}
+                          <p className="font-medium text-[var(--text)]">{product.name}</p>
+                          {product.description && <p className="text-[var(--muted-2)] text-xs truncate max-w-[180px]">{product.description}</p>}
                         </div>
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
                       <span className="px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-400 text-xs">{product.category}</span>
                     </td>
-                    <td className="px-5 py-3.5 text-white font-semibold">{product.price} $</td>
+                    <td className="px-5 py-3.5 text-[var(--text)] font-semibold">{product.price} $</td>
                     <td className="px-5 py-3.5">
                       <span className={`font-semibold ${product.stock === 0 ? "text-red-400" : product.stock < 5 ? "text-yellow-400" : "text-green-400"}`}>
                         {product.stock}

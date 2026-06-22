@@ -240,7 +240,7 @@ export default function AccountPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#0b0f1a] flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
         <span className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
       </div>
     );
@@ -259,19 +259,19 @@ export default function AccountPage() {
 
   return (
     <>
-    <div className="min-h-screen bg-[#0b0f1a] text-white">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <div className="fixed top-[-150px] right-[-150px] w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[140px] pointer-events-none" />
 
       {/* Header */}
-      <header className="border-b border-purple-500/20 px-4 md:px-6 py-4 flex items-center justify-between bg-[#0b0f1a]/90 backdrop-blur-md sticky top-0 z-40">
+      <header className="border-b border-purple-500/20 px-4 md:px-6 py-4 flex items-center justify-between bg-[var(--glass)] backdrop-blur-md sticky top-0 z-40">
         <a href="/" className="text-2xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
           TREND
         </a>
         <div className="flex items-center gap-3">
-          <a href="/cart" className="relative text-gray-400 hover:text-purple-400 transition-colors">
+          <a href="/cart" className="relative text-[var(--muted)] hover:text-purple-400 transition-colors">
             <ShoppingCart size={20} />
             {count > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-[var(--text)] flex items-center justify-center">
                 {count > 9 ? "9+" : count}
               </span>
             )}
@@ -297,13 +297,13 @@ export default function AccountPage() {
               </div>
             )}
             <div className="absolute inset-0 rounded-2xl bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              {uploading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Camera size={18} className="text-white" />}
+              {uploading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Camera size={18} className="text-[var(--text)]" />}
             </div>
           </div>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
           <div>
             <h1 className="text-xl font-bold">{profile.full_name || "مستخدم"}</h1>
-            <p className="text-gray-500 text-sm">{user.email}</p>
+            <p className="text-[var(--muted-2)] text-sm">{user.email}</p>
           </div>
         </div>
 
@@ -313,8 +313,8 @@ export default function AccountPage() {
             <button key={key} onClick={() => setActiveTab(key)}
               className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl text-xs md:text-sm font-medium whitespace-nowrap transition-all ${
                 activeTab === key
-                  ? "bg-purple-600 text-white shadow-[0_0_14px_rgba(168,85,247,0.4)]"
-                  : "bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 border border-white/10"
+                  ? "bg-purple-600 text-[var(--text)] shadow-[0_0_14px_rgba(168,85,247,0.4)]"
+                  : "bg-white/5 text-[var(--muted)] hover:text-[var(--text)] hover:bg-white/10 border border-[var(--border)]"
               }`}>
               <Icon size={14} />
               {label}
@@ -324,7 +324,7 @@ export default function AccountPage() {
 
         {/* ── PROFILE TAB ── */}
         {activeTab === "profile" && (
-          <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-5 md:p-6">
+          <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 md:p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-bold text-lg">البيانات الشخصية</h2>
               {!editMode ? (
@@ -351,14 +351,14 @@ export default function AccountPage() {
                 { label: "العنوان",              key: "address",   icon: MapPin, type: "text"  },
               ].map(({ label, key, icon: Icon, type }) => (
                 <div key={key}>
-                  <label className="text-gray-500 text-xs mb-1.5 flex items-center gap-1.5"><Icon size={12} /> {label}</label>
+                  <label className="text-[var(--muted-2)] text-xs mb-1.5 flex items-center gap-1.5"><Icon size={12} /> {label}</label>
                   {editMode ? (
                     <input type={type} value={editData[key as keyof Profile] as string}
                       onChange={(e) => setEditData({ ...editData, [key]: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-purple-500/30 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-all" />
+                      className="w-full px-4 py-2.5 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all" />
                   ) : (
-                    <p className="px-4 py-2.5 rounded-xl bg-black/20 border border-white/5 text-sm text-gray-300">
-                      {editData[key as keyof Profile] || <span className="text-gray-600">غير محدد</span>}
+                    <p className="px-4 py-2.5 rounded-xl bg-black/20 border border-[var(--border)] text-sm text-[var(--muted)]">
+                      {editData[key as keyof Profile] || <span className="text-[var(--muted-2)]">غير محدد</span>}
                     </p>
                   )}
                 </div>
@@ -371,21 +371,21 @@ export default function AccountPage() {
         {activeTab === "store" && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-gray-500 text-sm">{storeOrders.length} طلب</p>
+              <p className="text-[var(--muted-2)] text-sm">{storeOrders.length} طلب</p>
               <a href="/orders" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors">عرض الكل <ArrowLeft size={14} /></a>
             </div>
             {storeOrders.length === 0 ? (
-              <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-10 text-center text-gray-500">
+              <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-10 text-center text-[var(--muted-2)]">
                 <ShoppingBag size={40} className="mx-auto mb-3 text-purple-500/40" />
                 لا توجد طلبات من المتجر بعد
               </div>
             ) : storeOrders.map((order) => (
-              <a key={order.id} href="/orders" className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-5 flex items-center justify-between hover:border-purple-500/50 transition-all block">
+              <a key={order.id} href="/orders" className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 flex items-center justify-between hover:border-purple-500/50 transition-all block">
                 <div>
                   <p className="text-sm font-semibold">طلب #{order.id.slice(0, 8)}</p>
-                  <p className="text-gray-500 text-xs mt-0.5">{new Date(order.created_at).toLocaleDateString("ar-LY")}</p>
+                  <p className="text-[var(--muted-2)] text-xs mt-0.5">{new Date(order.created_at).toLocaleDateString("ar-LY")}</p>
                 </div>
-                <span className={`text-xs px-3 py-1 rounded-full border font-medium ${statusColors[order.status] || "bg-gray-500/20 text-gray-400 border-gray-500/30"}`}>
+                <span className={`text-xs px-3 py-1 rounded-full border font-medium ${statusColors[order.status] || "bg-gray-500/20 text-[var(--muted)] border-gray-500/30"}`}>
                   {statusLabels[order.status] || order.status}
                 </span>
               </a>
@@ -397,18 +397,18 @@ export default function AccountPage() {
         {activeTab === "shein" && (
           <div className="space-y-3">
             {sheinOrders.length === 0 ? (
-              <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-10 text-center text-gray-500">
+              <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-10 text-center text-[var(--muted-2)]">
                 <Package size={40} className="mx-auto mb-3 text-purple-500/40" />
                 لا توجد طلبات شي إن بعد
               </div>
             ) : sheinOrders.map((order) => (
-              <div key={order.id} className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-5 flex items-center justify-between">
+              <div key={order.id} className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold">طلب #{order.id.toString().slice(0, 8)}</p>
-                  <p className="text-gray-500 text-xs mt-0.5">{new Date(order.created_at).toLocaleDateString("ar-LY")}</p>
+                  <p className="text-[var(--muted-2)] text-xs mt-0.5">{new Date(order.created_at).toLocaleDateString("ar-LY")}</p>
                   {order.price && <p className="text-purple-400 text-xs mt-0.5">{order.price} $</p>}
                 </div>
-                <span className={`text-xs px-3 py-1 rounded-full border font-medium ${statusColors[order.status] || "bg-gray-500/20 text-gray-400 border-gray-500/30"}`}>
+                <span className={`text-xs px-3 py-1 rounded-full border font-medium ${statusColors[order.status] || "bg-gray-500/20 text-[var(--muted)] border-gray-500/30"}`}>
                   {statusLabels[order.status] || order.status}
                 </span>
               </div>
@@ -420,7 +420,7 @@ export default function AccountPage() {
         {activeTab === "favorites" && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-gray-500 text-sm">{favorites.length} منتج محفوظ</p>
+              <p className="text-[var(--muted-2)] text-sm">{favorites.length} منتج محفوظ</p>
               <a href="/products" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors">
                 تصفح المنتجات <ArrowLeft size={14} />
               </a>
@@ -430,10 +430,10 @@ export default function AccountPage() {
                 <span className="w-7 h-7 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
               </div>
             ) : favorites.length === 0 ? (
-              <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-10 text-center text-gray-500">
+              <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-10 text-center text-[var(--muted-2)]">
                 <Heart size={40} className="mx-auto mb-3 text-purple-500/40" />
                 <p>المفضلة فارغة</p>
-                <p className="text-xs mt-1 text-gray-600">أضف منتجات تعجبك من صفحة المنتج</p>
+                <p className="text-xs mt-1 text-[var(--muted-2)]">أضف منتجات تعجبك من صفحة المنتج</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
@@ -441,7 +441,7 @@ export default function AccountPage() {
                   const p = fav.products;
                   if (!p) return null;
                   return (
-                    <div key={fav.product_id} className="bg-[#0f1320] border border-purple-500/20 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all relative group">
+                    <div key={fav.product_id} className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all relative group">
                       <button
                         onClick={() => removeFavorite(fav.product_id)}
                         className="absolute top-2 left-2 z-10 w-7 h-7 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/40 transition-all shadow-sm"
@@ -449,14 +449,14 @@ export default function AccountPage() {
                         <Trash2 size={12} />
                       </button>
                       <a href={`/products/${p.id}`}>
-                        <div className="aspect-square bg-black/30 overflow-hidden">
+                        <div className="aspect-square bg-[var(--input)] overflow-hidden">
                           {p.image_url
                             ? <img src={p.image_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                             : <div className="w-full h-full flex items-center justify-center text-purple-400/20"><Package size={28} /></div>
                           }
                         </div>
                         <div className="p-2.5 space-y-1">
-                          <p className="text-xs font-semibold text-white leading-tight line-clamp-2">{p.name}</p>
+                          <p className="text-xs font-semibold text-[var(--text)] leading-tight line-clamp-2">{p.name}</p>
                           <div className="flex items-center justify-between">
                             <span className="font-black text-sm bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">{p.price} د</span>
                             <span className="text-[10px] text-purple-400/60">{p.category}</span>
@@ -475,11 +475,11 @@ export default function AccountPage() {
         {activeTab === "wallet" && (
           <div className="space-y-4">
             <div className="bg-gradient-to-br from-purple-900/60 to-blue-900/40 border border-purple-500/30 rounded-2xl p-6">
-              <p className="text-gray-400 text-xs mb-1">الرصيد الحالي</p>
+              <p className="text-[var(--muted)] text-xs mb-1">الرصيد الحالي</p>
               <p className="text-3xl font-black bg-gradient-to-r from-purple-300 to-blue-300 bg-clip-text text-transparent">
                 {walletBalance !== null ? walletBalance.toFixed(2) : "—"} <span className="text-lg">د</span>
               </p>
-              <p className="text-gray-500 text-xs mt-1">دينار ليبي</p>
+              <p className="text-[var(--muted-2)] text-xs mt-1">دينار ليبي</p>
             </div>
             <button
               onClick={() => setWalletOpen(true)}
@@ -488,7 +488,7 @@ export default function AccountPage() {
               <Wallet size={18} />
               شحن الرصيد
             </button>
-            <p className="text-gray-600 text-xs text-center">يمكنك شحن رصيد المحفظة واستخدامه لتسديد طلباتك</p>
+            <p className="text-[var(--muted-2)] text-xs text-center">يمكنك شحن رصيد المحفظة واستخدامه لتسديد طلباتك</p>
           </div>
         )}
 
@@ -497,7 +497,7 @@ export default function AccountPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="font-bold text-lg">مواقع التسليم</h2>
-              <button onClick={openAddAddr} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-all">
+              <button onClick={openAddAddr} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-[var(--text)] text-sm font-medium transition-all">
                 + إضافة موقع
               </button>
             </div>
@@ -507,12 +507,12 @@ export default function AccountPage() {
                 <span className="w-7 h-7 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
               </div>
             ) : addresses.length === 0 ? (
-              <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-10 text-center text-gray-500">
+              <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-10 text-center text-[var(--muted-2)]">
                 <MapPin size={40} className="mx-auto mb-3 text-purple-500/40" />
                 لا توجد مواقع محفوظة — أضف موقعك الأول!
               </div>
             ) : addresses.map((addr) => (
-              <div key={addr.id} className={`bg-[#0f1320] border rounded-2xl p-5 transition-all ${addr.is_default ? "border-purple-500/60 shadow-[0_0_16px_rgba(168,85,247,0.15)]" : "border-purple-500/20"}`}>
+              <div key={addr.id} className={`bg-[var(--surface)] border rounded-2xl p-5 transition-all ${addr.is_default ? "border-purple-500/60 shadow-[0_0_16px_rgba(168,85,247,0.15)]" : "border-purple-500/20"}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3 flex-1">
                     <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/20 flex items-center justify-center shrink-0">
@@ -520,14 +520,14 @@ export default function AccountPage() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-sm text-white">{addr.label}</span>
+                        <span className="font-bold text-sm text-[var(--text)]">{addr.label}</span>
                         {addr.is_default && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-medium">
                             افتراضي
                           </span>
                         )}
                       </div>
-                      <p className="text-gray-400 text-sm leading-relaxed">{addr.address_text}</p>
+                      <p className="text-[var(--muted)] text-sm leading-relaxed">{addr.address_text}</p>
                       {addr.lat && addr.lng && (
                         <a
                           href={`https://www.google.com/maps?q=${addr.lat},${addr.lng}`}
@@ -546,7 +546,7 @@ export default function AccountPage() {
                         تعيين افتراضي
                       </button>
                     )}
-                    <button onClick={() => openEditAddr(addr)} className="text-xs px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+                    <button onClick={() => openEditAddr(addr)} className="text-xs px-3 py-1.5 rounded-xl bg-white/5 border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-white/10 transition-all">
                       تعديل
                     </button>
                     <button onClick={() => handleDeleteAddr(addr.id)} className="text-xs px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all">
@@ -560,17 +560,17 @@ export default function AccountPage() {
             {/* Address Modal */}
             {showAddrModal && (
               <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowAddrModal(false); }}>
-                <div className="bg-[#0f1320] border border-purple-500/30 rounded-3xl p-6 w-full max-w-md shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
+                <div className="bg-[var(--surface)] border border-purple-500/30 rounded-3xl p-6 w-full max-w-md shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
                   <h3 className="font-bold text-lg mb-5">{editingAddr ? "تعديل الموقع" : "إضافة موقع جديد"}</h3>
 
                   <div className="space-y-4">
                     {/* Label */}
                     <div>
-                      <label className="text-gray-400 text-xs mb-2 block">تسمية الموقع</label>
+                      <label className="text-[var(--muted)] text-xs mb-2 block">تسمية الموقع</label>
                       <div className="flex gap-2 flex-wrap">
                         {ADDRESS_LABELS.map((lbl) => (
                           <button key={lbl} type="button" onClick={() => setAddrForm(f => ({ ...f, label: lbl }))}
-                            className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${addrForm.label === lbl ? "bg-purple-600 text-white" : "bg-white/5 border border-white/10 text-gray-400 hover:text-white"}`}>
+                            className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${addrForm.label === lbl ? "bg-purple-600 text-[var(--text)]" : "bg-white/5 border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)]"}`}>
                             {lbl}
                           </button>
                         ))}
@@ -579,20 +579,20 @@ export default function AccountPage() {
 
                     {/* Address text */}
                     <div>
-                      <label className="text-gray-400 text-xs mb-2 block">العنوان التفصيلي</label>
+                      <label className="text-[var(--muted)] text-xs mb-2 block">العنوان التفصيلي</label>
                       <textarea
                         value={addrForm.address_text}
                         onChange={(e) => setAddrForm(f => ({ ...f, address_text: e.target.value }))}
                         placeholder="مثال: شارع الجمهورية، بنغازي، بجانب مسجد النور"
                         rows={3}
-                        className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/30 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-all resize-none placeholder:text-gray-600"
+                        className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all resize-none placeholder:text-[var(--muted-2)]"
                       />
                     </div>
 
                     {/* GPS / Map */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <label className="text-gray-400 text-xs">الموقع الجغرافي (اختياري)</label>
+                        <label className="text-[var(--muted)] text-xs">الموقع الجغرافي (اختياري)</label>
                         <button type="button" onClick={() => setShowMap(!showMap)}
                           className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors">
                           <MapPin size={12} />
@@ -627,7 +627,7 @@ export default function AccountPage() {
                     {/* Default */}
                     <label className="flex items-center gap-3 cursor-pointer">
                       <input type="checkbox" checked={addrForm.is_default} onChange={(e) => setAddrForm(f => ({ ...f, is_default: e.target.checked }))} className="w-4 h-4 rounded accent-purple-500" />
-                      <span className="text-sm text-gray-300">تعيين كعنوان افتراضي</span>
+                      <span className="text-sm text-[var(--muted)]">تعيين كعنوان افتراضي</span>
                     </label>
                   </div>
 
@@ -637,7 +637,7 @@ export default function AccountPage() {
                       {addrSaving ? "⏳ جاري الحفظ..." : "حفظ الموقع"}
                     </button>
                     <button onClick={() => setShowAddrModal(false)}
-                      className="px-5 py-3 rounded-2xl font-medium text-gray-400 bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-sm">
+                      className="px-5 py-3 rounded-2xl font-medium text-[var(--muted)] bg-white/5 border border-[var(--border)] hover:bg-white/10 transition-all text-sm">
                       إلغاء
                     </button>
                   </div>
@@ -651,21 +651,21 @@ export default function AccountPage() {
         {activeTab === "settings" && (
           <div className="space-y-4">
             {/* تغيير كلمة المرور */}
-            <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-5 md:p-6">
+            <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 md:p-6">
               <h2 className="font-bold text-lg mb-1">🔒 تغيير كلمة المرور</h2>
-              <p className="text-gray-500 text-sm mb-5">يجب أن تكون 6 أحرف على الأقل</p>
+              <p className="text-[var(--muted-2)] text-sm mb-5">يجب أن تكون 6 أحرف على الأقل</p>
               <div className="space-y-3">
                 <div>
-                  <label className="text-gray-500 text-xs mb-1.5 block">كلمة المرور الجديدة</label>
+                  <label className="text-[var(--muted-2)] text-xs mb-1.5 block">كلمة المرور الجديدة</label>
                   <input type="password" value={pwData.next} onChange={e => setPwData(d => ({ ...d, next: e.target.value }))}
                     placeholder="••••••••"
-                    className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-purple-500/30 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-all" />
+                    className="w-full px-4 py-2.5 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all" />
                 </div>
                 <div>
-                  <label className="text-gray-500 text-xs mb-1.5 block">تأكيد كلمة المرور</label>
+                  <label className="text-[var(--muted-2)] text-xs mb-1.5 block">تأكيد كلمة المرور</label>
                   <input type="password" value={pwData.confirm} onChange={e => setPwData(d => ({ ...d, confirm: e.target.value }))}
                     placeholder="••••••••"
-                    className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-purple-500/30 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-all" />
+                    className="w-full px-4 py-2.5 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all" />
                 </div>
               </div>
               {pwError && <p className="text-red-400 text-sm mt-3">⚠️ {pwError}</p>}
@@ -676,9 +676,9 @@ export default function AccountPage() {
             </div>
 
             {/* تعديل بيانات الحساب */}
-            <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-5 md:p-6">
+            <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 md:p-6">
               <h2 className="font-bold text-lg mb-1">✏️ بيانات الحساب</h2>
-              <p className="text-gray-500 text-sm mb-5">تعديل الاسم ورقم الهاتف والعنوان</p>
+              <p className="text-[var(--muted-2)] text-sm mb-5">تعديل الاسم ورقم الهاتف والعنوان</p>
               <div className="space-y-3">
                 {[
                   { label: "الاسم الكامل", key: "full_name", type: "text" },
@@ -686,10 +686,10 @@ export default function AccountPage() {
                   { label: "العنوان",       key: "address",   type: "text" },
                 ].map(({ label, key, type }) => (
                   <div key={key}>
-                    <label className="text-gray-500 text-xs mb-1.5 block">{label}</label>
+                    <label className="text-[var(--muted-2)] text-xs mb-1.5 block">{label}</label>
                     <input type={type} value={editData[key as keyof Profile] as string}
                       onChange={e => setEditData({ ...editData, [key]: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-purple-500/30 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-all" />
+                      className="w-full px-4 py-2.5 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all" />
                   </div>
                 ))}
               </div>
@@ -700,9 +700,9 @@ export default function AccountPage() {
             </div>
 
             {/* الصورة الشخصية */}
-            <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-5 md:p-6">
+            <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 md:p-6">
               <h2 className="font-bold text-lg mb-1">📸 الصورة الشخصية</h2>
-              <p className="text-gray-500 text-sm mb-5">اضغط على الصورة أو زر التغيير لرفع صورة جديدة</p>
+              <p className="text-[var(--muted-2)] text-sm mb-5">اضغط على الصورة أو زر التغيير لرفع صورة جديدة</p>
               <div className="flex items-center gap-5">
                 <div className="relative group cursor-pointer" onClick={() => !uploading && fileRef.current?.click()}>
                   {avatarUrl ? (
@@ -713,7 +713,7 @@ export default function AccountPage() {
                     </div>
                   )}
                   <div className="absolute inset-0 rounded-2xl bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    {uploading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Camera size={20} className="text-white" />}
+                    {uploading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Camera size={20} className="text-[var(--text)]" />}
                   </div>
                 </div>
                 <button onClick={() => !uploading && fileRef.current?.click()}

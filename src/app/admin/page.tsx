@@ -75,38 +75,38 @@ export default function AdminDashboard() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">لوحة التحكم</h1>
-        <p className="text-gray-500 text-sm mt-0.5">مرحباً بك في لوحة إدارة ترند</p>
+        <p className="text-[var(--muted-2)] text-sm mt-0.5">مرحباً بك في لوحة إدارة ترند</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-5">
+          <div key={label} className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5">
             <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center mb-3 shadow-lg`}>
-              <Icon size={20} className="text-white" />
+              <Icon size={20} className="text-[var(--text)]" />
             </div>
-            <p className="text-gray-400 text-xs mb-1">{label}</p>
-            <p className="text-2xl font-black text-white">{loading ? "—" : value}</p>
+            <p className="text-[var(--muted)] text-xs mb-1">{label}</p>
+            <p className="text-2xl font-black text-[var(--text)]">{loading ? "—" : value}</p>
           </div>
         ))}
       </div>
 
       {/* Recent Orders */}
-      <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl overflow-hidden">
+      <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl overflow-hidden">
         <div className="flex items-center gap-2 px-6 py-4 border-b border-purple-500/15">
           <Clock size={16} className="text-purple-400" />
           <h2 className="font-bold text-sm">آخر الطلبات</h2>
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-gray-600">جاري التحميل...</div>
+          <div className="p-8 text-center text-[var(--muted-2)]">جاري التحميل...</div>
         ) : recentOrders.length === 0 ? (
-          <div className="p-8 text-center text-gray-600">لا توجد طلبات بعد</div>
+          <div className="p-8 text-center text-[var(--muted-2)]">لا توجد طلبات بعد</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-gray-500 text-xs border-b border-white/5">
+                <tr className="text-[var(--muted-2)] text-xs border-b border-[var(--border)]">
                   <th className="text-right px-6 py-3 font-medium">رقم الطلب</th>
                   <th className="text-right px-6 py-3 font-medium">الزبون</th>
                   <th className="text-right px-6 py-3 font-medium">المبلغ</th>
@@ -116,20 +116,20 @@ export default function AdminDashboard() {
               </thead>
               <tbody>
                 {recentOrders.map((order) => (
-                  <tr key={order.id} className="border-b border-white/5 hover:bg-white/2 transition-colors">
-                    <td className="px-6 py-3.5 text-gray-400 font-mono text-xs">#{order.id.toString().slice(0, 8)}</td>
-                    <td className="px-6 py-3.5 text-white">{order.profiles?.full_name || "—"}</td>
+                  <tr key={order.id} className="border-b border-[var(--border)] hover:bg-white/2 transition-colors">
+                    <td className="px-6 py-3.5 text-[var(--muted)] font-mono text-xs">#{order.id.toString().slice(0, 8)}</td>
+                    <td className="px-6 py-3.5 text-[var(--text)]">{order.profiles?.full_name || "—"}</td>
                     <td className="px-6 py-3.5 text-purple-400 font-semibold">{order.total ? `${order.total} د.ل` : "—"}</td>
-                    <td className="px-6 py-3.5 text-gray-400 text-xs">
+                    <td className="px-6 py-3.5 text-[var(--muted)] text-xs">
                       {order.created_at ? (
                         <>
                           <div>{new Date(order.created_at).toLocaleDateString("ar-LY", { day:"2-digit", month:"2-digit", year:"numeric" })}</div>
-                          <div className="text-gray-600">{new Date(order.created_at).toLocaleTimeString("ar-LY", { hour:"2-digit", minute:"2-digit" })}</div>
+                          <div className="text-[var(--muted-2)]">{new Date(order.created_at).toLocaleTimeString("ar-LY", { hour:"2-digit", minute:"2-digit" })}</div>
                         </>
-                      ) : <div className="text-gray-600">—</div>}
+                      ) : <div className="text-[var(--muted-2)]">—</div>}
                     </td>
                     <td className="px-6 py-3.5">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[order.status] || "bg-gray-500/20 text-gray-400"}`}>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[order.status] || "bg-gray-500/20 text-[var(--muted)]"}`}>
                         {statusLabels[order.status] || order.status}
                       </span>
                     </td>

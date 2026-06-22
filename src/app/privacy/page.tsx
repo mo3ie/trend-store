@@ -1,6 +1,6 @@
 export default function PrivacyPage() {
   return (
-    <div style={{ minHeight: "100vh", background: "#0b0f1a", color: "#cbd5e1", fontFamily: "Cairo, sans-serif", direction: "rtl", padding: "60px 24px" }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--muted)", fontFamily: "Cairo, sans-serif", direction: "rtl", padding: "60px 24px" }}>
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
 
         <h1 style={{ fontSize: 32, fontWeight: 900, color: "#fff", marginBottom: 8 }}>سياسة الخصوصية</h1>

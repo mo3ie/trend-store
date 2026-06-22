@@ -50,10 +50,10 @@ function MoamalatPayContent() {
   }, [MID, TID, AmountTrxn, MerchantReference, TrxDateTime, SecureHash, scriptUrl, returnUrl, cancelUrl]);
 
   return (
-    <div className="min-h-screen bg-[#0b0f1a] flex items-center justify-center" dir="rtl">
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center" dir="rtl">
       <div className="text-center">
         <div className="w-10 h-10 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-400 text-sm">جارٍ تحميل بوابة الدفع...</p>
+        <p className="text-[var(--muted)] text-sm">جارٍ تحميل بوابة الدفع...</p>
       </div>
     </div>
   );
@@ -62,7 +62,7 @@ function MoamalatPayContent() {
 export default function MoamalatPayPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#0b0f1a] flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
         <div className="w-10 h-10 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
       </div>
     }>

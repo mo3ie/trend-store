@@ -42,11 +42,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <h1 className="text-xl font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
             محل ترند
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">للإلكترونيات — لوحة الإدارة</p>
+          <p className="text-xs text-[var(--muted-2)] mt-0.5">للإلكترونيات — لوحة الإدارة</p>
         </div>
         <button
           onClick={() => setSidebarOpen(false)}
-          className="md:hidden text-gray-500 hover:text-white p-1"
+          className="md:hidden text-[var(--muted-2)] hover:text-[var(--text)] p-1"
         >
           <X size={20} />
         </button>
@@ -62,7 +62,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
                 active
                   ? "bg-purple-600/20 text-purple-300 border border-purple-500/30"
-                  : "text-gray-400 hover:text-white hover:bg-white/5"
+                  : "text-[var(--muted)] hover:text-[var(--text)] hover:bg-white/5"
               }`}
             >
               <Icon size={17} className="shrink-0" />
@@ -75,9 +75,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* External services */}
       <div className="mb-3 border-t border-purple-500/10 pt-3">
-        <p className="text-xs text-gray-600 px-3 mb-2">مواقع وخدمات</p>
+        <p className="text-xs text-[var(--muted-2)] px-3 mb-2">مواقع وخدمات</p>
         <a href="https://trendy.trendstore-ly.com" target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all">
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[var(--muted)] hover:text-[var(--text)] hover:bg-white/5 transition-all">
           <Building2 size={17} className="shrink-0" />
           Trendy — الحجوزات
         </a>
@@ -94,7 +94,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   );
 
   return (
-    <div className="flex min-h-screen bg-[#0b0f1a] text-white">
+    <div className="flex min-h-screen bg-[var(--bg)] text-[var(--text)]">
 
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -111,7 +111,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Mobile sidebar drawer */}
       <aside
-        className={`fixed top-0 right-0 h-full w-64 bg-[#0b0f1a] border-l border-purple-500/20 flex flex-col py-6 px-4 z-50 transition-transform duration-300 md:hidden ${
+        className={`fixed top-0 right-0 h-full w-64 bg-[var(--bg)] border-l border-purple-500/20 flex flex-col py-6 px-4 z-50 transition-transform duration-300 md:hidden ${
           sidebarOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -121,13 +121,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main */}
       <main className="flex-1 overflow-y-auto min-w-0">
         {/* Mobile top bar */}
-        <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-purple-500/20 sticky top-0 bg-[#0b0f1a]/90 backdrop-blur z-30">
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-purple-500/20 sticky top-0 bg-[var(--glass)] backdrop-blur z-30">
           <h1 className="flex-1 text-sm font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
             محل ترند — لوحة الإدارة
           </h1>
           <button
             onClick={() => setSidebarOpen(true)}
-            className="text-gray-400 hover:text-white p-1"
+            className="text-[var(--muted)] hover:text-[var(--text)] p-1"
           >
             <Menu size={22} />
           </button>

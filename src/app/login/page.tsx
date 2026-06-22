@@ -106,12 +106,12 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0f1a] flex items-center justify-center px-4 relative">
-      <a href="/cart" className="absolute top-5 left-5 text-gray-400 hover:text-purple-400 transition-colors">
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center px-4 relative">
+      <a href="/cart" className="absolute top-5 left-5 text-[var(--muted)] hover:text-purple-400 transition-colors">
         <div className="relative">
           <ShoppingCart size={22} />
           {count > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-[var(--text)] flex items-center justify-center">
               {count > 9 ? "9+" : count}
             </span>
           )}
@@ -121,27 +121,27 @@ export default function LoginPage() {
       <div className="fixed bottom-[-100px] right-[-100px] w-[400px] h-[400px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="w-full max-w-md relative">
-        <div className="bg-[#0f1320] border border-purple-500/30 rounded-3xl p-8 shadow-[0_0_60px_rgba(168,85,247,0.1)]">
+        <div className="bg-[var(--surface)] border border-purple-500/30 rounded-3xl p-8 shadow-[0_0_60px_rgba(168,85,247,0.1)]">
 
           {/* Logo */}
           <div className="text-center mb-8">
             <h1 className="text-4xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
               TREND
             </h1>
-            <p className="text-gray-500 text-sm mt-1">ترند للإلكترونيات</p>
+            <p className="text-[var(--muted-2)] text-sm mt-1">ترند للإلكترونيات</p>
           </div>
 
           {/* Title */}
           <div className="flex items-center gap-2 mb-6">
             <Zap size={18} className="text-purple-400" />
-            <h2 className="text-white font-bold text-lg">تسجيل الدخول</h2>
+            <h2 className="text-[var(--text)] font-bold text-lg">تسجيل الدخول</h2>
           </div>
 
           {/* Google Button */}
           <button
             onClick={handleGoogle}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-medium text-sm transition-all hover:border-white/20 mb-4 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-[var(--border)] bg-white/5 hover:bg-white/10 text-[var(--text)] font-medium text-sm transition-all hover:border-white/20 mb-4 disabled:opacity-50"
           >
             {googleLoading ? (
               <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -154,7 +154,7 @@ export default function LoginPage() {
           {/* Divider */}
           <div className="flex items-center gap-3 mb-4">
             <div className="flex-1 h-px bg-purple-500/20" />
-            <span className="text-gray-600 text-xs">أو</span>
+            <span className="text-[var(--muted-2)] text-xs">أو</span>
             <div className="flex-1 h-px bg-purple-500/20" />
           </div>
 
@@ -171,7 +171,7 @@ export default function LoginPage() {
           >
             {/* Email */}
             <div>
-              <label className="text-gray-400 text-sm mb-1.5 block">البريد الإلكتروني</label>
+              <label className="text-[var(--muted)] text-sm mb-1.5 block">البريد الإلكتروني</label>
               <input
                 type="email"
                 value={email}
@@ -179,7 +179,7 @@ export default function LoginPage() {
                 placeholder="example@email.com"
                 required
                 disabled={mode === "otp" && otpSent}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/20 text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm disabled:opacity-60"
+                className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/20 text-[var(--text)] placeholder:text-[var(--muted-2)] focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm disabled:opacity-60"
               />
             </div>
 
@@ -187,7 +187,7 @@ export default function LoginPage() {
             {mode === "password" && (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-gray-400 text-sm block">كلمة المرور</label>
+                  <label className="text-[var(--muted)] text-sm block">كلمة المرور</label>
                   <button
                     type="button"
                     onClick={handleForgotPassword}
@@ -203,12 +203,12 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/20 text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm pr-12"
+                    className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/20 text-[var(--text)] placeholder:text-[var(--muted-2)] focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm pr-12"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-purple-400 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-2)] hover:text-purple-400 transition-colors"
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -219,7 +219,7 @@ export default function LoginPage() {
             {/* OTP code (otp mode, after code sent) */}
             {mode === "otp" && otpSent && (
               <div>
-                <label className="text-gray-400 text-sm mb-1.5 block">رمز التحقق</label>
+                <label className="text-[var(--muted)] text-sm mb-1.5 block">رمز التحقق</label>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -227,7 +227,7 @@ export default function LoginPage() {
                   onChange={(e) => setOtpCode(e.target.value)}
                   placeholder="123456"
                   required
-                  className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/20 text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm tracking-[0.5em] text-center"
+                  className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/20 text-[var(--text)] placeholder:text-[var(--muted-2)] focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm tracking-[0.5em] text-center"
                 />
               </div>
             )}
@@ -264,7 +264,7 @@ export default function LoginPage() {
             {mode === "otp" ? "الدخول بكلمة المرور بدل الرمز" : "الدخول برمز عبر البريد بدل كلمة المرور"}
           </button>
 
-          <p className="text-center text-gray-500 text-sm mt-6">
+          <p className="text-center text-[var(--muted-2)] text-sm mt-6">
             ليس لديك حساب؟{" "}
             <a href="/register" className="text-purple-400 hover:text-purple-300 font-semibold transition-colors">
               سجّل الآن

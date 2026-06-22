@@ -68,11 +68,11 @@ export default function ProductsPage() {
   });
 
   return (
-    <div className="flex flex-col bg-[#0b0f1a] text-white min-h-screen">
+    <div className="flex flex-col bg-[var(--bg)] text-[var(--text)] min-h-screen">
 
       {/* ─── HEADER ─── */}
-      <header className="flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[#0b0f1a]/90 backdrop-blur-md z-40">
-        <button onClick={() => router.push("/")} className="text-gray-400 hover:text-purple-400 transition-colors shrink-0">
+      <header className="flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[var(--glass)] backdrop-blur-md z-40">
+        <button onClick={() => router.push("/")} className="text-[var(--muted)] hover:text-purple-400 transition-colors shrink-0">
           <ArrowRight size={22} />
         </button>
 
@@ -81,16 +81,16 @@ export default function ProductsPage() {
         </a>
 
         <div className="flex-1 relative">
-          <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+          <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-2)] pointer-events-none" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="ابحث عن منتج..."
-            className="w-full pr-9 pl-4 py-2.5 rounded-xl bg-black/40 border border-purple-500/20 text-sm focus:outline-none focus:border-purple-500/50 transition-colors placeholder:text-gray-500"
+            className="w-full pr-9 pl-4 py-2.5 rounded-xl bg-[var(--input)] border border-purple-500/20 text-sm focus:outline-none focus:border-purple-500/50 transition-colors placeholder:text-[var(--muted-2)]"
           />
         </div>
 
-        <div className="flex items-center gap-3 text-gray-400 shrink-0">
+        <div className="flex items-center gap-3 text-[var(--muted)] shrink-0">
           <button className="relative hover:text-purple-400 transition-colors">
             <Bell size={20} />
             <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full" />
@@ -98,7 +98,7 @@ export default function ProductsPage() {
           <a href="/cart" className="relative hover:text-purple-400 transition-colors">
             <ShoppingCart size={20} />
             {count > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-[var(--text)] flex items-center justify-center">
                 {count > 9 ? "9+" : count}
               </span>
             )}
@@ -108,7 +108,7 @@ export default function ProductsPage() {
               {(user.user_metadata?.full_name?.[0] || user.email?.[0] || "؟").toUpperCase()}
             </a>
           ) : (
-            <a href="/login" className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-gray-300 hover:text-purple-300 transition-all">
+            <a href="/login" className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-[var(--muted)] hover:text-purple-300 transition-all">
               <User size={16} />
               <span className="text-sm">دخول</span>
             </a>
@@ -122,7 +122,7 @@ export default function ProductsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-black">متجر الإلكترونيات</h1>
-            <p className="text-gray-500 text-sm mt-0.5">
+            <p className="text-[var(--muted-2)] text-sm mt-0.5">
               {loading ? "جاري التحميل..." : `${sorted.length} منتج`}
             </p>
           </div>
@@ -131,7 +131,7 @@ export default function ProductsPage() {
             className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
               showFilters
                 ? "bg-purple-600/20 border-purple-500/50 text-purple-300"
-                : "bg-white/5 border-white/10 text-gray-400 hover:text-white"
+                : "bg-white/5 border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)]"
             }`}
           >
             <SlidersHorizontal size={15} />
@@ -149,8 +149,8 @@ export default function ProductsPage() {
                 onClick={() => setActiveCategory(cat)}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                   activeCategory === cat
-                    ? "bg-purple-600 text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]"
-                    : "bg-[#0f1320] border border-purple-500/20 text-gray-400 hover:text-white"
+                    ? "bg-purple-600 text-[var(--text)] shadow-[0_0_12px_rgba(168,85,247,0.4)]"
+                    : "bg-[var(--surface)] border border-purple-500/20 text-[var(--muted)] hover:text-[var(--text)]"
                 }`}
               >
                 {cat}
@@ -161,7 +161,7 @@ export default function ProductsPage() {
           {/* Sort */}
           {showFilters && (
             <div className="flex items-center gap-2">
-              <span className="text-gray-500 text-xs">ترتيب:</span>
+              <span className="text-[var(--muted-2)] text-xs">ترتيب:</span>
               {sortOptions.map((opt) => (
                 <button
                   key={opt.value}
@@ -169,7 +169,7 @@ export default function ProductsPage() {
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     sort === opt.value
                       ? "bg-blue-600/30 border border-blue-500/50 text-blue-300"
-                      : "bg-white/5 border border-white/10 text-gray-400 hover:text-white"
+                      : "bg-white/5 border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)]"
                   }`}
                 >
                   {opt.label}
@@ -183,7 +183,7 @@ export default function ProductsPage() {
         {loading ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="bg-[#0f1320] border border-purple-500/10 rounded-2xl overflow-hidden animate-pulse">
+              <div key={i} className="bg-[var(--surface)] border border-purple-500/10 rounded-2xl overflow-hidden animate-pulse">
                 <div className="aspect-square bg-white/5" />
                 <div className="p-3 space-y-2">
                   <div className="h-3 bg-white/5 rounded w-3/4" />
@@ -193,7 +193,7 @@ export default function ProductsPage() {
             ))}
           </div>
         ) : sorted.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-4 text-gray-500">
+          <div className="flex flex-col items-center justify-center py-24 gap-4 text-[var(--muted-2)]">
             <Package size={56} className="text-purple-500/20" />
             <p className="text-lg font-medium">لا توجد منتجات</p>
             {(search || activeCategory !== "الكل") && (
@@ -211,10 +211,10 @@ export default function ProductsPage() {
               <a
                 key={product.id}
                 href={`/products/${product.id}`}
-                className="group bg-[#0f1320] border border-purple-500/20 rounded-2xl overflow-hidden hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.15)] transition-all"
+                className="group bg-[var(--surface)] border border-purple-500/20 rounded-2xl overflow-hidden hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.15)] transition-all"
               >
                 {/* Image */}
-                <div className="aspect-square bg-black/30 overflow-hidden">
+                <div className="aspect-square bg-[var(--input)] overflow-hidden">
                   {product.image_url ? (
                     <img
                       src={product.image_url}
@@ -231,7 +231,7 @@ export default function ProductsPage() {
                 {/* Info */}
                 <div className="p-3 space-y-1.5">
                   <span className="text-xs text-purple-400/70">{product.category}</span>
-                  <p className="text-sm font-semibold text-white leading-tight line-clamp-2">{product.name}</p>
+                  <p className="text-sm font-semibold text-[var(--text)] leading-tight line-clamp-2">{product.name}</p>
                   <div className="flex items-center justify-between pt-1">
                     <span className="font-black text-base bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
                       {product.price} د

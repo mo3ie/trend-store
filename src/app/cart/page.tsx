@@ -247,23 +247,23 @@ export default function CartPage() {
   };
 
   return (
-    <div className="flex flex-col bg-[#0b0f1a] text-white min-h-screen">
+    <div className="flex flex-col bg-[var(--bg)] text-[var(--text)] min-h-screen">
 
       {/* ─── HEADER ─── */}
-      <header className="flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[#0b0f1a]/90 backdrop-blur-md z-40">
-        <button onClick={() => router.back()} className="text-gray-400 hover:text-purple-400 transition-colors shrink-0">
+      <header className="flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[var(--glass)] backdrop-blur-md z-40">
+        <button onClick={() => router.back()} className="text-[var(--muted)] hover:text-purple-400 transition-colors shrink-0">
           <ArrowRight size={22} />
         </button>
         <a href="/" className="text-xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent shrink-0">
           TREND
         </a>
         <div className="flex-1" />
-        <div className="flex items-center gap-3 text-gray-400 shrink-0">
+        <div className="flex items-center gap-3 text-[var(--muted)] shrink-0">
           {user && <NotificationBell />}
           <a href="/cart" className="relative text-purple-400">
             <ShoppingCart size={20} />
             {count > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-[var(--text)] flex items-center justify-center">
                 {count > 9 ? "9+" : count}
               </span>
             )}
@@ -273,7 +273,7 @@ export default function CartPage() {
               {(user.user_metadata?.full_name?.[0] || user.email?.[0] || "؟").toUpperCase()}
             </a>
           ) : (
-            <a href="/login" className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-gray-300 text-sm">
+            <a href="/login" className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-[var(--muted)] text-sm">
               <User size={16} /> دخول
             </a>
           )}
@@ -286,7 +286,7 @@ export default function CartPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-black">سلة التسوق</h1>
-            <p className="text-gray-500 text-sm mt-0.5">{count} منتج</p>
+            <p className="text-[var(--muted-2)] text-sm mt-0.5">{count} منتج</p>
           </div>
           {items.length > 0 && (
             <button onClick={clearCart} className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors">
@@ -296,10 +296,10 @@ export default function CartPage() {
         </div>
 
         {items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-4 text-gray-500">
+          <div className="flex flex-col items-center justify-center py-24 gap-4 text-[var(--muted-2)]">
             <ShoppingBag size={64} className="text-purple-500/20" />
             <p className="text-lg font-medium">السلة فارغة</p>
-            <p className="text-sm text-gray-600">أضف منتجات تعجبك من المتجر</p>
+            <p className="text-sm text-[var(--muted-2)]">أضف منتجات تعجبك من المتجر</p>
             <a href="/products" className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-500 text-white text-sm font-bold hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all mt-2">
               <ShoppingCart size={16} /> تصفح المنتجات
             </a>
@@ -309,10 +309,10 @@ export default function CartPage() {
             {/* Items */}
             <div className="space-y-3">
               {items.map((item) => (
-                <div key={item.cartKey} className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-4 flex items-center gap-4">
+                <div key={item.cartKey} className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-4 flex items-center gap-4">
                   <a href={`/products/${item.id}`}>
                     {item.image_url ? (
-                      <img src={item.image_url} alt={item.name} className="w-16 h-16 rounded-xl object-cover border border-white/10 shrink-0" />
+                      <img src={item.image_url} alt={item.name} className="w-16 h-16 rounded-xl object-cover border border-[var(--border)] shrink-0" />
                     ) : (
                       <div className="w-16 h-16 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
                         <Package size={22} className="text-purple-400/40" />
@@ -320,7 +320,7 @@ export default function CartPage() {
                     )}
                   </a>
                   <div className="flex-1 min-w-0">
-                    <a href={`/products/${item.id}`} className="text-sm font-semibold text-white hover:text-purple-300 transition-colors line-clamp-2">
+                    <a href={`/products/${item.id}`} className="text-sm font-semibold text-[var(--text)] hover:text-purple-300 transition-colors line-clamp-2">
                       {item.name}
                     </a>
                     {item.variants && Object.keys(item.variants).length > 0 && (
@@ -331,11 +331,11 @@ export default function CartPage() {
                     <p className="text-purple-400 font-black mt-1">{item.price} د</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={() => updateQuantity(item.cartKey, item.quantity - 1)} className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-colors">
+                    <button onClick={() => updateQuantity(item.cartKey, item.quantity - 1)} className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 border border-[var(--border)] flex items-center justify-center transition-colors">
                       <Minus size={12} />
                     </button>
                     <span className="w-6 text-center text-sm font-bold">{item.quantity}</span>
-                    <button onClick={() => updateQuantity(item.cartKey, item.quantity + 1)} disabled={item.quantity >= item.stock} className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-colors disabled:opacity-30">
+                    <button onClick={() => updateQuantity(item.cartKey, item.quantity + 1)} disabled={item.quantity >= item.stock} className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 border border-[var(--border)] flex items-center justify-center transition-colors disabled:opacity-30">
                       <Plus size={12} />
                     </button>
                     <button onClick={() => removeItem(item.cartKey)} className="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 flex items-center justify-center text-red-400 transition-colors mr-1">
@@ -347,18 +347,18 @@ export default function CartPage() {
             </div>
 
             {/* Summary */}
-            <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-5 space-y-3">
-              <h2 className="font-bold text-sm text-gray-400">ملخص الطلب</h2>
+            <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 space-y-3">
+              <h2 className="font-bold text-sm text-[var(--muted)]">ملخص الطلب</h2>
               <div className="space-y-2 text-sm">
                 {items.map((item) => (
-                  <div key={item.cartKey} className="flex justify-between text-gray-400">
+                  <div key={item.cartKey} className="flex justify-between text-[var(--muted)]">
                     <span className="truncate max-w-[200px]">{item.name} × {item.quantity}</span>
                     <span>{item.price * item.quantity} د</span>
                   </div>
                 ))}
               </div>
-              <div className="border-t border-white/10 pt-3 flex justify-between items-center">
-                <span className="font-bold text-white">الإجمالي</span>
+              <div className="border-t border-[var(--border)] pt-3 flex justify-between items-center">
+                <span className="font-bold text-[var(--text)]">الإجمالي</span>
                 <span className="text-2xl font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
                   {total} د
                 </span>
@@ -366,14 +366,14 @@ export default function CartPage() {
             </div>
 
             {/* Notes */}
-            <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-5">
-              <label className="text-gray-400 text-sm font-medium mb-2 block">📝 ملاحظات للطلب (اختياري)</label>
+            <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5">
+              <label className="text-[var(--muted)] text-sm font-medium mb-2 block">📝 ملاحظات للطلب (اختياري)</label>
               <textarea
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 placeholder="أضف أي ملاحظات أو تعليمات خاصة بطلبك..."
                 rows={3}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/30 text-white text-sm focus:outline-none focus:border-purple-500/60 transition-all resize-none placeholder-gray-600"
+                className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all resize-none placeholder-gray-600"
               />
             </div>
 
@@ -389,7 +389,7 @@ export default function CartPage() {
                   : <><ShoppingBag size={18} /> تأكيد الطلب</>
                 }
               </button>
-              <a href="/products" className="w-full py-3 rounded-2xl font-medium text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center gap-2 transition-all text-sm">
+              <a href="/products" className="w-full py-3 rounded-2xl font-medium text-[var(--muted)] hover:text-[var(--text)] bg-white/5 hover:bg-white/10 border border-[var(--border)] flex items-center justify-center gap-2 transition-all text-sm">
                 <ShoppingCart size={16} /> مواصلة التسوق
               </a>
             </div>
@@ -412,7 +412,7 @@ export default function CartPage() {
               <div className="p-6">
                 <div className="flex items-center justify-between mb-5">
                   <h3 className="text-lg font-black text-gray-900">عنوان التسليم</h3>
-                  <button onClick={closeModal} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                  <button onClick={closeModal} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[var(--muted-2)] hover:bg-gray-200 transition-colors">
                     <X size={16} />
                   </button>
                 </div>
@@ -423,19 +423,19 @@ export default function CartPage() {
                     {addresses.map((addr) => (
                       <button key={addr.id} onClick={() => setSelectedAddr(addr.id)}
                         className={`w-full flex items-start gap-3 p-3.5 rounded-2xl border-2 text-right transition-all ${selectedAddr === addr.id ? "border-purple-500 bg-purple-50" : "border-gray-100 bg-gray-50 hover:border-purple-300"}`}>
-                        <MapPin size={18} className={`shrink-0 mt-0.5 ${selectedAddr === addr.id ? "text-purple-600" : "text-gray-400"}`} />
+                        <MapPin size={18} className={`shrink-0 mt-0.5 ${selectedAddr === addr.id ? "text-purple-600" : "text-[var(--muted)]"}`} />
                         <div className="flex-1 min-w-0">
                           <p className={`font-bold text-sm ${selectedAddr === addr.id ? "text-purple-700" : "text-gray-800"}`}>
                             {addr.label} {addr.is_default && <span className="text-xs font-medium text-purple-500">(افتراضي)</span>}
                           </p>
-                          <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">{addr.address_text}</p>
+                          <p className="text-[var(--muted-2)] text-xs mt-0.5 leading-relaxed">{addr.address_text}</p>
                         </div>
                       </button>
                     ))}
                     <button onClick={() => setSelectedAddr("__new")}
                       className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 text-right transition-all ${selectedAddr === "__new" ? "border-purple-500 bg-purple-50" : "border-dashed border-gray-200 hover:border-purple-300"}`}>
                       <span className="text-2xl">+</span>
-                      <span className={`text-sm font-medium ${selectedAddr === "__new" ? "text-purple-700" : "text-gray-500"}`}>إضافة عنوان جديد</span>
+                      <span className={`text-sm font-medium ${selectedAddr === "__new" ? "text-purple-700" : "text-[var(--muted-2)]"}`}>إضافة عنوان جديد</span>
                     </button>
                   </div>
                 )}
@@ -448,7 +448,7 @@ export default function CartPage() {
                       onChange={e => setNewAddrText(e.target.value)}
                       placeholder="أدخل عنوان التسليم التفصيلي..."
                       rows={3}
-                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-sm focus:outline-none focus:border-purple-400 transition-all resize-none placeholder:text-gray-400"
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-sm focus:outline-none focus:border-purple-400 transition-all resize-none placeholder:text-[var(--muted)]"
                     />
                     <button
                       type="button"
@@ -493,11 +493,11 @@ export default function CartPage() {
               <div className="p-6">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-black text-gray-900">اختر طريقة الدفع</h3>
-                  <button onClick={closeModal} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                  <button onClick={closeModal} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[var(--muted-2)] hover:bg-gray-200 transition-colors">
                     <X size={16} />
                   </button>
                 </div>
-                <p className="text-sm text-gray-400 mb-5">المبلغ الإجمالي: <strong className="text-gray-900">{total} د.ل</strong></p>
+                <p className="text-sm text-[var(--muted)] mb-5">المبلغ الإجمالي: <strong className="text-gray-900">{total} د.ل</strong></p>
 
                 <div className="space-y-2 mb-4">
                   {visibleMethods.map((pm) => (
@@ -526,7 +526,7 @@ export default function CartPage() {
                   {ordering ? <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "ادفع الآن →"}
                 </button>
 
-                <button onClick={() => { setStep("address"); setMethod(null); }} className="w-full mt-3 py-2.5 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+                <button onClick={() => { setStep("address"); setMethod(null); }} className="w-full mt-3 py-2.5 text-sm text-[var(--muted)] hover:text-gray-700 transition-colors">
                   ← رجوع لاختيار العنوان
                 </button>
               </div>
@@ -537,7 +537,7 @@ export default function CartPage() {
               <div className="p-6 text-center">
                 <div className="text-4xl mb-4">🏧</div>
                 <h3 className="text-lg font-black text-gray-900 mb-1">ادفع لي</h3>
-                <p className="text-gray-500 text-sm mb-5">أدخل رقم هاتفك المرتبط بحساب <strong>ادفع لي</strong></p>
+                <p className="text-[var(--muted-2)] text-sm mb-5">أدخل رقم هاتفك المرتبط بحساب <strong>ادفع لي</strong></p>
                 <input
                   type="tel"
                   placeholder="9xxxxxxxx"
@@ -547,13 +547,13 @@ export default function CartPage() {
                   style={{ direction: "ltr" }}
                   autoFocus
                 />
-                <p className="text-gray-400 text-xs mb-3 text-center">بدون الصفر — مثال: 918621511</p>
+                <p className="text-[var(--muted)] text-xs mb-3 text-center">بدون الصفر — مثال: 918621511</p>
                 {payError && <p className="text-red-500 text-sm mb-3">⚠️ {payError}</p>}
                 <button onClick={startEdfali} disabled={edfaliPhone.length < 9}
                   className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 disabled:opacity-50 mb-3 text-sm">
                   إرسال رمز التحقق →
                 </button>
-                <button onClick={() => setEdfaliStep(null)} className="w-full py-2.5 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+                <button onClick={() => setEdfaliStep(null)} className="w-full py-2.5 text-sm text-[var(--muted)] hover:text-gray-700 transition-colors">
                   ← رجوع
                 </button>
               </div>
@@ -563,7 +563,7 @@ export default function CartPage() {
             {step === "payment" && edfaliStep === "sending" && (
               <div className="p-10 text-center">
                 <div className="w-14 h-14 border-4 border-purple-100 border-t-purple-600 rounded-full animate-spin mx-auto mb-5" />
-                <p className="text-gray-500 text-sm">⏳ جاري إرسال رمز التحقق...</p>
+                <p className="text-[var(--muted-2)] text-sm">⏳ جاري إرسال رمز التحقق...</p>
               </div>
             )}
 
@@ -572,7 +572,7 @@ export default function CartPage() {
               <div className="p-6 text-center">
                 <div className="text-4xl mb-4">🔐</div>
                 <h3 className="text-lg font-black text-gray-900 mb-1">رمز التحقق</h3>
-                <p className="text-gray-500 text-sm mb-5">أُرسل رمز مكوّن من <strong>4 أرقام</strong> إلى هاتفك <strong className="text-purple-600">{edfaliPhone}</strong></p>
+                <p className="text-[var(--muted-2)] text-sm mb-5">أُرسل رمز مكوّن من <strong>4 أرقام</strong> إلى هاتفك <strong className="text-purple-600">{edfaliPhone}</strong></p>
                 <input
                   type="number"
                   maxLength={4}
@@ -588,7 +588,7 @@ export default function CartPage() {
                   className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 disabled:opacity-50 mb-3 text-sm">
                   {ordering ? <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "تأكيد الدفع ✓"}
                 </button>
-                <button onClick={() => { setEdfaliStep(null); setEdfaliOtp(""); setOrdering(false); }} className="w-full py-2.5 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+                <button onClick={() => { setEdfaliStep(null); setEdfaliOtp(""); setOrdering(false); }} className="w-full py-2.5 text-sm text-[var(--muted)] hover:text-gray-700 transition-colors">
                   ← رجوع
                 </button>
               </div>
@@ -599,7 +599,7 @@ export default function CartPage() {
               <div className="p-6 text-center">
                 <div className="text-4xl mb-4">💳</div>
                 <h3 className="text-lg font-black text-gray-900 mb-1">يسر باي</h3>
-                <p className="text-gray-500 text-sm mb-5">أدخل رقم بطاقتك المصرفية لإتمام الدفع</p>
+                <p className="text-[var(--muted-2)] text-sm mb-5">أدخل رقم بطاقتك المصرفية لإتمام الدفع</p>
                 <input
                   type="tel"
                   inputMode="numeric"
@@ -610,13 +610,13 @@ export default function CartPage() {
                   style={{ direction: "ltr" }}
                   autoFocus
                 />
-                <p className="text-gray-400 text-xs mb-3 text-center">9 أرقام (رقم البطاقة + البادئة) — أو 10 أرقام لمصرف التجارة والتنمية</p>
+                <p className="text-[var(--muted)] text-xs mb-3 text-center">9 أرقام (رقم البطاقة + البادئة) — أو 10 أرقام لمصرف التجارة والتنمية</p>
                 {payError && <p className="text-red-500 text-sm mb-3">⚠️ {payError}</p>}
                 <button onClick={startYusor} disabled={yusorCard.replace(/\D/g, "").length < 9}
                   className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-sky-600 to-blue-500 disabled:opacity-50 mb-3 text-sm">
                   إرسال رمز التحقق →
                 </button>
-                <button onClick={() => { setYusorStep(null); setYusorCard(""); setPayError(""); }} className="w-full py-2.5 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+                <button onClick={() => { setYusorStep(null); setYusorCard(""); setPayError(""); }} className="w-full py-2.5 text-sm text-[var(--muted)] hover:text-gray-700 transition-colors">
                   ← رجوع
                 </button>
               </div>
@@ -626,7 +626,7 @@ export default function CartPage() {
             {step === "payment" && yusorStep === "sending" && (
               <div className="p-10 text-center">
                 <div className="w-14 h-14 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin mx-auto mb-5" />
-                <p className="text-gray-500 text-sm">⏳ جاري إرسال رمز التحقق...</p>
+                <p className="text-[var(--muted-2)] text-sm">⏳ جاري إرسال رمز التحقق...</p>
               </div>
             )}
 
@@ -635,7 +635,7 @@ export default function CartPage() {
               <div className="p-6 text-center">
                 <div className="text-4xl mb-4">🔐</div>
                 <h3 className="text-lg font-black text-gray-900 mb-1">رمز التحقق</h3>
-                <p className="text-gray-500 text-sm mb-5">أُرسل رمز التحقق إلى هاتفك المرتبط بالبطاقة المصرفية</p>
+                <p className="text-[var(--muted-2)] text-sm mb-5">أُرسل رمز التحقق إلى هاتفك المرتبط بالبطاقة المصرفية</p>
                 <input
                   type="tel"
                   inputMode="numeric"
@@ -651,7 +651,7 @@ export default function CartPage() {
                   className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-sky-600 to-blue-500 disabled:opacity-50 mb-3 text-sm">
                   {ordering ? <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "تأكيد الدفع ✓"}
                 </button>
-                <button onClick={() => { setYusorStep("card"); setYusorOtp(""); setOrdering(false); }} className="w-full py-2.5 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+                <button onClick={() => { setYusorStep("card"); setYusorOtp(""); setOrdering(false); }} className="w-full py-2.5 text-sm text-[var(--muted)] hover:text-gray-700 transition-colors">
                   ← رجوع
                 </button>
               </div>
@@ -662,7 +662,7 @@ export default function CartPage() {
               <div className="p-10 text-center">
                 <div className="w-14 h-14 border-4 border-purple-100 border-t-purple-600 rounded-full animate-spin mx-auto mb-5" />
                 <p className="text-gray-700 font-medium mb-1">جاري معالجة الدفع...</p>
-                <p className="text-gray-400 text-sm">لا تغلق هذه النافذة</p>
+                <p className="text-[var(--muted)] text-sm">لا تغلق هذه النافذة</p>
               </div>
             )}
           </div>

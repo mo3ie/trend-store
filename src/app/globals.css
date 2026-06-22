@@ -7,16 +7,37 @@
 @custom-variant light (&:where(.light, .light *));
 
 :root {
+  /* DARK (default) semantic palette */
   --background: #ffffff;
   --foreground: #171717;
   --page-bg: radial-gradient(circle at top, #0f0f0f, #000);
   --dot-opacity: 0.1;
+  --bg: #0b0f1a;
+  --surface: #0f1320;
+  --surface-2: #090c16;
+  --glass: rgba(11, 15, 26, 0.92);
+  --surface-glass: rgba(15, 19, 32, 0.85);
+  --input: rgba(0, 0, 0, 0.4);
+  --text: #ffffff;
+  --muted: #9ca3af;
+  --muted-2: #6b7280;
+  --border: rgba(168, 85, 247, 0.20);
 }
 
 .light {
-  --page-bg: radial-gradient(circle at top, #ffffff, #eef1f7);
-  --dot-opacity: 0.04;
+  --page-bg: radial-gradient(circle at top, #ffffff, #e9edf6);
+  --dot-opacity: 0.05;
   color-scheme: light;
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface-2: #eef1f7;
+  --glass: rgba(244, 246, 251, 0.88);
+  --surface-glass: rgba(255, 255, 255, 0.9);
+  --input: #eef1f7;
+  --text: #16131f;
+  --muted: #5b6472;
+  --muted-2: #7a8290;
+  --border: rgba(124, 58, 237, 0.18);
 }
 
 @theme inline {

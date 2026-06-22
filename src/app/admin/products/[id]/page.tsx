@@ -58,12 +58,12 @@ export default function ViewProduct() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 transition-colors">
+          <button onClick={() => router.back()} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-[var(--muted)] transition-colors">
             <ArrowRight size={18} />
           </button>
           <div>
             <h1 className="text-2xl font-bold">تفاصيل المنتج</h1>
-            <p className="text-gray-500 text-sm">عرض بيانات المنتج الكاملة</p>
+            <p className="text-[var(--muted-2)] text-sm">عرض بيانات المنتج الكاملة</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -86,13 +86,13 @@ export default function ViewProduct() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Images */}
-        <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-4 space-y-3">
+        <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-4 space-y-3">
           {images.length > 0 ? (
             <>
               <img
                 src={images[activeImage]}
                 alt={product.name}
-                className="w-full aspect-square object-cover rounded-xl border border-white/10"
+                className="w-full aspect-square object-cover rounded-xl border border-[var(--border)]"
               />
               {images.length > 1 && (
                 <div className="grid grid-cols-4 gap-2">
@@ -101,7 +101,7 @@ export default function ViewProduct() {
                       <img
                         src={src}
                         className={`w-full aspect-square object-cover rounded-lg border transition-all ${
-                          activeImage === i ? "border-purple-500 opacity-100" : "border-white/10 opacity-50 hover:opacity-80"
+                          activeImage === i ? "border-purple-500 opacity-100" : "border-[var(--border)] opacity-50 hover:opacity-80"
                         }`}
                       />
                     </button>
@@ -119,26 +119,26 @@ export default function ViewProduct() {
 
         {/* Info */}
         <div className="space-y-4">
-          <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-5 space-y-4">
+          <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 space-y-4">
             <div>
-              <p className="text-gray-500 text-xs mb-1">اسم المنتج</p>
-              <p className="text-white font-bold text-xl">{product.name}</p>
+              <p className="text-[var(--muted-2)] text-xs mb-1">اسم المنتج</p>
+              <p className="text-[var(--text)] font-bold text-xl">{product.name}</p>
             </div>
 
             {product.description && (
               <div>
-                <p className="text-gray-500 text-xs mb-1">الوصف</p>
-                <p className="text-gray-300 text-sm leading-relaxed">{product.description}</p>
+                <p className="text-[var(--muted-2)] text-xs mb-1">الوصف</p>
+                <p className="text-[var(--muted)] text-sm leading-relaxed">{product.description}</p>
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-black/30 rounded-xl p-3">
-                <p className="text-gray-500 text-xs mb-1">السعر</p>
-                <p className="text-white font-bold text-lg">{product.price} $</p>
+              <div className="bg-[var(--input)] rounded-xl p-3">
+                <p className="text-[var(--muted-2)] text-xs mb-1">السعر</p>
+                <p className="text-[var(--text)] font-bold text-lg">{product.price} $</p>
               </div>
-              <div className="bg-black/30 rounded-xl p-3">
-                <p className="text-gray-500 text-xs mb-1">الكمية</p>
+              <div className="bg-[var(--input)] rounded-xl p-3">
+                <p className="text-[var(--muted-2)] text-xs mb-1">الكمية</p>
                 <p className={`font-bold text-lg ${product.stock === 0 ? "text-red-400" : product.stock < 5 ? "text-yellow-400" : "text-green-400"}`}>
                   {product.stock}
                 </p>
@@ -146,7 +146,7 @@ export default function ViewProduct() {
             </div>
 
             <div>
-              <p className="text-gray-500 text-xs mb-1">التصنيف</p>
+              <p className="text-[var(--muted-2)] text-xs mb-1">التصنيف</p>
               <span className="px-3 py-1 rounded-full bg-purple-500/15 text-purple-400 text-sm">
                 {product.category}
               </span>
@@ -154,17 +154,17 @@ export default function ViewProduct() {
 
             {product.created_at && (
               <div>
-                <p className="text-gray-500 text-xs mb-1">تاريخ الإضافة</p>
-                <p className="text-gray-400 text-sm">
+                <p className="text-[var(--muted-2)] text-xs mb-1">تاريخ الإضافة</p>
+                <p className="text-[var(--muted)] text-sm">
                   {new Date(product.created_at).toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" })}
                 </p>
               </div>
             )}
           </div>
 
-          <div className="bg-[#0f1320] border border-purple-500/20 rounded-2xl p-4">
-            <p className="text-gray-500 text-xs mb-1">ID</p>
-            <p className="text-gray-500 text-xs font-mono break-all">{product.id}</p>
+          <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-4">
+            <p className="text-[var(--muted-2)] text-xs mb-1">ID</p>
+            <p className="text-[var(--muted-2)] text-xs font-mono break-all">{product.id}</p>
           </div>
         </div>
       </div>

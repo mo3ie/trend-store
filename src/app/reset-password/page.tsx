@@ -44,38 +44,38 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0f1a] flex items-center justify-center px-4 relative">
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center px-4 relative">
       <div className="fixed top-[-100px] left-[-100px] w-[400px] h-[400px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="fixed bottom-[-100px] right-[-100px] w-[400px] h-[400px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="w-full max-w-md relative">
-        <div className="bg-[#0f1320] border border-purple-500/30 rounded-3xl p-8 shadow-[0_0_60px_rgba(168,85,247,0.1)]">
+        <div className="bg-[var(--surface)] border border-purple-500/30 rounded-3xl p-8 shadow-[0_0_60px_rgba(168,85,247,0.1)]">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
               TREND
             </h1>
-            <p className="text-gray-500 text-sm mt-1">ترند للإلكترونيات</p>
+            <p className="text-[var(--muted-2)] text-sm mt-1">ترند للإلكترونيات</p>
           </div>
 
           <div className="flex items-center gap-2 mb-6">
             <KeyRound size={18} className="text-purple-400" />
-            <h2 className="text-white font-bold text-lg">تعيين كلمة مرور جديدة</h2>
+            <h2 className="text-[var(--text)] font-bold text-lg">تعيين كلمة مرور جديدة</h2>
           </div>
 
           {done ? (
             <div className="text-center py-6">
               <ShieldCheck size={48} className="text-green-400 mx-auto mb-3" />
               <p className="text-green-400 font-bold">تم تحديث كلمة المرور بنجاح</p>
-              <p className="text-gray-500 text-sm mt-1">يتم تحويلك لتسجيل الدخول…</p>
+              <p className="text-[var(--muted-2)] text-sm mt-1">يتم تحويلك لتسجيل الدخول…</p>
             </div>
           ) : !ready ? (
-            <p className="text-gray-400 text-sm bg-black/30 border border-purple-500/20 rounded-xl px-4 py-3 text-center">
+            <p className="text-[var(--muted)] text-sm bg-[var(--input)] border border-purple-500/20 rounded-xl px-4 py-3 text-center">
               افتح هذه الصفحة من رابط الاستعادة المُرسل إلى بريدك. إن لم يصل، اطلب رابطاً جديداً من صفحة الدخول.
             </p>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="text-gray-400 text-sm mb-1.5 block">كلمة المرور الجديدة</label>
+                <label className="text-[var(--muted)] text-sm mb-1.5 block">كلمة المرور الجديدة</label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
@@ -83,12 +83,12 @@ export default function ResetPasswordPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/20 text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm pr-12"
+                    className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/20 text-[var(--text)] placeholder:text-[var(--muted-2)] focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm pr-12"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-purple-400 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-2)] hover:text-purple-400 transition-colors"
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -96,14 +96,14 @@ export default function ResetPasswordPage() {
               </div>
 
               <div>
-                <label className="text-gray-400 text-sm mb-1.5 block">تأكيد كلمة المرور</label>
+                <label className="text-[var(--muted)] text-sm mb-1.5 block">تأكيد كلمة المرور</label>
                 <input
                   type={showPassword ? "text" : "password"}
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/20 text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/20 text-[var(--text)] placeholder:text-[var(--muted-2)] focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm"
                 />
               </div>
 
@@ -130,7 +130,7 @@ export default function ResetPasswordPage() {
             </form>
           )}
 
-          <p className="text-center text-gray-500 text-sm mt-6">
+          <p className="text-center text-[var(--muted-2)] text-sm mt-6">
             <a href="/login" className="text-purple-400 hover:text-purple-300 font-semibold transition-colors">
               العودة لتسجيل الدخول
             </a>

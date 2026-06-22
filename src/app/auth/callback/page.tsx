@@ -60,7 +60,7 @@ export default function AuthCallback() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "#0b0f1a",
+      background: "var(--bg)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
