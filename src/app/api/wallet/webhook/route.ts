@@ -8,6 +8,17 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: Request) {
   try {
+    // Fail CLOSED: this legacy DPay top-up webhook credits wallets, so it must
+    // present the shared secret. If WALLET_WEBHOOK_SECRET is unset, the endpoint
+    // is effectively disabled (DPay is retired and nothing else calls this).
+    const secret = process.env.WALLET_WEBHOOK_SECRET;
+    const provided =
+      req.headers.get("x-webhook-secret") ||
+      new URL(req.url).searchParams.get("secret");
+    if (!secret || provided !== secret) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
     console.log("WALLET WEBHOOK:", body);
 

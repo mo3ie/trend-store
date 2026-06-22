@@ -38,7 +38,8 @@ export default function AdminProducts() {
   async function fetchProducts() {
     setLoading(true);
     const { data } = await supabase.from("products").select("*").order("created_at", { ascending: false });
-    setProducts((data || []).map((p: any) => ({ ...p, stock: p.stock ?? p.quantity })));
+    // quantity is canonical; legacy stock column lingers at 0, so prefer quantity.
+    setProducts((data || []).map((p: any) => ({ ...p, stock: p.quantity ?? p.stock })));
     setLoading(false);
   }
 

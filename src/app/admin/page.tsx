@@ -51,7 +51,14 @@ export default function AdminDashboard() {
 
       const revenue = revenueData?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
       setStats({ products: products || 0, orders: orders || 0, users: users || 0, revenue });
-      setRecentOrders(ordersData || []);
+      // Supabase types an embedded one-to-one join (profiles) as an array;
+      // normalize to a single object to match the Order type.
+      setRecentOrders(
+        (ordersData || []).map((o) => ({
+          ...o,
+          profiles: Array.isArray(o.profiles) ? o.profiles[0] : o.profiles,
+        })) as Order[]
+      );
       setLoading(false);
     }
     load();

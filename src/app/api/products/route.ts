@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/apiAuth";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,10 +20,15 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data?.map((p: any) => ({ ...p, stock: p.stock ?? p.quantity })));
+  // `quantity` is the canonical DB column; a legacy `stock` column lingers at 0.
+  // Prefer quantity (?? falls back only when quantity is null, not when stock is 0).
+  return NextResponse.json(data?.map((p: any) => ({ ...p, stock: p.quantity ?? p.stock })));
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   try {
     const { name, description, price, stock, category, image_url, images, variants } =
       await req.json();

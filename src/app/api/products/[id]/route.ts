@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/apiAuth";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,10 +18,14 @@ export async function GET(_req: NextRequest, { params }: { params: Params }) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-  return NextResponse.json({ ...data, stock: data.stock ?? data.quantity });
+  // `quantity` is canonical; legacy `stock` column lingers at 0, so prefer quantity.
+  return NextResponse.json({ ...data, stock: data.quantity ?? data.stock });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Params }) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   const { id } = await params;
   const { error } = await supabaseAdmin.from("products").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -28,6 +33,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Params }) 
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Params }) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   const { id } = await params;
   try {
     const { name, description, price, stock, category, image_url, images, variants } =

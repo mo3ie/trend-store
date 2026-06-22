@@ -61,14 +61,10 @@ export async function POST(req: Request) {
 
   if (txErr) return NextResponse.json({ error: txErr.message }, { status: 500 });
 
-  // Auto-complete for prepaid cards with valid reference
-  if (method === "prepaid_card" && reference) {
-    await supabase.from("wallet_transactions").update({ status: "completed" }).eq("id", tx.id);
-    // Increment wallet_balance
-    const { data: prof } = await supabase.from("profiles").select("wallet_balance").eq("id", user.id).single();
-    const newBalance = (prof?.wallet_balance || 0) + amount;
-    await supabase.from("profiles").update({ wallet_balance: newBalance }).eq("id", user.id);
-  }
-
-  return NextResponse.json({ success: true, transaction_id: tx.id, status: method === "prepaid_card" ? "completed" : "pending" });
+  // SECURITY: prepaid-card top-ups are NOT auto-credited. There is no card
+  // inventory to validate the entered number against, so auto-crediting let any
+  // user mint unlimited balance for free. The transaction is created as
+  // "pending" and must be approved (admin review or a future card-validation
+  // system) before the balance is credited.
+  return NextResponse.json({ success: true, transaction_id: tx.id, status: "pending" });
 }

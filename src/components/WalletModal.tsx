@@ -16,7 +16,8 @@ type Transaction = {
 const PAYMENT_METHODS = [
   { id: "edfali",       label: "ادفع لي",  icon: "🏧", desc: "محفظة ادفع لي"        },
   { id: "moamalat",     label: "معاملات",   icon: "💳", desc: "بوابة معاملات"        },
-  { id: "prepaid_card", label: "كرت شحن", icon: "🎫", desc: "كرت شحن مسبق الدفع"  },
+  // prepaid_card temporarily disabled: no card-inventory validation exists yet,
+  // so it must not be selectable until a real card system is built (see /api/wallet).
 ];
 
 const METHOD_LABELS: Record<string, string> = {
