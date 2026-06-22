@@ -27,6 +27,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [mode, setMode] = useState<"password" | "otp">("password");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -34,39 +38,62 @@ export default function LoginPage() {
     });
   }, [router]);
 
+  const mapAuthError = (msg: string) => {
+    if (msg.includes("Invalid login credentials")) return "البريد الإلكتروني أو كلمة المرور غير صحيحة";
+    if (msg.includes("Email not confirmed")) return "يرجى تأكيد بريدك الإلكتروني أولاً — تحقق من صندوق الوارد";
+    if (msg.includes("expired") || msg.toLowerCase().includes("invalid")) return "الرمز غير صحيح أو منتهي الصلاحية";
+    if (msg.includes("Too many requests")) return "محاولات كثيرة جداً، حاول مرة أخرى لاحقاً";
+    return "حدث خطأ غير متوقع، حاول مرة أخرى";
+  };
+
+  // Shared post-login routing: admins/employees → /admin, everyone else → home.
+  const afterLogin = async (userId: string) => {
+    const { data: profile } = await supabase
+      .from("profiles").select("role").eq("id", userId).single();
+    if (profile?.role === "admin" || profile?.role === "employee") {
+      document.cookie = `admin_role=${profile.role}; path=/; max-age=86400; SameSite=Lax`;
+      router.push("/admin");
+    } else {
+      router.push("/");
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setLoading(true);
-
+    setError(""); setInfo(""); setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-      if (error.message.includes("Invalid login credentials")) {
-        setError("البريد الإلكتروني أو كلمة المرور غير صحيحة");
-      } else if (error.message.includes("Email not confirmed")) {
-        setError("يرجى تأكيد بريدك الإلكتروني أولاً — تحقق من صندوق الوارد");
-      } else if (error.message.includes("Too many requests")) {
-        setError("محاولات كثيرة جداً، حاول مرة أخرى لاحقاً");
-      } else {
-        setError("حدث خطأ غير متوقع، حاول مرة أخرى");
-      }
-    } else {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
-        .single();
-
-      if (profile?.role === "admin" || profile?.role === "employee") {
-        document.cookie = `admin_role=${profile.role}; path=/; max-age=86400; SameSite=Lax`;
-        router.push("/admin");
-      } else {
-        router.push("/");
-      }
-    }
-
+    if (error) setError(mapAuthError(error.message));
+    else await afterLogin(data.user.id);
     setLoading(false);
+  };
+
+  // OTP login: email a one-time code, then verify it (no password needed).
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(""); setInfo(""); setLoading(true);
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    if (error) setError(mapAuthError(error.message));
+    else { setOtpSent(true); setInfo("أرسلنا رمزاً إلى بريدك — أدخله بالأسفل"); }
+    setLoading(false);
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(""); setInfo(""); setLoading(true);
+    const { data, error } = await supabase.auth.verifyOtp({ email, token: otpCode.trim(), type: "email" });
+    if (error || !data.user) setError(mapAuthError(error?.message || "invalid"));
+    else await afterLogin(data.user.id);
+    setLoading(false);
+  };
+
+  const handleForgotPassword = async () => {
+    setError(""); setInfo("");
+    if (!email) { setError("أدخل بريدك الإلكتروني أولاً ثم اضغط نسيت كلمة المرور"); return; }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) setError(mapAuthError(error.message));
+    else setInfo("أرسلنا رابط استعادة كلمة المرور إلى بريدك");
   };
 
   const handleGoogle = async () => {
@@ -131,7 +158,17 @@ export default function LoginPage() {
             <div className="flex-1 h-px bg-purple-500/20" />
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          {/* Info */}
+          {info && (
+            <p className="text-green-400 text-sm bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-2.5 mb-4">
+              ✅ {info}
+            </p>
+          )}
+
+          <form
+            onSubmit={mode === "otp" ? (otpSent ? handleVerifyOtp : handleSendOtp) : handleLogin}
+            className="space-y-4"
+          >
             {/* Email */}
             <div>
               <label className="text-gray-400 text-sm mb-1.5 block">البريد الإلكتروني</label>
@@ -141,31 +178,59 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="example@email.com"
                 required
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/20 text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm"
+                disabled={mode === "otp" && otpSent}
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/20 text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm disabled:opacity-60"
               />
             </div>
 
-            {/* Password */}
-            <div>
-              <label className="text-gray-400 text-sm mb-1.5 block">كلمة المرور</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/20 text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm pr-12"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-purple-400 transition-colors"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+            {/* Password (password mode) */}
+            {mode === "password" && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-gray-400 text-sm block">كلمة المرور</label>
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="text-purple-400 hover:text-purple-300 text-xs font-medium transition-colors"
+                  >
+                    نسيت كلمة المرور؟
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/20 text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm pr-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-purple-400 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* OTP code (otp mode, after code sent) */}
+            {mode === "otp" && otpSent && (
+              <div>
+                <label className="text-gray-400 text-sm mb-1.5 block">رمز التحقق</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                  placeholder="123456"
+                  required
+                  className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-500/20 text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm tracking-[0.5em] text-center"
+                />
+              </div>
+            )}
 
             {/* Error */}
             {error && (
@@ -182,14 +247,22 @@ export default function LoginPage() {
             >
               {loading ? (
                 <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : mode === "otp" ? (
+                <><LogIn size={18} /> {otpSent ? "تأكيد الرمز" : "إرسال الرمز"}</>
               ) : (
-                <>
-                  <LogIn size={18} />
-                  تسجيل الدخول
-                </>
+                <><LogIn size={18} /> تسجيل الدخول</>
               )}
             </button>
           </form>
+
+          {/* Mode toggle */}
+          <button
+            type="button"
+            onClick={() => { setMode(mode === "otp" ? "password" : "otp"); setOtpSent(false); setOtpCode(""); setError(""); setInfo(""); }}
+            className="w-full text-center text-purple-400 hover:text-purple-300 text-xs font-medium transition-colors mt-4"
+          >
+            {mode === "otp" ? "الدخول بكلمة المرور بدل الرمز" : "الدخول برمز عبر البريد بدل كلمة المرور"}
+          </button>
 
           <p className="text-center text-gray-500 text-sm mt-6">
             ليس لديك حساب؟{" "}
