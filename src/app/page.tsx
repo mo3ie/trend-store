@@ -1,801 +1,285 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
-  Home as HomeIcon,
-  ShoppingCart,
-  Wrench,
-  Laptop,
-  Gamepad2,
-  Globe,
-  Smartphone,
-  Megaphone,
-  Package,
-  Heart,
-  Wallet,
-  Settings,
-  Menu,
-  User,
-  Clock,
-  Headphones,
-  MapPin,
-  Phone,
-  LogOut,
-  ChevronDown,
-  ArrowLeft,
-  Search,
-  X,
-  Building2,
+  Home as HomeIcon, ShoppingCart, Wrench, Laptop, Gamepad2, Globe, Smartphone,
+  Megaphone, Package, Heart, Wallet, Settings, Menu, Search, Sun, Moon,
+  Building2, Headphones, Phone, MapPin, ShieldCheck, Truck, RotateCcw, Lock,
+  BadgeCheck, MessageCircle, Check, X,
 } from "lucide-react";
-
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  stock: number;
-  category: string;
-  image_url?: string;
-};
-import HeroSlider from "@/components/HeroSlider";
-import NotificationBell from "@/components/NotificationBell";
 import WalletModal from "@/components/WalletModal";
+import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
 
-const categories = [
-  { title: "هواتف",           sub: "PHONES",          icon: Smartphone,  href: "/products?category=هواتف"      },
-  { title: "لابتوبات",        sub: "LAPTOPS",         icon: Laptop,      href: "/products?category=لابتوبات"   },
-  { title: "بلايستيشن",      sub: "PLAYSTATION",     icon: Gamepad2,    href: "/products?category=بلايستيشن"  },
-  { title: "خدمات إلكترونية", sub: "E-SERVICES",      icon: Globe,       href: "/products"                     },
-  { title: "طلب من المواقع", sub: "ONLINE SHOPPING", icon: ShoppingCart, href: "https://order.trendstore-ly.com" },
-  { title: "إعلانات",         sub: "MARKETING",       icon: Megaphone,   href: "/ads"                          },
-  { title: "مواقعنا",         sub: "OUR SITES",       icon: Building2,   href: "/our-sites"                       },
-];
+type Product = { id: string; name: string; price: number; stock: number; category: string; image_url?: string };
 
-const services = [
-  { title: "صيانة الأجهزة",  desc: "إصلاح احترافي لجميع الأجهزة الإلكترونية",    icon: Wrench      },
-  { title: "خدمات رقمية",   desc: "اشتراكات وخدمات رقمية متنوعة بأفضل الأسعار", icon: Globe       },
-  { title: "إكسسوارات",      desc: "ملحقات أصلية لجميع أنواع الأجهزة",            icon: Headphones  },
-  { title: "بيع الأجهزة",   desc: "أحدث الأجهزة الإلكترونية بضمان رسمي",        icon: Smartphone  },
-];
-
-const navTop = [
-  { label: "الرئيسية",          icon: HomeIcon,    href: undefined },
-  { label: "طلب شي ان",         icon: ShoppingCart, href: "https://order.trendstore-ly.com" },
-  { label: "متجر الإلكترونيات", icon: Smartphone,  href: "/products" },
-  { label: "الصيانة",           icon: Wrench,      href: undefined },
-  { label: "خدمات رقمية",      icon: Megaphone,   href: undefined },
-  { label: "مواقعنا",           icon: Building2,   href: "/our-sites" },
-];
-
-const navBottom = [
-  { label: "تتبع طلبك", icon: Package,  href: "/orders"              },
-  { label: "المفضلة",   icon: Heart,    href: "/account?tab=favorites" },
-  { label: "محفظتي",    icon: Wallet,   href: undefined               },
-  { label: "الإعدادات", icon: Settings, href: "/account?tab=settings" },
-];
+// Store contact info (will become admin-editable in stage B).
+const PHONES = ["0965798033", "0925000000"];
+const ADDRESS_AR = "الفرع الرئيسي — بنغازي، شارع العهد الجديد";
+const ADDRESS_EN = "Main branch — Benghazi, Al-Ahd Al-Jadid St.";
 
 export default function Home() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [mobileSearch, setMobileSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [desktopSearch, setDesktopSearch] = useState("");
-  const [walletOpen, setWalletOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, signOut } = useAuth();
-  const { count } = useCart();
+  const { count, addItem } = useCart();
+
+  const [lang, setLang] = useState<"ar" | "en">("ar");
+  const [light, setLight] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [walletOpen, setWalletOpen] = useState(false);
+  const [modal, setModal] = useState<null | "maint" | "support" | "soon">(null);
+  const [query, setQuery] = useState("");
+  const [products, setProducts] = useState<Product[]>([]);
+
+  const t = (ar: string, en: string) => (lang === "ar" ? ar : en);
+  const rtl = lang === "ar";
 
   useEffect(() => {
-    fetch("/api/products?limit=100")
-      .then((r) => r.json())
-      .then((data) => setAllProducts(Array.isArray(data) ? data : []));
+    try { if (localStorage.getItem("store-lang") === "en") setLang("en"); } catch {}
+    setLight(document.documentElement.classList.contains("light"));
+    fetch("/api/products?limit=12").then((r) => r.json()).then((d) => setProducts(Array.isArray(d) ? d : []));
   }, []);
 
-  const activeQuery = desktopSearch || searchQuery;
-  const products = activeQuery.trim()
-    ? allProducts.filter(p =>
-        p.name.toLowerCase().includes(activeQuery.toLowerCase()) ||
-        p.category.toLowerCase().includes(activeQuery.toLowerCase())
-      )
-    : allProducts.slice(0, 8);
+  const toggleLang = () => setLang((l) => { const n = l === "ar" ? "en" : "ar"; try { localStorage.setItem("store-lang", n); } catch {} return n; });
+  const toggleTheme = () => { const n = !light; setLight(n); document.documentElement.classList.toggle("light", n); try { localStorage.setItem("theme", n ? "light" : "dark"); } catch {} };
+  const addToCart = (p: Product) => addItem({ id: p.id, name: p.name, price: p.price, image_url: p.image_url, stock: p.stock });
+  const go = (href?: string) => { if (href) window.location.href = href; };
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  const shown = query.trim()
+    ? products.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()) || (p.category || "").toLowerCase().includes(query.toLowerCase()))
+    : products.slice(0, 8);
 
-  // ─── shared content blocks ───────────────────────────────────────────────
+  const categories = [
+    { ar: "هواتف", en: "Phones", sub: "PHONES", icon: Smartphone, href: "/products?category=هواتف" },
+    { ar: "لابتوبات", en: "Laptops", sub: "LAPTOPS", icon: Laptop, href: "/products?category=لابتوبات" },
+    { ar: "بلايستيشن", en: "PlayStation", sub: "PLAYSTATION", icon: Gamepad2, href: "/products?category=بلايستيشن" },
+    { ar: "خدمات رقمية", en: "Digital", sub: "DIGITAL", icon: Globe, href: "/products" },
+    { ar: "طلب من المواقع", en: "Order Online", sub: "SHOPPING", icon: ShoppingCart, href: "https://order.trendstore-ly.com" },
+    { ar: "إعلانات", en: "Ads", sub: "MARKETING", icon: Megaphone, href: "/ads" },
+    { ar: "مواقعنا", en: "Our Sites", sub: "SITES", icon: Building2, href: "/our-sites" },
+  ];
+  const services = [
+    { ar: "صيانة الأجهزة", en: "Device repair", dAr: "إصلاح احترافي بضمان", dEn: "Pro repair, warranted", icon: Wrench, cta: t("احجز صيانة", "Book repair"), onClick: () => setModal("maint") },
+    { ar: "الإكسسوارات", en: "Accessories", dAr: "ملحقات أصلية", dEn: "Genuine add-ons", icon: Headphones, cta: t("تصفّح", "Browse"), href: "/products?category=إكسسوارات" },
+    { ar: "خدمات رقمية", en: "Digital services", dAr: "اشتراكات وبطاقات", dEn: "Subs & cards", icon: Globe, cta: t("اطلب خدمة", "Request"), onClick: () => setModal("soon") },
+    { ar: "بيع الأجهزة", en: "Buy devices", dAr: "أحدث الأجهزة بضمان", dEn: "Latest, warranted", icon: Smartphone, cta: t("تصفّح", "Browse"), href: "/products" },
+  ];
+  const trust = [
+    { ar: "دعم فني 24/7", en: "24/7 support", icon: Headphones },
+    { ar: "استرجاع سهل", en: "Easy returns", icon: RotateCcw },
+    { ar: "دفع آمن", en: "Secure pay", icon: Lock },
+    { ar: "توصيل سريع", en: "Fast delivery", icon: Truck },
+    { ar: "الثقة والموثوقية", en: "Trusted", icon: ShieldCheck },
+    { ar: "ضمان الجودة", en: "Quality", icon: BadgeCheck },
+  ];
 
-  const CategoriesGrid = ({ cols }: { cols: string }) => (
-    <div className={`grid ${cols} gap-4`}>
-      {categories.map((cat, i) => {
-        const Icon = cat.icon;
-        const isExternal = cat.href.startsWith("http");
-        return (
-          <a
-            key={i}
-            href={cat.href}
-            target={isExternal ? "_blank" : undefined}
-            rel={isExternal ? "noopener noreferrer" : undefined}
-            className="category-card"
-          >
-            <Icon size={32} className="icon gradient-icon" />
-            <h3>{cat.title}</h3>
-            <p>{cat.sub}</p>
-          </a>
-        );
-      })}
-    </div>
-  );
+  return (
+    <div className="home2 min-h-screen" dir={rtl ? "rtl" : "ltr"}>
 
-  const ProductsGrid = ({ cols }: { cols: string }) => (
-    <div className={`grid ${cols} gap-4`}>
-      {products.map((product) => (
-        <a
-          key={product.id}
-          href={`/products/${product.id}`}
-          className="group bg-[var(--surface)] border border-purple-500/20 rounded-2xl overflow-hidden hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.15)] transition-all"
-        >
-          <div className="aspect-square bg-[var(--input)] overflow-hidden">
-            {product.image_url ? (
-              <img src={product.image_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-purple-400/20">
-                <Package size={36} />
-              </div>
-            )}
-          </div>
-          <div className="p-3 space-y-1.5">
-            <span className="text-xs text-purple-400/70">{product.category}</span>
-            <p className="text-sm font-semibold text-[var(--text)] leading-tight line-clamp-2">{product.name}</p>
-            <div className="flex items-center justify-between pt-1">
-              <span className="font-black text-base bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                {product.price} د
-              </span>
-              <span className={`text-xs font-medium ${product.stock === 0 ? "text-red-400" : product.stock < 5 ? "text-yellow-400" : "text-green-400"}`}>
-                {product.stock === 0 ? "نفد" : product.stock < 5 ? `${product.stock} متبقي` : "متوفر"}
-              </span>
-            </div>
-          </div>
-        </a>
-      ))}
-    </div>
-  );
-
-  // =========================================================================
-  // DESKTOP LAYOUT — unchanged, pixel-perfect
-  // =========================================================================
-  const DesktopLayout = () => (
-    <div className="hidden md:flex bg-[var(--bg)] text-[var(--text)] min-h-screen">
-
-      {/* ═══════════════════════════════ SIDEBAR ═══════════════════════════════ */}
-      <div
-        className={`${
-          sidebarOpen ? "w-64 px-6" : "w-[70px] px-3"
-        } flex flex-col py-6 border-r border-purple-500/20 min-h-screen shrink-0 transition-all duration-300 overflow-hidden`}
-      >
-          <div className={`mb-8 ${!sidebarOpen ? "text-center" : ""}`}>
-            <h1 className="text-xl font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent leading-tight">
-              {sidebarOpen ? "محل ترند" : "ت"}
-            </h1>
-            {sidebarOpen && (
-              <p className="text-xs text-[var(--muted-2)] mt-0.5">للإلكترونيات</p>
-            )}
-          </div>
-
-          <nav className="space-y-1 flex-1">
-            {navTop.map(({ label, icon: Icon, href }, i) => {
-              const cls = `flex items-center py-2.5 rounded-xl text-[var(--muted)] hover:text-purple-300 hover:bg-purple-500/10 cursor-pointer transition-all ${sidebarOpen ? "gap-3 px-3" : "justify-center px-0"}`;
-              if (href) {
-                const isExternal = href.startsWith("http");
-                return (
-                  <a key={i} href={href} target={isExternal ? "_blank" : undefined} rel={isExternal ? "noopener noreferrer" : undefined} title={!sidebarOpen ? label : undefined} className={cls}>
-                    <Icon size={18} className="shrink-0" />
-                    {sidebarOpen && <span className="text-sm">{label}</span>}
-                  </a>
-                );
-              }
-              return (
-                <div key={i} title={!sidebarOpen ? label : undefined} className={cls}>
-                  <Icon size={18} className="shrink-0" />
-                  {sidebarOpen && <span className="text-sm">{label}</span>}
-                </div>
-              );
-            })}
-
-            <div className="border-t border-purple-500/15 my-4" />
-
-            {navBottom.map(({ label, icon: Icon, href }, i) => {
-              const cls = `flex items-center py-2.5 rounded-xl text-[var(--muted)] hover:text-purple-300 hover:bg-purple-500/10 cursor-pointer transition-all ${sidebarOpen ? "gap-3 px-3" : "justify-center px-0"}`;
-              if (label === "محفظتي") return (
-                <button key={i} onClick={() => user ? setWalletOpen(true) : (window.location.href="/login")} title={!sidebarOpen ? label : undefined} className={cls}>
-                  <Icon size={18} className="shrink-0" />
-                  {sidebarOpen && <span className="text-sm">{label}</span>}
-                </button>
-              );
-              if (href) return (
-                <a key={i} href={href} title={!sidebarOpen ? label : undefined} className={cls}>
-                  <Icon size={18} className="shrink-0" />
-                  {sidebarOpen && <span className="text-sm">{label}</span>}
-                </a>
-              );
-              return (
-                <div key={i} title={!sidebarOpen ? label : undefined} className={cls}>
-                  <Icon size={18} className="shrink-0" />
-                  {sidebarOpen && <span className="text-sm">{label}</span>}
-                </div>
-              );
-            })}
-          </nav>
-
-          {sidebarOpen && (
-            <div className="mt-6 p-4 rounded-2xl bg-purple-900/25 border border-purple-500/30">
-              <div className="flex items-center gap-2 mb-1.5">
-                <Clock size={15} className="text-purple-400" />
-                <span className="text-sm font-bold text-purple-300">دعم 24/7</span>
-              </div>
-              <p className="text-xs text-[var(--muted)] mb-3 leading-relaxed">
-                فريقنا جاهز لمساعدتك في أي وقت
-              </p>
-              <button className="w-full py-2 rounded-xl text-sm font-bold bg-gradient-to-r from-purple-600 to-blue-500 text-white transition-all hover:shadow-[0_0_18px_rgba(168,85,247,0.55)]">
-                تواصل معنا
-              </button>
-            </div>
-          )}
-      </div>
-
-      {/* ═══════════════════════════════ MAIN ═══════════════════════════════ */}
-      <div className="flex-1 flex flex-col min-w-0">
-
-        <header className="flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[var(--glass)] backdrop-blur-md z-40">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-[var(--muted)] hover:text-purple-400 transition-colors shrink-0">
-            <Menu size={22} />
-          </button>
-
-          {user ? (
-            <div className="relative shrink-0" ref={dropdownRef}>
-              <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-[var(--muted)] hover:text-purple-300 transition-all">
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-xs font-black">
-                  {(user.user_metadata?.full_name?.[0] || user.email?.[0] || "؟").toUpperCase()}
-                </div>
-                <span className="text-sm font-medium max-w-[80px] truncate">
-                  {user.user_metadata?.full_name?.split(" ")[0] || user.email?.split("@")[0]}
-                </span>
-                <ChevronDown size={14} className={`transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
-              </button>
-              {dropdownOpen && (
-                <div className="absolute top-full mt-2 right-0 w-44 bg-[var(--surface)] border border-purple-500/30 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.5)] overflow-hidden z-50">
-                  {[
-                    { label: "حسابي",    icon: User,    href: "/account"  },
-                    { label: "طلباتي",   icon: Package, href: "/account?tab=shein" },
-                    { label: "المفضلة",  icon: Heart,   href: "/account?tab=favorites" },
-                  ].map(({ label, icon: Icon, href }) => (
-                    <a key={label} href={href} className="flex items-center gap-3 px-4 py-3 text-sm text-[var(--muted)] hover:text-purple-300 hover:bg-purple-500/10 transition-colors">
-                      <Icon size={15} />
-                      {label}
-                    </a>
-                  ))}
-                  <div className="border-t border-purple-500/15" />
-                  <button onClick={signOut} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors">
-                    <LogOut size={15} />
-                    تسجيل الخروج
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <a href="/login" className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-[var(--muted)] hover:text-purple-300 transition-all shrink-0">
-              <User size={18} />
-              <span className="text-sm font-medium">تسجيل الدخول</span>
-            </a>
-          )}
-
-          <div className="flex items-center gap-3 text-[var(--muted)] shrink-0">
-            {user && <NotificationBell />}
-            <a href="/cart" className="relative hover:text-purple-400 transition-colors">
-              <ShoppingCart size={20} />
-              {count > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[10px] font-black text-[var(--text)] flex items-center justify-center">
-                  {count > 9 ? "9+" : count}
-                </span>
-              )}
-            </a>
-          </div>
-
-          <div className="flex-1 relative">
-            <div className="relative">
-              <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-2)] pointer-events-none" />
-              <input
-                value={desktopSearch}
-                onChange={(e) => setDesktopSearch(e.target.value)}
-                placeholder="ابحث عن منتج أو تصنيف..."
-                className="w-full px-4 py-2.5 pr-9 rounded-xl bg-[var(--input)] border border-purple-500/20 text-sm focus:outline-none focus:border-purple-500/50 transition-colors placeholder:text-[var(--muted-2)]"
-              />
-              {desktopSearch && (
-                <button onClick={() => setDesktopSearch("")} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-2)] hover:text-[var(--text)]">
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-            {desktopSearch && products.length > 0 && (
-              <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-[var(--surface)] border border-purple-500/30 rounded-xl shadow-2xl overflow-hidden max-h-64 overflow-y-auto">
-                {products.slice(0, 8).map(p => (
-                  <a key={p.id} href={`/products/${p.id}`}
-                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-purple-500/10 transition-colors border-b border-[var(--border)] last:border-b-0">
-                    {p.image_url
-                      ? <img src={p.image_url} alt="" className="w-9 h-9 rounded-lg object-cover" />
-                      : <div className="w-9 h-9 rounded-lg bg-purple-500/10 flex items-center justify-center"><Package size={14} className="text-purple-400/40" /></div>
-                    }
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-[var(--text)] truncate">{p.name}</p>
-                      <p className="text-xs text-purple-400">{p.price} د</p>
-                    </div>
-                  </a>
-                ))}
-                {products.length > 8 && (
-                  <a href={`/products?search=${encodeURIComponent(desktopSearch)}`}
-                    className="block px-4 py-2.5 text-xs text-purple-400 hover:text-purple-300 text-center hover:bg-purple-500/10 transition-colors">
-                    عرض كل النتائج ({products.length}) →
-                  </a>
-                )}
-              </div>
-            )}
-            {desktopSearch && products.length === 0 && (
-              <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-[var(--surface)] border border-purple-500/30 rounded-xl shadow-2xl px-4 py-3 text-[var(--muted-2)] text-sm text-center">
-                لا توجد نتائج لـ "{desktopSearch}"
-              </div>
-            )}
-          </div>
-        </header>
-
-        <div className="p-6 space-y-6 overflow-y-auto">
-          <HeroSlider />
-          <CategoriesGrid cols="grid-cols-2 md:grid-cols-3 lg:grid-cols-6" />
-
-          {(products.length > 0 || desktopSearch) && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-[var(--text)]">
-                  {desktopSearch ? `نتائج البحث عن "${desktopSearch}"` : "أحدث المنتجات"}
-                  {desktopSearch && <span className="text-base font-normal text-[var(--muted-2)] mr-2">({products.length} نتيجة)</span>}
-                </h2>
-                {!desktopSearch && (
-                  <a href="/products" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors">
-                    عرض الكل <ArrowLeft size={14} />
-                  </a>
-                )}
-              </div>
-              {products.length === 0 && desktopSearch ? (
-                <div className="text-center py-12 text-[var(--muted-2)]">
-                  <Package size={48} className="mx-auto mb-3 opacity-20" />
-                  <p>لا توجد نتائج لـ "{desktopSearch}"</p>
-                </div>
-              ) : (
-                <ProductsGrid cols="grid-cols-2 md:grid-cols-3 lg:grid-cols-4" />
-              )}
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-6">
-            <div className="shein-wrapper">
-              <img src="/images/shein.png" className="shein-bg" alt="shein" />
-              <a href="https://order.trendstore-ly.com" target="_blank" className="shein-order-btn">ابدأ الطلب 🛍️</a>
-            </div>
-            <div className="offer-card">
-              <img src="/images/offer.png" alt="عرض اليوم" />
-              <button className="offer-btn">% استفد من العرض</button>
-            </div>
-          </div>
-
-          <div className="relative rounded-2xl border border-purple-500/30 overflow-hidden" style={{ height: "200px" }}>
-            <div className="absolute inset-0" style={{ backgroundImage: "url('/images/laptop.png')", backgroundSize: "cover", backgroundPosition: "center" }} />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-            <button className="absolute bottom-5 left-5 px-6 py-2.5 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg font-bold text-sm hover:shadow-[0_0_20px_rgba(168,85,247,0.6)] transition-all">
-              اطلب الآن
-            </button>
-          </div>
-
-          <div>
-            <h2 className="text-xl font-bold mb-4 text-purple-300">خدماتنا المميزة</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {services.map((srv, i) => {
-                const Icon = srv.icon;
-                return (
-                  <div key={i} className="p-5 rounded-2xl bg-[var(--surface)] border border-purple-500/20 flex flex-col items-center gap-3 text-center hover:border-purple-500/60 hover:shadow-[0_0_20px_rgba(168,85,247,0.18)] transition-all">
-                    <div className="w-16 h-16 rounded-2xl bg-purple-500/15 flex items-center justify-center">
-                      <Icon size={30} className="text-purple-400" style={{ filter: "drop-shadow(0 0 8px rgba(168,85,247,0.8))" }} />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-[var(--text)] text-sm mb-1">{srv.title}</h3>
-                      <p className="text-[var(--muted)] text-xs leading-relaxed">{srv.desc}</p>
-                    </div>
-                    <button className="mt-auto w-full py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-500 hover:to-blue-500 transition-all hover:shadow-[0_0_12px_rgba(168,85,247,0.5)]">
-                      اطلب الآن
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="w-full rounded-2xl overflow-hidden">
-            <img src="/images/features-banner.png" alt="مميزات المتجر" style={{ width: "100%", height: "120px", objectFit: "cover", display: "block" }} />
-          </div>
-
-          <footer className="rounded-2xl bg-[var(--surface-2)] border border-purple-500/20 p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-6">
-              <div>
-                <div className="mb-2">
-                <h3 className="text-xl font-bold text-purple-400">محل ترند</h3>
-                <p className="text-xs text-[var(--muted-2)]">للإلكترونيات</p>
-              </div>
-                <p className="text-[var(--muted)] text-sm leading-relaxed">متجرك الأول للإلكترونيات والخدمات الرقمية في ليبيا</p>
-              </div>
-              <div>
-                <h4 className="font-bold text-purple-300 mb-3 flex items-center gap-2 text-sm">
-                  <MapPin size={14} className="text-purple-400" /> فروعنا
-                </h4>
-                <div className="space-y-3 text-sm text-[var(--muted)]">
-                  <div>
-                    <p className="text-[var(--text)] font-semibold mb-0.5">بنغازي — قاريونس</p>
-                    <p>محلات نادي قاريونس، مقابل مطعم كودو</p>
-                  </div>
-                  <div>
-                    <p className="text-[var(--text)] font-semibold mb-0.5">الفرع الثاني — بلعون</p>
-                    <p>شارع المعهد الصحي</p>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <h4 className="font-bold text-purple-300 mb-3 flex items-center gap-2 text-sm">
-                  <Phone size={14} className="text-purple-400" /> واتساب
-                </h4>
-                <div className="space-y-2.5">
-                  {["0945798033", "0943579690"].map((num) => (
-                    <a key={num} href={`https://wa.me/218${num.slice(1)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-sm text-[var(--muted)] hover:text-green-400 transition-colors">
-                      <span className="w-7 h-7 bg-green-500/20 border border-green-500/30 rounded-full flex items-center justify-center text-green-400 text-xs font-bold">W</span>
-                      <span dir="ltr">{num}</span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-purple-500/15 pt-4 text-center text-xs text-[var(--muted-2)]">
-              © 2025 محل ترند للإلكترونيات — جميع الحقوق محفوظة
-            </div>
-          </footer>
+      <header className="topbar">
+        <button className="iconbtn menubtn" aria-label="menu" onClick={() => setCollapsed((c) => !c)}><Menu size={20} /></button>
+        <div className="brand">
+          <span className="logo"><b>T</b></span>
+          <span className="names">
+            <span className="ar">{t("محل ترند", "Trend Store")}</span>
+            <span className="wm en">TREND ELECTRONICS</span>
+          </span>
         </div>
-      </div>
-    </div>
-  );
-
-  // =========================================================================
-  // MOBILE LAYOUT — completely separate, no shared JSX with desktop
-  // =========================================================================
-  const MobileLayout = () => (
-    <div className="flex flex-col md:hidden bg-[var(--bg)] text-[var(--text)] min-h-screen" dir="rtl">
-
-      {/* ── Mobile Top Bar ── */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-purple-500/20 sticky top-0 bg-[var(--glass)] backdrop-blur-md z-40">
-        {/* Logo */}
-        <a href="/" className="flex flex-col leading-tight">
-          <span className="text-lg font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">محل ترند</span>
-          <span className="text-[10px] text-[var(--muted-2)] font-medium">للإلكترونيات</span>
-        </a>
-
-        {/* Right actions */}
-        <div className="flex items-center gap-3">
-          {/* Search toggle */}
-          <button onClick={() => setMobileSearch(!mobileSearch)} className="text-[var(--muted)] hover:text-purple-400 transition-colors">
-            {mobileSearch ? <X size={20} /> : <Search size={20} />}
-          </button>
-          {/* Notifications */}
-          {user && <NotificationBell />}
-          {/* Cart */}
-          <a href="/cart" className="relative text-[var(--muted)] hover:text-purple-400 transition-colors">
-            <ShoppingCart size={20} />
-            {count > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full text-[9px] font-black text-[var(--text)] flex items-center justify-center">
-                {count > 9 ? "9+" : count}
-              </span>
-            )}
-          </a>
-          {/* Account */}
-          {user ? (
-            <a href="/account" className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-sm font-black">
-              {(user.user_metadata?.full_name?.[0] || user.email?.[0] || "؟").toUpperCase()}
-            </a>
-          ) : (
-            <a href="/login" className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
-              <User size={16} />
-            </a>
-          )}
+        <div className="hide-sm" style={{ position: "relative", flex: "0 1 280px" }}>
+          <Search size={16} style={{ position: "absolute", insetInlineStart: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted)" }} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("ابحث عن منتج…", "Search products…")}
+            style={{ width: "100%", padding: "10px 36px", borderRadius: 13, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--text)", fontFamily: "inherit", fontSize: 13 }} />
         </div>
+        <button className="iconbtn langbtn" onClick={toggleLang}>{lang === "ar" ? "EN" : "ع"}</button>
+        <button className="iconbtn" aria-label="theme" onClick={toggleTheme}>{light ? <Moon size={19} /> : <Sun size={19} />}</button>
+        {user && <NotificationBell />}
+        <a className="iconbtn cartdot" href="/cart" aria-label="cart"><ShoppingCart size={20} />{count > 0 && <i>{count > 9 ? "9+" : count}</i>}</a>
+        <a className="iconbtn" href={user ? "/account" : "/login"} aria-label="account"><svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg></a>
       </header>
 
-      {/* Search bar (expandable) */}
-      {mobileSearch && (
-        <div className="px-4 py-3 border-b border-purple-500/10 bg-[var(--bg)] relative z-30">
-          <div className="relative">
-            <input
-              autoFocus
-              placeholder="ابحث عن منتج أو تصنيف..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl bg-black/50 border border-purple-500/30 text-sm text-[var(--text)] focus:outline-none focus:border-purple-500/60 transition-colors placeholder:text-[var(--muted-2)]"
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-2)]">
-                <X size={14} />
-              </button>
-            )}
+      <div className="shell">
+        <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
+          <div className="side-head">
+            <span className="logo" style={{ width: 32, height: 32, borderRadius: 10 }}><b style={{ fontSize: 15 }}>T</b></span>
+            <span className="ar" style={{ fontWeight: 900, fontSize: 15 }}>{t("محل ترند", "Trend Store")}</span>
+            <button className="collapse" aria-label="collapse" onClick={() => setCollapsed((c) => !c)}><svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor" style={{ width: 16, height: 16, transform: rtl ? "" : "scaleX(-1)" }}><path d="M9 6l6 6-6 6" /></svg></button>
           </div>
-          {searchQuery && products.length > 0 && (
-            <div className="mt-2 bg-[var(--surface)] border border-purple-500/30 rounded-xl overflow-hidden">
-              {products.slice(0, 5).map(p => (
-                <a key={p.id} href={`/products/${p.id}`}
-                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-purple-500/10 border-b border-[var(--border)] last:border-b-0">
-                  {p.image_url
-                    ? <img src={p.image_url} alt="" className="w-9 h-9 rounded-lg object-cover" />
-                    : <div className="w-9 h-9 rounded-lg bg-purple-500/10 flex items-center justify-center"><Package size={14} className="text-purple-400/40" /></div>
-                  }
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-[var(--text)] truncate">{p.name}</p>
-                    <p className="text-xs text-purple-400">{p.price} د</p>
+          <div className="side-group">{t("التصفّح", "Browse")}</div>
+          <div className="navitem active" onClick={() => go("/")}><HomeIcon size={19} /><span>{t("الرئيسية", "Home")}</span></div>
+          <div className="navitem" onClick={() => go("/products")}><Smartphone size={19} /><span>{t("متجر الإلكترونيات", "Electronics")}</span></div>
+          <div className="navitem" onClick={() => go("https://order.trendstore-ly.com")}><ShoppingCart size={19} /><span>{t("طلب من شي إن", "Order from Shein")}</span></div>
+          <div className="navitem" onClick={() => setModal("maint")}><Wrench size={19} /><span>{t("الصيانة", "Maintenance")}</span></div>
+          <div className="navitem" onClick={() => setModal("soon")}><Globe size={19} /><span>{t("خدمات رقمية", "Digital Services")}</span></div>
+          <div className="navitem" onClick={() => go("/our-sites")}><Building2 size={19} /><span>{t("مواقعنا", "Our Sites")}</span></div>
+          <div className="side-group">{t("حسابي", "My account")}</div>
+          <div className="navitem" onClick={() => go("/orders")}><Package size={19} /><span>{t("تتبّع طلبك", "Track order")}</span></div>
+          <div className="navitem" onClick={() => go("/account?tab=favorites")}><Heart size={19} /><span>{t("المفضلة", "Favorites")}</span></div>
+          <div className="navitem" onClick={() => (user ? setWalletOpen(true) : go("/login"))}><Wallet size={19} /><span>{t("محفظتي", "Wallet")}</span></div>
+          <div className="navitem" onClick={() => go("/account?tab=settings")}><Settings size={19} /><span>{t("الإعدادات", "Settings")}</span></div>
+          {user && <div className="navitem" onClick={signOut}><svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5M21 12H9" /></svg><span>{t("تسجيل الخروج", "Sign out")}</span></div>}
+        </aside>
+
+        <main className="content">
+          <section className="hero">
+            <div className="inner">
+              <h1>{t("كل ما تحتاجه من عالم التقنية", "Everything you need from the world of tech")}</h1>
+              <p>{t("هواتف، لابتوبات، أجهزة وإكسسوارات أصلية — توصيل لكل ليبيا.", "Phones, laptops, devices & genuine accessories — delivery across Libya.")}</p>
+              <a className="btn" href="/products">{t("تسوّق الآن", "Shop now")}</a>
+            </div>
+          </section>
+
+          <section>
+            <div className="section-h"><h2>{t("الأقسام", "Categories")}</h2></div>
+            <div className="cats" style={{ marginTop: 13 }}>
+              {categories.map((c) => { const I = c.icon; return (
+                <a key={c.sub} className="cat" href={c.href}><span className="ic"><I size={23} /></span><span>{t(c.ar, c.en)}</span><small>{c.sub}</small></a>
+              ); })}
+            </div>
+          </section>
+
+          <section>
+            <div className="section-h"><h2>{t("عروض وخدمات", "Offers & Services")}</h2></div>
+            <div className="grid2" style={{ marginTop: 13 }}>
+              <a className="card wide" href="/products">
+                <div className="thumb"><Laptop /></div>
+                <div className="body"><span className="badge">{t("عرض الأسبوع", "Weekly deal")}</span><h3>{t("لابتوبات بخصم يصل 25%", "Laptops up to 25% off")}</h3><span className="btn sm">{t("تسوّق الآن", "Shop now")}</span></div>
+              </a>
+              <a className="card wide shein" href="https://order.trendstore-ly.com">
+                <div className="thumb"><ShoppingCart /></div>
+                <div className="body"><span className="badge">{t("حصري", "Exclusive")}</span><h3>{t("اطلب من شي إن إلى ليبيا", "Order Shein to Libya")}</h3><span className="btn sm">{t("ابدأ طلبك", "Start order")}</span></div>
+              </a>
+            </div>
+          </section>
+
+          <section>
+            <div className="section-h"><h2>{t("خدماتنا", "Our services")}</h2></div>
+            <div className="grid4" style={{ marginTop: 13 }}>
+              {services.map((s) => { const I = s.icon; return (
+                <div key={s.en} className="card">
+                  <div className="thumb tall"><I /></div>
+                  <div className="body"><h3>{t(s.ar, s.en)}</h3><p>{t(s.dAr, s.dEn)}</p>
+                    <button className="btn sm" onClick={() => (s.onClick ? s.onClick() : go(s.href))}>{s.cta}</button>
                   </div>
-                </a>
+                </div>
+              ); })}
+            </div>
+          </section>
+
+          <section className="trust">
+            {trust.map((x) => { const I = x.icon; return (
+              <div key={x.en} className="t"><span className="ic"><I size={20} /></span><span>{t(x.ar, x.en)}</span></div>
+            ); })}
+          </section>
+
+          <section className="maint">
+            <div className="head"><span className="ic"><Wrench size={23} /></span><h2>{t("منظومة الصيانة المتكاملة", "Integrated maintenance system")}</h2></div>
+            <p className="sub">{t("اطلب صيانة جهازك وتابع حالته لحظة بلحظة — وبوابة مستقلة للفنيين.", "Request a repair and track it live — with a dedicated technician portal.")}</p>
+            <div className="two">
+              <div className="mcard"><h3>{t("للزبون", "For customers")}</h3>
+                <ul className="feat">
+                  <li><Check size={16} /><span>{t("طلب بالصور ووصف العطل", "Request with photos & fault")}</span></li>
+                  <li><Check size={16} /><span>{t("عرض سعر قبل البدء وتتبّع الحالة", "Quote first, live status")}</span></li>
+                  <li><Check size={16} /><span>{t("ضمان على الإصلاح", "Repair warranty")}</span></li>
+                </ul>
+                <button className="btn sm" onClick={() => setModal("maint")}>{t("اطلب صيانة الآن", "Request a repair")}</button>
+              </div>
+              <div className="mcard"><h3>{t("لفني الصيانة", "For technicians")}</h3>
+                <ul className="feat">
+                  <li><Check size={16} /><span>{t("بوابة استلام وقبول الطلبات", "Receive & accept jobs")}</span></li>
+                  <li><Check size={16} /><span>{t("تحديث الحالة وإرسال السعر", "Update status & quote")}</span></li>
+                  <li><Check size={16} /><span>{t("لوحة الأرباح والسجل", "Earnings & history")}</span></li>
+                </ul>
+                <button className="btn sm ghost" onClick={() => setModal("soon")}>{t("دخول الفنيين", "Technician login")}</button>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <div className="section-h"><h2>{query ? t("نتائج البحث", "Search results") : t("أحدث المنتجات", "Latest products")}</h2><a href="/products">{t("عرض الكل", "View all")}</a></div>
+            <div className="grid4" style={{ marginTop: 13 }}>
+              {shown.length === 0 && <p style={{ color: "var(--muted)", gridColumn: "1/-1", padding: "20px 0" }}>{t("لا توجد منتجات.", "No products.")}</p>}
+              {shown.map((p) => (
+                <div key={p.id} className="card">
+                  <a className="thumb tall" href={`/products/${p.id}`}>{p.image_url ? <img src={p.image_url} alt={p.name} /> : <Package />}</a>
+                  <div className="body"><h3 style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</h3><span className="price">{p.price} {t("د.ل", "LYD")}</span>
+                    <button className="btn sm" onClick={() => addToCart(p)}>{t("أضف للسلة", "Add to cart")}</button>
+                  </div>
+                </div>
               ))}
             </div>
-          )}
-          {searchQuery && products.length === 0 && (
-            <p className="mt-2 text-center text-[var(--muted-2)] text-sm py-2">لا توجد نتائج</p>
-          )}
+          </section>
+
+          <footer className="footer">
+            <div>
+              <div className="row"><span className="logo"><b>T</b></span><div className="names"><div style={{ fontWeight: 900, fontSize: 17 }}>{t("محل ترند", "Trend Store")}</div><div className="wm" style={{ fontSize: 12 }}>TREND ELECTRONICS</div></div></div>
+              <span className="support-badge"><span className="dot" />{t("دعم فني 24/7", "24/7 support")}</span>
+              <p>{t("وجهتك الأولى للإلكترونيات والخدمات الرقمية في ليبيا — جودة موثوقة وخدمة سريعة.", "Your first stop for electronics & digital services in Libya — trusted quality, fast service.")}</p>
+              <button className="btn" onClick={() => setModal("support")}>{t("تواصل معنا", "Contact us")}</button>
+            </div>
+            <div>
+              <h4>{t("للتواصل", "Contact")}</h4>
+              <div className="contact">
+                <a href={`tel:${PHONES[0]}`}><span className="ic"><Phone size={17} /></span>{PHONES[0]}</a>
+                <a href={`tel:${PHONES[1]}`}><span className="ic"><Phone size={17} /></span>{PHONES[1]}</a>
+                <a><span className="ic"><MapPin size={17} /></span><span>{t(ADDRESS_AR, ADDRESS_EN)}</span></a>
+              </div>
+              <div className="socials">
+                <a className="iconbtn" aria-label="facebook"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" strokeWidth={2} stroke="currentColor"><path d="M14 8h2V5h-2a3 3 0 0 0-3 3v2H9v3h2v6h3v-6h2l1-3h-3V8a1 1 0 0 1 1-1Z" /></svg></a>
+                <a className="iconbtn" aria-label="instagram"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" strokeWidth={2} stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" /></svg></a>
+                <a className="iconbtn" aria-label="whatsapp" href={`https://wa.me/218${PHONES[0].replace(/^0/, "")}`}><MessageCircle size={18} /></a>
+              </div>
+            </div>
+            <div>
+              <h4>{t("روابط سريعة", "Quick links")}</h4>
+              <div className="contact">
+                <a href="/products">{t("متجر الإلكترونيات", "Electronics")}</a>
+                <a href="/orders">{t("تتبّع طلبك", "Track order")}</a>
+                <a onClick={() => setModal("maint")}>{t("منظومة الصيانة", "Maintenance")}</a>
+                <a href="/privacy">{t("سياسة الخصوصية", "Privacy")}</a>
+              </div>
+            </div>
+            <div className="copy">© 2026 {t("محل ترند للإلكترونيات — جميع الحقوق محفوظة", "Trend Store — all rights reserved")}</div>
+          </footer>
+        </main>
+      </div>
+
+      <nav className="bottomnav">
+        <a className="active" href="/"><HomeIcon size={21} /><span>{t("الرئيسية", "Home")}</span></a>
+        <a href="/orders"><Package size={21} /><span>{t("الطلبات", "Orders")}</span></a>
+        <a href="/account?tab=favorites"><Heart size={21} /><span>{t("المفضلة", "Saved")}</span></a>
+        <a onClick={() => (user ? setWalletOpen(true) : go("/login"))}><Wallet size={21} /><span>{t("المحفظة", "Wallet")}</span></a>
+        <a href={user ? "/account" : "/login"}><svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg><span>{t("حسابي", "Account")}</span></a>
+      </nav>
+
+      <button className="support-fab" onClick={() => setModal("support")}><MessageCircle size={18} /><span>{t("الدعم", "Support")}</span></button>
+
+      {modal && (
+        <div className="h2modal open" onClick={(e) => { if (e.currentTarget === e.target) setModal(null); }}>
+          <div className="sheet">
+            <button className="iconbtn" style={{ marginInlineStart: "auto", display: "block" }} aria-label="close" onClick={() => setModal(null)}><X size={18} /></button>
+            {modal === "maint" && (<>
+              <h3>{t("طلب صيانة", "Request a repair")}</h3>
+              <p>{t("عبّئ التفاصيل وسيصلك عرض سعر قبل البدء.", "Fill in the details — you'll get a quote before any work starts.")}</p>
+              <input className="field" placeholder={t("نوع الجهاز", "Device")} />
+              <textarea className="field" rows={3} placeholder={t("وصف العطل", "Describe the fault")} />
+              <input className="field" placeholder={t("رقم الهاتف", "Phone")} />
+              <button className="btn" style={{ width: "100%", justifyContent: "center" }} onClick={() => setModal(null)}>{t("إرسال الطلب", "Send request")}</button>
+            </>)}
+            {modal === "support" && (<>
+              <h3>{t("تواصل معنا", "Contact us")}</h3>
+              <p>{t("فريق الدعم جاهز لخدمتك على مدار الساعة.", "Our support team is available around the clock.")}</p>
+              <a className="btn" style={{ width: "100%", justifyContent: "center", marginBottom: 10 }} href={`https://wa.me/218${PHONES[0].replace(/^0/, "")}`}>{t("واتساب", "WhatsApp")}: {PHONES[0]}</a>
+              <a className="btn ghost" style={{ width: "100%", justifyContent: "center" }} href={`tel:${PHONES[0]}`}>{t("اتصال هاتفي", "Call us")}</a>
+            </>)}
+            {modal === "soon" && (<>
+              <h3>{t("قريباً", "Coming soon")}</h3>
+              <p>{t("هذه الميزة قيد الإعداد وستتوفر قريباً.", "This feature is being prepared and will be available soon.")}</p>
+            </>)}
+          </div>
         </div>
       )}
 
-      {/* ── Scrollable Content ── */}
-      <div className="flex-1 overflow-y-auto pb-20 space-y-5 px-4 py-4">
-
-        {/* Hero Slider */}
-        <div className="rounded-2xl overflow-hidden">
-          <HeroSlider />
-        </div>
-
-        {/* Categories - horizontal scroll */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-purple-300">التصنيفات</h2>
-          </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-            {categories.map((cat, i) => {
-              const Icon = cat.icon;
-              const isExternal = cat.href.startsWith("http");
-              return (
-                <a
-                  key={i}
-                  href={cat.href}
-                  target={isExternal ? "_blank" : undefined}
-                  rel={isExternal ? "noopener noreferrer" : undefined}
-                  className="flex flex-col items-center gap-2 shrink-0 p-3 rounded-2xl bg-[var(--surface)] border border-purple-500/20 hover:border-purple-500/50 transition-all min-w-[80px]"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/15 flex items-center justify-center">
-                    <Icon size={20} className="text-purple-400" />
-                  </div>
-                  <span className="text-[11px] text-center text-[var(--muted)] font-medium leading-tight">{cat.title}</span>
-                </a>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Shein banner */}
-        <a href="https://order.trendstore-ly.com" target="_blank" className="block rounded-2xl overflow-hidden border border-purple-500/20 hover:border-purple-500/50 transition-all" style={{ background: "linear-gradient(135deg,#1e1b4b,#1e3a5f)" }}>
-          <div className="flex items-center justify-between p-4">
-            <div>
-              <p className="text-[var(--text)] font-black text-base">طلب من شي إن 🛍️</p>
-              <p className="text-[var(--muted)] text-xs mt-0.5">اطلب أي منتج من شي إن وسنوصّله لك</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-2xl">
-              🛒
-            </div>
-          </div>
-        </a>
-
-        {/* Our sites banner */}
-        <a href="/our-sites"
-          className="block rounded-2xl overflow-hidden border border-yellow-500/30 hover:border-yellow-500/60 transition-all"
-          style={{ background: "linear-gradient(135deg,#1B3A6B,#2A5298)" }}>
-          <div className="flex items-center justify-between p-4">
-            <div>
-              <p className="text-[var(--text)] font-black text-base">مواقعنا وخدماتنا 🌐</p>
-              <p className="text-blue-200 text-xs mt-0.5">Trendy للحجوزات وخدمات أخرى</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: "rgba(201,168,76,0.25)" }}>
-              <Building2 size={24} className="text-yellow-400" />
-            </div>
-          </div>
-        </a>
-
-        {/* Products */}
-        {products.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-[var(--text)]">أحدث المنتجات</h2>
-              <a href="/products" className="text-xs text-purple-400 flex items-center gap-1">
-                عرض الكل <ArrowLeft size={12} />
-              </a>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {products.map((product) => (
-                <a
-                  key={product.id}
-                  href={`/products/${product.id}`}
-                  className="group bg-[var(--surface)] border border-purple-500/20 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all"
-                >
-                  <div className="aspect-square bg-[var(--input)] overflow-hidden">
-                    {product.image_url ? (
-                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-purple-400/20">
-                        <Package size={28} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-2.5 space-y-1">
-                    <p className="text-xs font-semibold text-[var(--text)] leading-tight line-clamp-2">{product.name}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="font-black text-sm bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                        {product.price} د
-                      </span>
-                      <span className={`text-[10px] ${product.stock === 0 ? "text-red-400" : "text-green-400"}`}>
-                        {product.stock === 0 ? "نفد" : "متوفر"}
-                      </span>
-                    </div>
-                  </div>
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Services */}
-        <div>
-          <h2 className="text-sm font-bold text-purple-300 mb-3">خدماتنا</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {services.map((srv, i) => {
-              const Icon = srv.icon;
-              return (
-                <div key={i} className="p-4 rounded-2xl bg-[var(--surface)] border border-purple-500/20 flex flex-col items-center gap-2 text-center hover:border-purple-500/50 transition-all">
-                  <div className="w-12 h-12 rounded-xl bg-purple-500/15 flex items-center justify-center">
-                    <Icon size={24} className="text-purple-400" />
-                  </div>
-                  <h3 className="font-bold text-[var(--text)] text-xs">{srv.title}</h3>
-                  <p className="text-[var(--muted-2)] text-[10px] leading-relaxed">{srv.desc}</p>
-                  <button className="w-full py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-blue-600 text-white">
-                    اطلب الآن
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="rounded-2xl bg-[var(--surface-2)] border border-purple-500/20 p-4 text-center">
-          <p className="text-purple-400 font-bold text-sm">محل ترند</p>
-          <p className="text-[var(--muted-2)] text-xs mb-1">للإلكترونيات</p>
-          <p className="text-[var(--muted-2)] text-xs">© 2025 — جميع الحقوق محفوظة</p>
-          <div className="flex justify-center gap-4 mt-3">
-            {["0945798033", "0943579690"].map((num) => (
-              <a key={num} href={`https://wa.me/218${num.slice(1)}`} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:text-green-300 transition-colors" dir="ltr">
-                {num}
-              </a>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Mobile Bottom Navigation ── */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-[var(--glass)] border-t border-purple-500/20 backdrop-blur-md z-50 safe-area-inset-bottom">
-        <div className="flex items-center justify-around py-2">
-          {[
-            { label: "الرئيسية", icon: HomeIcon,    href: "/"         },
-            { label: "المنتجات", icon: Smartphone,  href: "/products" },
-            { label: "السلة",    icon: ShoppingCart, href: "/cart",   badge: count },
-            { label: "حسابي",    icon: User,         href: user ? "/account" : "/login" },
-          ].map(({ label, icon: Icon, href, badge }) => (
-            <a
-              key={label}
-              href={href}
-              className="flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-[var(--muted-2)] hover:text-purple-400 transition-colors relative"
-            >
-              <Icon size={20} />
-              {badge ? (
-                <span className="absolute -top-0.5 right-2 w-4 h-4 bg-purple-500 rounded-full text-[9px] font-black text-[var(--text)] flex items-center justify-center">
-                  {badge > 9 ? "9+" : badge}
-                </span>
-              ) : null}
-              <span className="text-[10px] font-medium">{label}</span>
-            </a>
-          ))}
-          {/* Menu button */}
-          <button
-            onClick={() => {
-              const menu = document.getElementById("mobile-menu-overlay");
-              if (menu) menu.classList.toggle("hidden");
-            }}
-            className="flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-[var(--muted-2)] hover:text-purple-400 transition-colors"
-          >
-            <Menu size={20} />
-            <span className="text-[10px] font-medium">القائمة</span>
-          </button>
-        </div>
-      </nav>
-
-      {/* ── Mobile Menu Overlay ── */}
-      <div id="mobile-menu-overlay" className="hidden fixed inset-0 z-[60]" onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          document.getElementById("mobile-menu-overlay")?.classList.add("hidden");
-        }
-      }}>
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-        <div className="absolute bottom-0 left-0 right-0 bg-[var(--bg)] border-t border-purple-500/20 rounded-t-3xl p-6 space-y-2">
-          <div className="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-4" />
-
-          {[...navTop, ...navBottom].map(({ label, icon: Icon, href }, i) => {
-            const cls = "flex items-center gap-4 px-4 py-3.5 rounded-2xl text-[var(--muted)] hover:text-purple-300 hover:bg-purple-500/10 cursor-pointer transition-all";
-            const closeMenu = () => document.getElementById("mobile-menu-overlay")?.classList.add("hidden");
-            if (label === "محفظتي") return (
-              <button key={i} onClick={() => { closeMenu(); user ? setWalletOpen(true) : (window.location.href="/login"); }} className={cls + " w-full text-right"}>
-                <Icon size={20} />
-                <span className="text-sm font-medium">{label}</span>
-              </button>
-            );
-            if (href) {
-              const isExternal = href.startsWith("http");
-              return (
-                <a key={i} href={href} target={isExternal ? "_blank" : undefined} rel={isExternal ? "noopener noreferrer" : undefined} className={cls}
-                  onClick={closeMenu}>
-                  <Icon size={20} />
-                  <span className="text-sm font-medium">{label}</span>
-                </a>
-              );
-            }
-            return (
-              <div key={i} className={cls} onClick={closeMenu}>
-                <Icon size={20} />
-                <span className="text-sm font-medium">{label}</span>
-              </div>
-            );
-          })}
-
-          {user && (
-            <>
-              <div className="border-t border-purple-500/15 my-2" />
-              <button onClick={() => { signOut(); document.getElementById("mobile-menu-overlay")?.classList.add("hidden"); }}
-                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-red-400 hover:bg-red-500/10 transition-all">
-                <LogOut size={20} />
-                <span className="text-sm font-medium">تسجيل الخروج</span>
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  return (
-    <>
-      {DesktopLayout()}
-      {MobileLayout()}
       {walletOpen && <WalletModal onClose={() => setWalletOpen(false)} />}
-    </>
+    </div>
   );
 }
