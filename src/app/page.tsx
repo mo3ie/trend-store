@@ -40,6 +40,10 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
+  const [mForm, setMForm] = useState({ name: "", phone: "", device: "", fault: "" });
+  const [mImages, setMImages] = useState<string[]>([]);
+  const [mBusy, setMBusy] = useState(false);
+  const [mDoneId, setMDoneId] = useState<string | null>(null);
 
   const t = (ar: string, en: string) => (lang === "ar" ? ar : en);
   const rtl = lang === "ar";
@@ -62,6 +66,23 @@ export default function Home() {
   const toggleTheme = () => { const n = !light; setLight(n); document.documentElement.classList.toggle("light", n); try { localStorage.setItem("theme", n ? "light" : "dark"); } catch {} };
   const addToCart = (p: Product) => addItem({ id: p.id, name: p.name, price: p.price, image_url: p.image_url, stock: p.stock });
   const go = (href?: string) => { if (href) window.location.href = href; };
+  const closeModal = () => { setModal(null); setMDoneId(null); };
+
+  const uploadMaintPhoto = async (file: File) => {
+    const fd = new FormData(); fd.append("file", file);
+    const r = await fetch("/api/maintenance/upload", { method: "POST", body: fd });
+    const d = await r.json();
+    if (d.url) setMImages((p) => [...p, d.url].slice(0, 5)); else alert(d.error || "فشل رفع الصورة");
+  };
+  const submitMaintenance = async () => {
+    if (!mForm.phone || !mForm.device) { alert(t("نوع الجهاز ورقم الهاتف مطلوبان", "Device and phone are required")); return; }
+    setMBusy(true);
+    const res = await fetch("/api/maintenance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...mForm, images: mImages }) });
+    const d = await res.json();
+    setMBusy(false);
+    if (d.success) { setMDoneId(d.id); setMForm({ name: "", phone: "", device: "", fault: "" }); setMImages([]); }
+    else alert(d.error || t("فشل إرسال الطلب", "Failed to send"));
+  };
 
   const shown = query.trim()
     ? products.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()) || (p.category || "").toLowerCase().includes(query.toLowerCase()))
@@ -276,17 +297,32 @@ export default function Home() {
       <button className="support-fab" onClick={() => setModal("support")}><MessageCircle size={18} /><span>{t("الدعم", "Support")}</span></button>
 
       {modal && (
-        <div className="h2modal open" onClick={(e) => { if (e.currentTarget === e.target) setModal(null); }}>
+        <div className="h2modal open" onClick={(e) => { if (e.currentTarget === e.target) closeModal(); }}>
           <div className="sheet">
-            <button className="iconbtn" style={{ marginInlineStart: "auto", display: "block" }} aria-label="close" onClick={() => setModal(null)}><X size={18} /></button>
-            {modal === "maint" && (<>
+            <button className="iconbtn" style={{ marginInlineStart: "auto", display: "block" }} aria-label="close" onClick={closeModal}><X size={18} /></button>
+            {modal === "maint" && (mDoneId ? (<>
+              <h3>{t("تم استلام طلبك ✅", "Request received ✅")}</h3>
+              <p>{t("سيتواصل معك فنّي الصيانة بعرض سعر قريباً. رقم طلبك:", "A technician will contact you with a quote soon. Your request number:")}</p>
+              <div className="field" style={{ textAlign: "center", fontWeight: 800, letterSpacing: 1 }}>{mDoneId.slice(0, 8).toUpperCase()}</div>
+              <a className="btn" style={{ width: "100%", justifyContent: "center" }} href={`/maintenance/track?id=${mDoneId}`}>{t("تتبّع حالة الطلب", "Track request")}</a>
+            </>) : (<>
               <h3>{t("طلب صيانة", "Request a repair")}</h3>
-              <p>{t("عبّئ التفاصيل وسيصلك عرض سعر قبل البدء.", "Fill in the details — you'll get a quote before any work starts.")}</p>
-              <input className="field" placeholder={t("نوع الجهاز", "Device")} />
-              <textarea className="field" rows={3} placeholder={t("وصف العطل", "Describe the fault")} />
-              <input className="field" placeholder={t("رقم الهاتف", "Phone")} />
-              <button className="btn" style={{ width: "100%", justifyContent: "center" }} onClick={() => setModal(null)}>{t("إرسال الطلب", "Send request")}</button>
-            </>)}
+              <p>{t("عبّئ التفاصيل وأرفق صور العطل — سيصلك عرض سعر قبل البدء.", "Fill in the details and attach fault photos — you'll get a quote before any work starts.")}</p>
+              <input className="field" placeholder={t("الاسم", "Name")} value={mForm.name} onChange={(e) => setMForm({ ...mForm, name: e.target.value })} />
+              <input className="field" placeholder={t("نوع الجهاز (مثلاً آيفون 13)", "Device (e.g. iPhone 13)")} value={mForm.device} onChange={(e) => setMForm({ ...mForm, device: e.target.value })} />
+              <textarea className="field" rows={3} placeholder={t("وصف العطل", "Describe the fault")} value={mForm.fault} onChange={(e) => setMForm({ ...mForm, fault: e.target.value })} />
+              <input className="field" placeholder={t("رقم الهاتف", "Phone")} value={mForm.phone} onChange={(e) => setMForm({ ...mForm, phone: e.target.value })} />
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10, alignItems: "center" }}>
+                {mImages.map((u, i) => <img key={i} src={u} alt="" style={{ width: 46, height: 46, borderRadius: 8, objectFit: "cover" }} />)}
+                {mImages.length < 5 && (
+                  <label style={{ width: 46, height: 46, borderRadius: 8, border: "1px dashed var(--line)", display: "grid", placeItems: "center", cursor: "pointer", color: "var(--muted)" }}>
+                    +
+                    <input type="file" accept="image/*" className="hidden" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadMaintPhoto(f); }} />
+                  </label>
+                )}
+              </div>
+              <button className="btn" style={{ width: "100%", justifyContent: "center" }} disabled={mBusy} onClick={submitMaintenance}>{mBusy ? "…" : t("إرسال الطلب", "Send request")}</button>
+            </>))}
             {modal === "support" && (<>
               <h3>{t("تواصل معنا", "Contact us")}</h3>
               <p>{t("فريق الدعم جاهز لخدمتك على مدار الساعة.", "Our support team is available around the clock.")}</p>
