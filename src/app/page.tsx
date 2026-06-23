@@ -13,11 +13,20 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
 
 type Product = { id: string; name: string; price: number; stock: number; category: string; image_url?: string };
+type Branch = { name: string; phone: string; addrAr: string; addrEn: string };
+type SiteSettings = {
+  branches?: Branch[];
+  support_phone?: string;
+  socials?: { whatsapp?: string; facebook?: string; instagram?: string };
+  images?: { hero?: string; offer?: string; shein?: string };
+};
 
-// Store contact info (will become admin-editable in stage B).
-const PHONES = ["0965798033", "0925000000"];
-const ADDRESS_AR = "الفرع الرئيسي — بنغازي، شارع العهد الجديد";
-const ADDRESS_EN = "Main branch — Benghazi, Al-Ahd Al-Jadid St.";
+// Default branches + contact (overridden by /admin/appearance settings at runtime).
+const BRANCHES: Branch[] = [
+  { name: "قاريونس", phone: "0945798033", addrAr: "بنغازي — قاريونس، محلات نادي قاريونس، مقابل مطعم كودو", addrEn: "Benghazi — Garyounis, Garyounis Club shops, opposite Kudu" },
+  { name: "بلعون", phone: "0918621511", addrAr: "بنغازي — بلعون، شارع المعهد الصحي، بجانب مطعم الحويج", addrEn: "Benghazi — Bel'oun, Health Institute St., next to Al-Huwaij" },
+];
+const SUPPORT_PHONE = "0918621511";
 
 export default function Home() {
   const { user, signOut } = useAuth();
@@ -30,6 +39,7 @@ export default function Home() {
   const [modal, setModal] = useState<null | "maint" | "support" | "soon">(null);
   const [query, setQuery] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
+  const [settings, setSettings] = useState<SiteSettings | null>(null);
 
   const t = (ar: string, en: string) => (lang === "ar" ? ar : en);
   const rtl = lang === "ar";
@@ -38,7 +48,15 @@ export default function Home() {
     try { if (localStorage.getItem("store-lang") === "en") setLang("en"); } catch {}
     setLight(document.documentElement.classList.contains("light"));
     fetch("/api/products?limit=12").then((r) => r.json()).then((d) => setProducts(Array.isArray(d) ? d : []));
+    fetch("/api/site-settings").then((r) => r.json()).then((d) => setSettings(d || null)).catch(() => {});
   }, []);
+
+  // settings with sensible fallbacks (everything is admin-editable in /admin/appearance)
+  const branches = settings?.branches?.length ? settings.branches : BRANCHES;
+  const support = settings?.support_phone || SUPPORT_PHONE;
+  const socials = settings?.socials || {};
+  const wa = socials.whatsapp || `https://wa.me/218${support.replace(/^0/, "")}`;
+  const img = settings?.images || {};
 
   const toggleLang = () => setLang((l) => { const n = l === "ar" ? "en" : "ar"; try { localStorage.setItem("store-lang", n); } catch {} return n; });
   const toggleTheme = () => { const n = !light; setLight(n); document.documentElement.classList.toggle("light", n); try { localStorage.setItem("theme", n ? "light" : "dark"); } catch {} };
@@ -120,7 +138,7 @@ export default function Home() {
         </aside>
 
         <main className="content">
-          <section className="hero">
+          <section className="hero" style={img.hero ? { backgroundImage: `linear-gradient(120deg, rgba(8,10,18,.80), rgba(8,10,18,.45)), url(${img.hero})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
             <div className="inner">
               <h1>{t("كل ما تحتاجه من عالم التقنية", "Everything you need from the world of tech")}</h1>
               <p>{t("هواتف، لابتوبات، أجهزة وإكسسوارات أصلية — توصيل لكل ليبيا.", "Phones, laptops, devices & genuine accessories — delivery across Libya.")}</p>
@@ -141,11 +159,11 @@ export default function Home() {
             <div className="section-h"><h2>{t("عروض وخدمات", "Offers & Services")}</h2></div>
             <div className="grid2" style={{ marginTop: 13 }}>
               <a className="card wide" href="/products">
-                <div className="thumb"><Laptop /></div>
+                <div className="thumb">{img.offer ? <img src={img.offer} alt="" /> : <Laptop />}</div>
                 <div className="body"><span className="badge">{t("عرض الأسبوع", "Weekly deal")}</span><h3>{t("لابتوبات بخصم يصل 25%", "Laptops up to 25% off")}</h3><span className="btn sm">{t("تسوّق الآن", "Shop now")}</span></div>
               </a>
               <a className="card wide shein" href="https://order.trendstore-ly.com">
-                <div className="thumb"><ShoppingCart /></div>
+                <div className="thumb">{img.shein ? <img src={img.shein} alt="" /> : <ShoppingCart />}</div>
                 <div className="body"><span className="badge">{t("حصري", "Exclusive")}</span><h3>{t("اطلب من شي إن إلى ليبيا", "Order Shein to Libya")}</h3><span className="btn sm">{t("ابدأ طلبك", "Start order")}</span></div>
               </a>
             </div>
@@ -219,14 +237,18 @@ export default function Home() {
             <div>
               <h4>{t("للتواصل", "Contact")}</h4>
               <div className="contact">
-                <a href={`tel:${PHONES[0]}`}><span className="ic"><Phone size={17} /></span>{PHONES[0]}</a>
-                <a href={`tel:${PHONES[1]}`}><span className="ic"><Phone size={17} /></span>{PHONES[1]}</a>
-                <a><span className="ic"><MapPin size={17} /></span><span>{t(ADDRESS_AR, ADDRESS_EN)}</span></a>
+                {branches.map((br, i) => (
+                  <a key={i} href={`tel:${br.phone}`}>
+                    <span className="ic"><MapPin size={17} /></span>
+                    <span><b>{br.name}</b> — {br.phone}<br /><span style={{ color: "var(--muted)", fontSize: 12, fontWeight: 500 }}>{t(br.addrAr, br.addrEn)}</span></span>
+                  </a>
+                ))}
+                <a href={`tel:${support}`}><span className="ic"><Phone size={17} /></span>{t("الدعم", "Support")}: {support}</a>
               </div>
               <div className="socials">
-                <a className="iconbtn" aria-label="facebook"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" strokeWidth={2} stroke="currentColor"><path d="M14 8h2V5h-2a3 3 0 0 0-3 3v2H9v3h2v6h3v-6h2l1-3h-3V8a1 1 0 0 1 1-1Z" /></svg></a>
-                <a className="iconbtn" aria-label="instagram"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" strokeWidth={2} stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" /></svg></a>
-                <a className="iconbtn" aria-label="whatsapp" href={`https://wa.me/218${PHONES[0].replace(/^0/, "")}`}><MessageCircle size={18} /></a>
+                {socials.facebook && <a className="iconbtn" aria-label="facebook" href={socials.facebook} target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" strokeWidth={2} stroke="currentColor"><path d="M14 8h2V5h-2a3 3 0 0 0-3 3v2H9v3h2v6h3v-6h2l1-3h-3V8a1 1 0 0 1 1-1Z" /></svg></a>}
+                {socials.instagram && <a className="iconbtn" aria-label="instagram" href={socials.instagram} target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" strokeWidth={2} stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" /></svg></a>}
+                <a className="iconbtn" aria-label="whatsapp" href={wa} target="_blank" rel="noopener noreferrer"><MessageCircle size={18} /></a>
               </div>
             </div>
             <div>
@@ -268,8 +290,8 @@ export default function Home() {
             {modal === "support" && (<>
               <h3>{t("تواصل معنا", "Contact us")}</h3>
               <p>{t("فريق الدعم جاهز لخدمتك على مدار الساعة.", "Our support team is available around the clock.")}</p>
-              <a className="btn" style={{ width: "100%", justifyContent: "center", marginBottom: 10 }} href={`https://wa.me/218${PHONES[0].replace(/^0/, "")}`}>{t("واتساب", "WhatsApp")}: {PHONES[0]}</a>
-              <a className="btn ghost" style={{ width: "100%", justifyContent: "center" }} href={`tel:${PHONES[0]}`}>{t("اتصال هاتفي", "Call us")}</a>
+              <a className="btn" style={{ width: "100%", justifyContent: "center", marginBottom: 10 }} href={wa}>{t("واتساب", "WhatsApp")}: {support}</a>
+              <a className="btn ghost" style={{ width: "100%", justifyContent: "center" }} href={`tel:${support}`}>{t("اتصال هاتفي", "Call us")}</a>
             </>)}
             {modal === "soon" && (<>
               <h3>{t("قريباً", "Coming soon")}</h3>
