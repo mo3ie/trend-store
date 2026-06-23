@@ -11,6 +11,8 @@ const MapPicker = dynamic(() => import("@/components/MapPicker"), { ssr: false }
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
+import { useLang } from "@/hooks/useLang";
+import LangToggle from "@/components/LangToggle";
 
 type UserAddress = {
   id: string;
@@ -41,6 +43,7 @@ export default function CartPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { items, removeItem, updateQuantity, clearCart, total, count } = useCart();
+  const { t, rtl } = useLang();
 
   const [notes,         setNotes]         = useState("");
   const [ordering,      setOrdering]      = useState(false);
@@ -247,18 +250,19 @@ export default function CartPage() {
   };
 
   return (
-    <div className="flex flex-col bg-[var(--bg)] text-[var(--text)] min-h-screen">
+    <div className="flex flex-col bg-[var(--bg)] text-[var(--text)] min-h-screen" dir={rtl ? "rtl" : "ltr"}>
 
       {/* ─── HEADER ─── */}
       <header className="flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[var(--glass)] backdrop-blur-md z-40">
         <button onClick={() => router.back()} className="text-[var(--muted)] hover:text-purple-400 transition-colors shrink-0">
-          <ArrowRight size={22} />
+          <ArrowRight size={22} className={rtl ? "" : "rotate-180"} />
         </button>
         <a href="/" className="text-xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent shrink-0">
           TREND
         </a>
         <div className="flex-1" />
         <div className="flex items-center gap-3 text-[var(--muted)] shrink-0">
+          <LangToggle />
           {user && <NotificationBell />}
           <a href="/cart" className="relative text-purple-400">
             <ShoppingCart size={20} />
@@ -274,7 +278,7 @@ export default function CartPage() {
             </a>
           ) : (
             <a href="/login" className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-[var(--muted)] text-sm">
-              <User size={16} /> دخول
+              <User size={16} /> {t("دخول", "Sign in")}
             </a>
           )}
         </div>
@@ -285,12 +289,12 @@ export default function CartPage() {
         {/* Title */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-black">سلة التسوق</h1>
-            <p className="text-[var(--muted-2)] text-sm mt-0.5">{count} منتج</p>
+            <h1 className="text-2xl font-black">{t("سلة التسوق", "Shopping Cart")}</h1>
+            <p className="text-[var(--muted-2)] text-sm mt-0.5">{count} {t("منتج", "items")}</p>
           </div>
           {items.length > 0 && (
             <button onClick={clearCart} className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors">
-              <Trash2 size={13} /> تفريغ السلة
+              <Trash2 size={13} /> {t("تفريغ السلة", "Clear cart")}
             </button>
           )}
         </div>
@@ -298,10 +302,10 @@ export default function CartPage() {
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4 text-[var(--muted-2)]">
             <ShoppingBag size={64} className="text-purple-500/20" />
-            <p className="text-lg font-medium">السلة فارغة</p>
-            <p className="text-sm text-[var(--muted-2)]">أضف منتجات تعجبك من المتجر</p>
+            <p className="text-lg font-medium">{t("السلة فارغة", "Your cart is empty")}</p>
+            <p className="text-sm text-[var(--muted-2)]">{t("أضف منتجات تعجبك من المتجر", "Add some products from the store")}</p>
             <a href="/products" className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-500 text-white text-sm font-bold hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all mt-2">
-              <ShoppingCart size={16} /> تصفح المنتجات
+              <ShoppingCart size={16} /> {t("تصفح المنتجات", "Browse products")}
             </a>
           </div>
         ) : (
@@ -328,7 +332,7 @@ export default function CartPage() {
                         {Object.entries(item.variants).map(([k, v]) => `${k}: ${v}`).join(" · ")}
                       </p>
                     )}
-                    <p className="text-purple-400 font-black mt-1">{item.price} د</p>
+                    <p className="text-purple-400 font-black mt-1">{item.price} {t("د", "LYD")}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button onClick={() => updateQuantity(item.cartKey, item.quantity - 1)} className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 border border-[var(--border)] flex items-center justify-center transition-colors">
@@ -348,30 +352,30 @@ export default function CartPage() {
 
             {/* Summary */}
             <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 space-y-3">
-              <h2 className="font-bold text-sm text-[var(--muted)]">ملخص الطلب</h2>
+              <h2 className="font-bold text-sm text-[var(--muted)]">{t("ملخص الطلب", "Order summary")}</h2>
               <div className="space-y-2 text-sm">
                 {items.map((item) => (
                   <div key={item.cartKey} className="flex justify-between text-[var(--muted)]">
                     <span className="truncate max-w-[200px]">{item.name} × {item.quantity}</span>
-                    <span>{item.price * item.quantity} د</span>
+                    <span>{item.price * item.quantity} {t("د", "LYD")}</span>
                   </div>
                 ))}
               </div>
               <div className="border-t border-[var(--border)] pt-3 flex justify-between items-center">
-                <span className="font-bold text-[var(--text)]">الإجمالي</span>
+                <span className="font-bold text-[var(--text)]">{t("الإجمالي", "Total")}</span>
                 <span className="text-2xl font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                  {total} د
+                  {total} {t("د", "LYD")}
                 </span>
               </div>
             </div>
 
             {/* Notes */}
             <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5">
-              <label className="text-[var(--muted)] text-sm font-medium mb-2 block">📝 ملاحظات للطلب (اختياري)</label>
+              <label className="text-[var(--muted)] text-sm font-medium mb-2 block">📝 {t("ملاحظات للطلب (اختياري)", "Order notes (optional)")}</label>
               <textarea
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                placeholder="أضف أي ملاحظات أو تعليمات خاصة بطلبك..."
+                placeholder={t("أضف أي ملاحظات أو تعليمات خاصة بطلبك...", "Add any notes or special instructions...")}
                 rows={3}
                 className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all resize-none placeholder-gray-600"
               />
@@ -386,11 +390,11 @@ export default function CartPage() {
               >
                 {ordering
                   ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  : <><ShoppingBag size={18} /> تأكيد الطلب</>
+                  : <><ShoppingBag size={18} /> {t("تأكيد الطلب", "Checkout")}</>
                 }
               </button>
               <a href="/products" className="w-full py-3 rounded-2xl font-medium text-[var(--muted)] hover:text-[var(--text)] bg-white/5 hover:bg-white/10 border border-[var(--border)] flex items-center justify-center gap-2 transition-all text-sm">
-                <ShoppingCart size={16} /> مواصلة التسوق
+                <ShoppingCart size={16} /> {t("مواصلة التسوق", "Continue shopping")}
               </a>
             </div>
           </>

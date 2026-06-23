@@ -11,6 +11,7 @@ import WalletModal from "@/components/WalletModal";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
+import { useLang } from "@/hooks/useLang";
 
 type Product = { id: string; name: string; price: number; stock: number; category: string; image_url?: string };
 type Branch = { name: string; phone: string; addrAr: string; addrEn: string };
@@ -32,7 +33,7 @@ export default function Home() {
   const { user, signOut } = useAuth();
   const { count, addItem } = useCart();
 
-  const [lang, setLang] = useState<"ar" | "en">("ar");
+  const { lang, toggle: toggleLang, t, rtl } = useLang();
   const [light, setLight] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
@@ -45,11 +46,7 @@ export default function Home() {
   const [mBusy, setMBusy] = useState(false);
   const [mDoneId, setMDoneId] = useState<string | null>(null);
 
-  const t = (ar: string, en: string) => (lang === "ar" ? ar : en);
-  const rtl = lang === "ar";
-
   useEffect(() => {
-    try { if (localStorage.getItem("store-lang") === "en") setLang("en"); } catch {}
     setLight(document.documentElement.classList.contains("light"));
     fetch("/api/products?limit=12").then((r) => r.json()).then((d) => setProducts(Array.isArray(d) ? d : []));
     fetch("/api/site-settings").then((r) => r.json()).then((d) => setSettings(d || null)).catch(() => {});
@@ -62,7 +59,6 @@ export default function Home() {
   const wa = socials.whatsapp || `https://wa.me/218${support.replace(/^0/, "")}`;
   const img = settings?.images || {};
 
-  const toggleLang = () => setLang((l) => { const n = l === "ar" ? "en" : "ar"; try { localStorage.setItem("store-lang", n); } catch {} return n; });
   const toggleTheme = () => { const n = !light; setLight(n); document.documentElement.classList.toggle("light", n); try { localStorage.setItem("theme", n ? "light" : "dark"); } catch {} };
   const addToCart = (p: Product) => addItem({ id: p.id, name: p.name, price: p.price, image_url: p.image_url, stock: p.stock });
   const go = (href?: string) => { if (href) window.location.href = href; };
