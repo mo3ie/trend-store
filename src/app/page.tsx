@@ -36,6 +36,7 @@ export default function Home() {
   const { lang, toggle: toggleLang, t, rtl } = useLang();
   const [light, setLight] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
   const [modal, setModal] = useState<null | "maint" | "support" | "soon">(null);
   const [query, setQuery] = useState("");
@@ -112,7 +113,7 @@ export default function Home() {
     <div className="home2 min-h-screen" dir={rtl ? "rtl" : "ltr"}>
 
       <header className="topbar">
-        <button className="iconbtn menubtn" aria-label="menu" onClick={() => setCollapsed((c) => !c)}><Menu size={20} /></button>
+        <button className="iconbtn menubtn" aria-label="menu" onClick={() => setMenuOpen(true)}><Menu size={20} /></button>
         <div className="brand">
           <span className="logo"><b>T</b></span>
           <span className="names">
@@ -133,7 +134,8 @@ export default function Home() {
       </header>
 
       <div className="shell">
-        <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
+        {menuOpen && <div className="drawer-overlay" onClick={() => setMenuOpen(false)} />}
+        <aside className={`sidebar${collapsed ? " collapsed" : ""}${menuOpen ? " open" : ""}`} onClick={() => setMenuOpen(false)}>
           <div className="side-head">
             <span className="logo" style={{ width: 32, height: 32, borderRadius: 10 }}><b style={{ fontSize: 15 }}>T</b></span>
             <span className="ar" style={{ fontWeight: 900, fontSize: 15 }}>{t("محل ترند", "Trend Store")}</span>

@@ -548,7 +548,7 @@ align-items: center;
 .home2 .bottomnav a{ display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:10px;font-weight:700;padding:4px 8px;border-radius:12px;cursor:pointer; }
 .home2 .bottomnav a svg{ width:21px;height:21px; }
 .home2 .bottomnav a.active{ color:var(--brand-ink); }
-.home2 .support-fab{ position:fixed;inset-inline-end:16px;bottom:24px;z-index:45;display:inline-flex;align-items:center;gap:8px;padding:12px 18px;border-radius:999px;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));box-shadow:0 12px 28px -10px var(--brand-2);font-weight:800;font-size:13px;border:0;cursor:pointer; }
+.home2 .support-fab{ position:fixed;right:16px;bottom:24px;z-index:45;display:inline-flex;align-items:center;gap:8px;padding:12px 18px;border-radius:999px;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));box-shadow:0 12px 28px -10px var(--brand-2);font-weight:800;font-size:13px;border:0;cursor:pointer; }
 .home2 .support-fab svg{ width:18px;height:18px;stroke:#fff; }
 .home2 .h2modal{ position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(5,7,12,.62);backdrop-filter:blur(4px); }
 .home2 .h2modal.open{ display:flex; }
@@ -559,6 +559,9 @@ align-items: center;
 .home2 .menubtn{ display:none; }
 @media(max-width:880px){
   .home2 .menubtn{ display:grid; } .home2 .sidebar{ display:none; } .home2 .shell{ grid-template-columns:1fr;padding:14px 13px 0; }
+  .home2 .sidebar.open{ display:block;position:fixed;top:0;bottom:0;inset-inline-start:0;width:272px;max-width:84vw;z-index:60;border-radius:0;overflow-y:auto;box-shadow:0 0 50px rgba(0,0,0,.55); }
+  .home2 .drawer-overlay{ position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:55; }
+  .home2 .support-fab{ bottom:84px; }
   .home2 .cats{ grid-template-columns:repeat(4,1fr); } .home2 .grid4{ grid-template-columns:1fr 1fr; } .home2 .hero .inner{ max-width:100%; }
   .home2 .wide{ grid-template-columns:1fr; } .home2 .trust{ grid-template-columns:repeat(3,1fr); } .home2 .maint .two{ grid-template-columns:1fr; }
   .home2 .footer{ grid-template-columns:1fr;gap:20px; } .home2 .bottomnav{ display:flex; } .home2 .brand .en{ font-size:11px; } .home2 .brand .ar{ font-size:16px; } .home2 .hide-sm{ display:none; }
