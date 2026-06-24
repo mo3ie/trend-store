@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Eye, EyeOff, UserPlus, Zap, CheckCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { useLang } from "@/hooks/useLang";
+import LangToggle from "@/components/LangToggle";
 
 function GoogleIcon() {
   return (
@@ -16,6 +18,7 @@ function GoogleIcon() {
 }
 
 export default function RegisterPage() {
+  const { t, rtl } = useLang();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -31,78 +34,47 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-
-    if (password !== confirmPassword) {
-      setError("كلمتا المرور غير متطابقتين");
-      return;
-    }
-    if (password.length < 6) {
-      setError("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
-      return;
-    }
-
+    if (password !== confirmPassword) { setError(t("كلمتا المرور غير متطابقتين", "Passwords do not match")); return; }
+    if (password.length < 6) { setError(t("كلمة المرور يجب أن تكون 6 أحرف على الأقل", "Password must be at least 6 characters")); return; }
     setLoading(true);
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName, phone } },
-    });
-
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName, phone } } });
     if (error) {
-      if (error.message.includes("User already registered")) {
-        setError("هذا البريد الإلكتروني مسجّل مسبقاً");
-      } else {
-        setError("حدث خطأ أثناء إنشاء الحساب، حاول مرة أخرى");
-      }
+      setError(error.message.includes("User already registered") ? t("هذا البريد الإلكتروني مسجّل مسبقاً", "This email is already registered") : t("حدث خطأ أثناء إنشاء الحساب، حاول مرة أخرى", "Couldn't create the account, please try again"));
       setLoading(false);
       return;
     }
-
-    // إدخال البيانات في جدول profiles
     if (data.user) {
-      await supabase.from("profiles").insert({
-        id: data.user.id,
-        full_name: fullName,
-        phone,
-        email,
-      });
+      await supabase.from("profiles").insert({ id: data.user.id, full_name: fullName, phone, email });
     }
-
     setSuccess(true);
     setLoading(false);
   };
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/` },
-    });
+    await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${window.location.origin}/` } });
     setGoogleLoading(false);
   };
 
+  const inputCls = "w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/20 text-[var(--text)] placeholder:text-[var(--muted-2)] focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm";
+
   if (success) {
     return (
-      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center px-4">
+      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center px-4" dir={rtl ? "rtl" : "ltr"}>
+        <div className="absolute top-5 end-5"><LangToggle /></div>
         <div className="fixed top-[-100px] left-[-100px] w-[400px] h-[400px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none" />
         <div className="fixed bottom-[-100px] right-[-100px] w-[400px] h-[400px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
-
         <div className="w-full max-w-md relative">
           <div className="bg-[var(--surface)] border border-green-500/30 rounded-3xl p-8 shadow-[0_0_60px_rgba(34,197,94,0.1)] text-center">
-            <div className="flex justify-center mb-4">
-              <CheckCircle size={56} className="text-green-400" />
-            </div>
-            <h2 className="text-[var(--text)] font-bold text-xl mb-2">تم إنشاء حسابك بنجاح!</h2>
+            <div className="flex justify-center mb-4"><CheckCircle size={56} className="text-green-400" /></div>
+            <h2 className="text-[var(--text)] font-bold text-xl mb-2">{t("تم إنشاء حسابك بنجاح!", "Account created successfully!")}</h2>
             <p className="text-[var(--muted)] text-sm leading-relaxed mb-6">
-              أرسلنا رسالة تأكيد إلى <span className="text-purple-400 font-semibold">{email}</span>
-              <br />يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول
+              {t("أرسلنا رسالة تأكيد إلى", "We sent a confirmation email to")} <span className="text-purple-400 font-semibold">{email}</span>
+              <br />{t("يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول", "Please confirm your email before signing in")}
             </p>
-            <a
-              href="/login"
-              className="inline-block w-full py-3 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-500 hover:to-blue-400 hover:shadow-[0_0_24px_rgba(168,85,247,0.5)] transition-all"
-            >
-              الذهاب لتسجيل الدخول
+            <a href="/login" className="inline-block w-full py-3 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-500 hover:to-blue-400 hover:shadow-[0_0_24px_rgba(168,85,247,0.5)] transition-all">
+              {t("الذهاب لتسجيل الدخول", "Go to sign in")}
             </a>
           </div>
         </div>
@@ -111,162 +83,72 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center px-4 py-10">
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center px-4 py-10 relative" dir={rtl ? "rtl" : "ltr"}>
+      <div className="absolute top-5 end-5"><LangToggle /></div>
       <div className="fixed top-[-100px] right-[-100px] w-[400px] h-[400px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="fixed bottom-[-100px] left-[-100px] w-[400px] h-[400px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="w-full max-w-md relative">
         <div className="bg-[var(--surface)] border border-purple-500/30 rounded-3xl p-8 shadow-[0_0_60px_rgba(168,85,247,0.1)]">
-
-          {/* Logo */}
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-              TREND
-            </h1>
-            <p className="text-[var(--muted-2)] text-sm mt-1">ترند للإلكترونيات</p>
+            <h1 className="text-4xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">TREND</h1>
+            <p className="text-[var(--muted-2)] text-sm mt-1">{t("ترند للإلكترونيات", "Trend Electronics")}</p>
           </div>
 
-          {/* Title */}
           <div className="flex items-center gap-2 mb-6">
             <Zap size={18} className="text-purple-400" />
-            <h2 className="text-[var(--text)] font-bold text-lg">إنشاء حساب جديد</h2>
+            <h2 className="text-[var(--text)] font-bold text-lg">{t("إنشاء حساب جديد", "Create a new account")}</h2>
           </div>
 
-          {/* Google Button */}
-          <button
-            onClick={handleGoogle}
-            disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-[var(--border)] bg-white/5 hover:bg-white/10 text-[var(--text)] font-medium text-sm transition-all hover:border-white/20 mb-4 disabled:opacity-50"
-          >
-            {googleLoading ? (
-              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <GoogleIcon />
-            )}
-            التسجيل بحساب جوجل
+          <button onClick={handleGoogle} disabled={googleLoading} className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-[var(--border)] bg-white/5 hover:bg-white/10 text-[var(--text)] font-medium text-sm transition-all hover:border-white/20 mb-4 disabled:opacity-50">
+            {googleLoading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <GoogleIcon />}
+            {t("التسجيل بحساب جوجل", "Sign up with Google")}
           </button>
 
-          {/* Divider */}
           <div className="flex items-center gap-3 mb-4">
             <div className="flex-1 h-px bg-purple-500/20" />
-            <span className="text-[var(--muted-2)] text-xs">أو</span>
+            <span className="text-[var(--muted-2)] text-xs">{t("أو", "or")}</span>
             <div className="flex-1 h-px bg-purple-500/20" />
           </div>
 
           <form onSubmit={handleRegister} className="space-y-4">
-
-            {/* Full Name */}
             <div>
-              <label className="text-[var(--muted)] text-sm mb-1.5 block">الاسم الكامل</label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="محمد علي"
-                required
-                className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/20 text-[var(--text)] placeholder:text-[var(--muted-2)] focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm"
-              />
+              <label className="text-[var(--muted)] text-sm mb-1.5 block">{t("الاسم الكامل", "Full name")}</label>
+              <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={t("محمد علي", "John Doe")} required className={inputCls} />
             </div>
-
-            {/* Email */}
             <div>
-              <label className="text-[var(--muted)] text-sm mb-1.5 block">البريد الإلكتروني</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="example@email.com"
-                required
-                className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/20 text-[var(--text)] placeholder:text-[var(--muted-2)] focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm"
-              />
+              <label className="text-[var(--muted)] text-sm mb-1.5 block">{t("البريد الإلكتروني", "Email")}</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@email.com" required className={inputCls} />
             </div>
-
-            {/* Phone */}
             <div>
-              <label className="text-[var(--muted)] text-sm mb-1.5 block">رقم الهاتف</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="09xxxxxxxx"
-                required
-                className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/20 text-[var(--text)] placeholder:text-[var(--muted-2)] focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm"
-              />
+              <label className="text-[var(--muted)] text-sm mb-1.5 block">{t("رقم الهاتف", "Phone")}</label>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxxx" required className={inputCls} />
             </div>
-
-            {/* Password */}
             <div>
-              <label className="text-[var(--muted)] text-sm mb-1.5 block">كلمة المرور</label>
+              <label className="text-[var(--muted)] text-sm mb-1.5 block">{t("كلمة المرور", "Password")}</label>
               <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/20 text-[var(--text)] placeholder:text-[var(--muted-2)] focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm pr-12"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-2)] hover:text-purple-400 transition-colors"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+                <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required className={`${inputCls} pe-12`} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute end-3 top-1/2 -translate-y-1/2 text-[var(--muted-2)] hover:text-purple-400 transition-colors">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+              </div>
+            </div>
+            <div>
+              <label className="text-[var(--muted)] text-sm mb-1.5 block">{t("تأكيد كلمة المرور", "Confirm password")}</label>
+              <div className="relative">
+                <input type={showConfirm ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" required className={`${inputCls} pe-12`} />
+                <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute end-3 top-1/2 -translate-y-1/2 text-[var(--muted-2)] hover:text-purple-400 transition-colors">{showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}</button>
               </div>
             </div>
 
-            {/* Confirm Password */}
-            <div>
-              <label className="text-[var(--muted)] text-sm mb-1.5 block">تأكيد كلمة المرور</label>
-              <div className="relative">
-                <input
-                  type={showConfirm ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/20 text-[var(--text)] placeholder:text-[var(--muted-2)] focus:outline-none focus:border-purple-500/60 focus:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all text-sm pr-12"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirm(!showConfirm)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-2)] hover:text-purple-400 transition-colors"
-                >
-                  {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
+            {error && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5">⚠️ {error}</p>}
 
-            {/* Error */}
-            {error && (
-              <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5">
-                ⚠️ {error}
-              </p>
-            )}
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-500 hover:to-blue-400 hover:shadow-[0_0_24px_rgba(168,85,247,0.5)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-            >
-              {loading ? (
-                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <UserPlus size={18} />
-                  إنشاء الحساب
-                </>
-              )}
+            <button type="submit" disabled={loading} className="w-full py-3 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-500 hover:to-blue-400 hover:shadow-[0_0_24px_rgba(168,85,247,0.5)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-2">
+              {loading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><UserPlus size={18} />{t("إنشاء الحساب", "Create account")}</>}
             </button>
           </form>
 
           <p className="text-center text-[var(--muted-2)] text-sm mt-6">
-            لديك حساب بالفعل؟{" "}
-            <a href="/login" className="text-purple-400 hover:text-purple-300 font-semibold transition-colors">
-              سجّل الدخول
-            </a>
+            {t("لديك حساب بالفعل؟", "Already have an account?")}{" "}
+            <a href="/login" className="text-purple-400 hover:text-purple-300 font-semibold transition-colors">{t("سجّل الدخول", "Sign in")}</a>
           </p>
         </div>
       </div>
