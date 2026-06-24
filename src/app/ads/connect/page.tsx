@@ -2,7 +2,9 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Globe, CheckCircle, XCircle, Trash2, Plus, ArrowLeft, Loader2 } from "lucide-react";
+import { Globe, CheckCircle, XCircle, Trash2, Plus, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { useLang } from "@/hooks/useLang";
+import LangToggle from "@/components/LangToggle";
 
 const GRADIENT = "linear-gradient(135deg, #0f0f1a 0%, #0d1b2a 100%)";
 const BLUE     = "#1877f2";
@@ -18,6 +20,8 @@ interface ConnectedPage {
 function ConnectPageInner() {
   const router       = useRouter();
   const searchParams = useSearchParams();
+  const { t, rtl } = useLang();
+  const Back = rtl ? ArrowLeft : ArrowRight;
   const [pages, setPages]     = useState<ConnectedPage[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
@@ -27,12 +31,15 @@ function ConnectPageInner() {
   useEffect(() => {
     const s = searchParams.get("success");
     const e = searchParams.get("error");
-    if (s === "1") setSuccess("تم ربط الصفحات بنجاح!");
-    if (e === "cancelled")    setError("تم إلغاء الربط");
-    if (e === "no_pages")     setError("لم نجد صفحات متاحة في حسابك");
+    if (s === "1") setSuccess(t("تم ربط الصفحات بنجاح!", "Pages connected successfully!"));
+    if (e === "cancelled")    setError(t("تم إلغاء الربط", "Connection cancelled"));
+    if (e === "no_pages")     setError(t("لم نجد صفحات متاحة في حسابك", "No available Pages found in your account"));
     if (e === "oauth_failed") {
       const reason = searchParams.get("reason");
-      setError(`فشل الربط${reason ? ` — ${reason}` : " — تأكد من صلاحيات التطبيق"}`);
+      setError(t(
+        `فشل الربط${reason ? ` — ${reason}` : " — تأكد من صلاحيات التطبيق"}`,
+        `Connection failed${reason ? ` — ${reason}` : " — check the app permissions"}`,
+      ));
     }
     loadPages();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -54,25 +61,26 @@ function ConnectPageInner() {
     if (data.url) {
       window.location.href = data.url;
     } else {
-      setError(data.error || "حدث خطأ");
+      setError(data.error || t("حدث خطأ", "Something went wrong"));
       setConnecting(false);
     }
   }
 
   async function deletePage(id: string) {
-    if (!confirm("هل تريد إلغاء ربط هذه الصفحة؟")) return;
+    if (!confirm(t("هل تريد إلغاء ربط هذه الصفحة؟", "Disconnect this Page?"))) return;
     await fetch(`/api/promo/pages?id=${id}`, { method: "DELETE" });
     setPages((p) => p.filter((x) => x.id !== id));
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: GRADIENT, color: "#fff", fontFamily: "Cairo, sans-serif", direction: "rtl", padding: "0 0 80px" }}>
+    <div style={{ minHeight: "100vh", background: GRADIENT, color: "#fff", fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", padding: "0 0 80px" }}>
 
       <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 12 }}>
         <button onClick={() => router.push("/ads")} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-          <ArrowLeft size={18} /> رجوع
+          <Back size={18} /> {t("رجوع", "Back")}
         </button>
-        <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>ربط صفحة فيسبوك</h1>
+        <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{t("ربط صفحة فيسبوك", "Connect a Facebook Page")}</h1>
+        <div style={{ marginInlineStart: "auto" }}><LangToggle /></div>
       </div>
 
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "40px 24px" }}>
@@ -95,25 +103,25 @@ function ConnectPageInner() {
               <Globe size={26} color={BLUE} />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>ربط عبر Meta</div>
-              <div style={{ color: "#94a3b8", fontSize: 13 }}>صلاحيات رسمية — آمن ومحمي</div>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>{t("ربط عبر Meta", "Connect via Meta")}</div>
+              <div style={{ color: "#94a3b8", fontSize: 13 }}>{t("صلاحيات رسمية — آمن ومحمي", "Official permissions — safe and secure")}</div>
             </div>
           </div>
           <ul style={{ margin: "0 0 20px", padding: "0 18px", color: "#94a3b8", fontSize: 13, lineHeight: 2.2 }}>
-            <li>نطلب فقط صلاحيات إدارة الإعلانات لصفحاتك</li>
-            <li>لا نطلع على كلمة مرورك أو رسائلك الخاصة</li>
-            <li>يمكنك إلغاء الربط في أي وقت</li>
+            <li>{t("نطلب فقط صلاحيات إدارة الإعلانات لصفحاتك", "We only request ad-management permissions for your Pages")}</li>
+            <li>{t("لا نطلع على كلمة مرورك أو رسائلك الخاصة", "We never see your password or private messages")}</li>
+            <li>{t("يمكنك إلغاء الربط في أي وقت", "You can disconnect at any time")}</li>
           </ul>
           <button onClick={connectMeta} disabled={connecting}
             style={{ width: "100%", background: `linear-gradient(135deg, ${BLUE}, #1565c0)`, border: "none", borderRadius: 12, padding: "14px 0", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, opacity: connecting ? 0.7 : 1 }}>
             {connecting ? <Loader2 size={18} className="spin" /> : <Plus size={18} />}
-            {connecting ? "جارٍ الاتصال..." : "ربط صفحة جديدة"}
+            {connecting ? t("جارٍ الاتصال...", "Connecting...") : t("ربط صفحة جديدة", "Connect a new Page")}
           </button>
         </div>
 
         {/* Pages list */}
         <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14, color: "#cbd5e1" }}>
-          الصفحات المرتبطة ({pages.length})
+          {t("الصفحات المرتبطة", "Connected Pages")} ({pages.length})
         </h2>
 
         {loading ? (
@@ -122,7 +130,7 @@ function ConnectPageInner() {
           </div>
         ) : pages.length === 0 ? (
           <div style={{ background: CARD_BG, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 32, textAlign: "center", color: "#64748b" }}>
-            لم تربط أي صفحة بعد — اضغط الزر أعلاه للبدء
+            {t("لم تربط أي صفحة بعد — اضغط الزر أعلاه للبدء", "No Pages connected yet — tap the button above to start")}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -153,7 +161,7 @@ function ConnectPageInner() {
         {pages.length > 0 && (
           <button onClick={() => router.push("/ads/create")}
             style={{ marginTop: 32, width: "100%", background: `linear-gradient(135deg, ${BLUE}, #6b46c1)`, border: "none", borderRadius: 14, padding: "16px 0", color: "#fff", fontWeight: 700, fontSize: 16, cursor: "pointer" }}>
-            التالي — إنشاء حملة إعلانية
+            {t("التالي — إنشاء حملة إعلانية", "Next — create a campaign")}
           </button>
         )}
       </div>

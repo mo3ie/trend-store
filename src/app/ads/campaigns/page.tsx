@@ -3,10 +3,12 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft, Plus, Megaphone, CheckCircle, Clock,
+  ArrowLeft, ArrowRight, Plus, Megaphone, CheckCircle, Clock,
   TrendingUp, ExternalLink, Loader2, RefreshCw, AlertCircle,
 } from "lucide-react";
-import { CAMPAIGN_STATUS_LABELS, CAMPAIGN_STATUS_COLORS } from "@/services/campaigns";
+import { CAMPAIGN_STATUS_LABELS, CAMPAIGN_STATUS_LABELS_EN, CAMPAIGN_STATUS_COLORS } from "@/services/campaigns";
+import { useLang } from "@/hooks/useLang";
+import LangToggle from "@/components/LangToggle";
 
 const GRADIENT = "linear-gradient(135deg, #0f0f1a 0%, #0d1b2a 100%)";
 const BLUE     = "#1877f2";
@@ -39,6 +41,10 @@ function CampaignsInner() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const paid         = searchParams.get("paid");
+  const { t, rtl } = useLang();
+  const Back = rtl ? ArrowLeft : ArrowRight;
+  const LYD  = t("د.ل", "LYD");
+  const statusLabels = rtl ? CAMPAIGN_STATUS_LABELS : CAMPAIGN_STATUS_LABELS_EN;
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -59,23 +65,24 @@ function CampaignsInner() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: GRADIENT, color: "#fff", fontFamily: "Cairo,sans-serif", direction: "rtl", paddingBottom: 80 }}>
+    <div style={{ minHeight: "100vh", background: GRADIENT, color: "#fff", fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80 }}>
 
       <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={() => router.push("/ads")} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-            <ArrowLeft size={18} /> رجوع
+            <Back size={18} /> {t("رجوع", "Back")}
           </button>
-          <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>حملاتي الإعلانية</h1>
+          <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{t("حملاتي الإعلانية", "My campaigns")}</h1>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <button onClick={loadCampaigns} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "7px 12px", color: "#94a3b8", cursor: "pointer" }}>
             <RefreshCw size={15} />
           </button>
           <button onClick={() => router.push("/ads/create")}
             style={{ background: `linear-gradient(135deg,${BLUE},#6b46c1)`, border: "none", borderRadius: 10, padding: "8px 16px", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-            <Plus size={15} /> حملة جديدة
+            <Plus size={15} /> {t("حملة جديدة", "New campaign")}
           </button>
+          <LangToggle />
         </div>
       </div>
 
@@ -84,7 +91,7 @@ function CampaignsInner() {
         {showSuccess && (
           <div style={{ background: "rgba(34,197,94,0.12)", border: "1px solid #22c55e40", borderRadius: 12, padding: "14px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, color: "#86efac" }}>
             <CheckCircle size={18} />
-            تم الدفع بنجاح! سيبدأ إعلانك خلال دقائق.
+            {t("تم الدفع بنجاح! سيبدأ إعلانك خلال دقائق.", "Payment successful! Your ad will start within minutes.")}
           </div>
         )}
 
@@ -95,10 +102,10 @@ function CampaignsInner() {
         ) : campaigns.length === 0 ? (
           <div style={{ background: CARD_BG, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, padding: "60px 32px", textAlign: "center" }}>
             <Megaphone size={48} color="#334155" style={{ marginBottom: 16 }} />
-            <p style={{ color: "#64748b", fontSize: 15, marginBottom: 24 }}>لم تنشئ أي حملة إعلانية بعد</p>
+            <p style={{ color: "#64748b", fontSize: 15, marginBottom: 24 }}>{t("لم تنشئ أي حملة إعلانية بعد", "You haven't created any campaigns yet")}</p>
             <button onClick={() => router.push("/ads/create")}
               style={{ background: `linear-gradient(135deg,${BLUE},#6b46c1)`, border: "none", borderRadius: 12, padding: "12px 28px", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 15 }}>
-              أنشئ أول حملة
+              {t("أنشئ أول حملة", "Create your first campaign")}
             </button>
           </div>
         ) : (
@@ -108,7 +115,7 @@ function CampaignsInner() {
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>
-                      {c.page_name || "حملة إعلانية"}
+                      {c.page_name || t("حملة إعلانية", "Ad campaign")}
                     </div>
                     <a href={c.post_url} target="_blank" rel="noopener noreferrer"
                       style={{ color: "#64748b", fontSize: 12, display: "flex", alignItems: "center", gap: 4, textDecoration: "none", wordBreak: "break-all" }}>
@@ -125,15 +132,15 @@ function CampaignsInner() {
                     fontSize: 12, fontWeight: 700, flexShrink: 0,
                   }}>
                     {statusIcon(c.status)}
-                    {CAMPAIGN_STATUS_LABELS[c.status] || c.status}
+                    {statusLabels[c.status] || c.status}
                   </div>
                 </div>
 
                 <div style={{ display: "flex", gap: 20, marginTop: 16, flexWrap: "wrap" }}>
                   {[
-                    { label: "الميزانية", val: `${c.budget} د.ل` },
-                    { label: "المدة",     val: `${c.duration_days} يوم` },
-                    { label: "الإجمالي", val: `${c.total_price} د.ل` },
+                    { label: t("الميزانية", "Budget"), val: `${c.budget} ${LYD}` },
+                    { label: t("المدة", "Duration"),   val: t(`${c.duration_days} يوم`, `${c.duration_days} days`) },
+                    { label: t("الإجمالي", "Total"),   val: `${c.total_price} ${LYD}` },
                   ].map((r) => (
                     <div key={r.label} style={{ textAlign: "center" }}>
                       <div style={{ fontSize: 11, color: "#64748b", marginBottom: 2 }}>{r.label}</div>
@@ -141,9 +148,9 @@ function CampaignsInner() {
                     </div>
                   ))}
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 11, color: "#64748b", marginBottom: 2 }}>تاريخ الإنشاء</div>
+                    <div style={{ fontSize: 11, color: "#64748b", marginBottom: 2 }}>{t("تاريخ الإنشاء", "Created")}</div>
                     <div style={{ fontSize: 13, color: "#94a3b8" }}>
-                      {new Date(c.created_at).toLocaleDateString("ar-LY")}
+                      {new Date(c.created_at).toLocaleDateString(rtl ? "ar-LY" : "en-GB")}
                     </div>
                   </div>
                 </div>
@@ -151,7 +158,7 @@ function CampaignsInner() {
                 {c.status === "pending_payment" && (
                   <button onClick={() => router.push(`/ads/checkout?campaignId=${c.id}`)}
                     style={{ marginTop: 14, width: "100%", background: `${BLUE}22`, border: `1px solid ${BLUE}40`, borderRadius: 10, padding: "10px 0", color: "#93c5fd", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-                    استكمال الدفع
+                    {t("استكمال الدفع", "Complete payment")}
                   </button>
                 )}
 
