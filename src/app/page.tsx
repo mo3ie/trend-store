@@ -128,9 +128,9 @@ export default function Home() {
         </div>
         <button className="iconbtn langbtn" onClick={toggleLang}>{lang === "ar" ? "EN" : "ع"}</button>
         <button className="iconbtn" aria-label="theme" onClick={toggleTheme}>{light ? <Moon size={19} /> : <Sun size={19} />}</button>
-        {user && <NotificationBell />}
+        {user && <span className="hide-sm flex"><NotificationBell /></span>}
         <a className="iconbtn cartdot" href="/cart" aria-label="cart"><ShoppingCart size={20} />{count > 0 && <i>{count > 9 ? "9+" : count}</i>}</a>
-        <a className="iconbtn" href={user ? "/account" : "/login"} aria-label="account"><svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg></a>
+        <a className="iconbtn hide-sm" href={user ? "/account" : "/login"} aria-label="account"><svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg></a>
       </header>
 
       <div className="shell">

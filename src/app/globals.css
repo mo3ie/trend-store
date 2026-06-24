@@ -564,7 +564,11 @@ align-items: center;
   .home2 .support-fab{ bottom:84px; }
   .home2 .cats{ grid-template-columns:repeat(4,1fr); } .home2 .grid4{ grid-template-columns:1fr 1fr; } .home2 .hero .inner{ max-width:100%; }
   .home2 .wide{ grid-template-columns:1fr; } .home2 .trust{ grid-template-columns:repeat(3,1fr); } .home2 .maint .two{ grid-template-columns:1fr; }
-  .home2 .footer{ grid-template-columns:1fr;gap:20px; } .home2 .bottomnav{ display:flex; } .home2 .brand .en{ font-size:11px; } .home2 .brand .ar{ font-size:16px; } .home2 .hide-sm{ display:none; }
+  .home2 .footer{ grid-template-columns:1fr;gap:20px; } .home2 .bottomnav{ display:flex; } .home2 .brand .en{ font-size:10px;letter-spacing:.02em; } .home2 .brand .ar{ font-size:16px; } .home2 .hide-sm{ display:none !important; }
   .home2 .content{ padding-bottom:80px; }
+  .home2 .topbar{ gap:7px;padding:10px 12px; } .home2 .topbar .iconbtn{ width:37px;height:37px;border-radius:11px; } .home2 .topbar .iconbtn svg{ width:18px;height:18px; }
+  .home2 .topbar .logo{ width:38px;height:38px; } .home2 .topbar .logo b{ font-size:18px; }
+  .home2 .brand{ gap:8px;min-width:0; } .home2 .brand .names{ min-width:0;overflow:hidden; }
+  .home2 .brand .ar, .home2 .brand .en{ white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
 }
 @media(max-width:430px){ .home2 .cats{ grid-template-columns:repeat(3,1fr); } .home2 .grid2{ grid-template-columns:1fr; } .home2 .trust{ grid-template-columns:repeat(2,1fr); } }
