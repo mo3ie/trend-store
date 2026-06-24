@@ -1,46 +1,51 @@
 "use client";
 
+"use client";
+
 import { Building2, ShoppingCart, ArrowLeft, ExternalLink, Globe, Stethoscope } from "lucide-react";
+import { useLang } from "@/hooks/useLang";
+import LangToggle from "@/components/LangToggle";
 
 const SITES = [
   {
     name: "Trendy",
-    tagline: "منصة الحجوزات العقارية الليبية",
-    desc: "احجز فنادق، شاليهات، منتجعات واستراحات في جميع أنحاء ليبيا بأفضل الأسعار.",
+    tagline: ["منصة الحجوزات العقارية الليبية", "Libya's property booking platform"] as const,
+    desc: ["احجز فنادق، شاليهات، منتجعات واستراحات في جميع أنحاء ليبيا بأفضل الأسعار.", "Book hotels, chalets, resorts and rest houses across Libya at the best prices."] as const,
     href: "https://trendy.trendstore-ly.com",
     icon: Building2,
     color: "#1B3A6B",
     accent: "#C9A84C",
-    badge: "جديد",
-    features: ["فنادق وشاليهات", "منتجعات واستراحات", "حجز فوري", "دفع محلي"],
+    badge: ["جديد", "New"] as const,
+    features: [["فنادق وشاليهات", "Hotels & chalets"], ["منتجعات واستراحات", "Resorts & rest houses"], ["حجز فوري", "Instant booking"], ["دفع محلي", "Local payment"]] as const,
   },
   {
     name: "Shein Order",
-    tagline: "اطلب من شي إن إلى ليبيا",
-    desc: "أرسل رابط سلة شي إن وسنوصّل لك طلبك مباشرة إلى باب منزلك في ليبيا.",
+    tagline: ["اطلب من شي إن إلى ليبيا", "Order from Shein to Libya"] as const,
+    desc: ["أرسل رابط سلة شي إن وسنوصّل لك طلبك مباشرة إلى باب منزلك في ليبيا.", "Send your Shein cart link and we'll deliver your order straight to your door in Libya."] as const,
     href: "https://order.trendstore-ly.com",
     icon: ShoppingCart,
     color: "#7c3aed",
     accent: "#a78bfa",
     badge: null,
-    features: ["أي منتج من شي إن", "توصيل لليبيا", "دفع محلي", "تتبع الطلب"],
+    features: [["أي منتج من شي إن", "Any Shein product"], ["توصيل لليبيا", "Delivery to Libya"], ["دفع محلي", "Local payment"], ["تتبع الطلب", "Order tracking"]] as const,
   },
   {
     name: "MedSprint",
-    tagline: "منصة التعليم الطبي الذكية",
-    desc: "تعلّم الطب بذكاء — شروحات مبسّطة وعميقة، أسئلة وحالات سريرية ومحاكاة امتحانات، مبنية على مصادر موثوقة.",
+    tagline: ["منصة التعليم الطبي الذكية", "The smart medical-education platform"] as const,
+    desc: ["تعلّم الطب بذكاء — شروحات مبسّطة وعميقة، أسئلة وحالات سريرية ومحاكاة امتحانات، مبنية على مصادر موثوقة.", "Learn medicine smartly — clear, in-depth explanations, questions, clinical cases and exam simulations built on trusted sources."] as const,
     href: "https://medsprint.trendstore-ly.com",
     icon: Stethoscope,
     color: "#0d9488",
     accent: "#2dd4bf",
-    badge: "جديد",
-    features: ["شروحات ذكية", "أسئلة وحالات سريرية", "محاكاة امتحانات", "للطلاب والأطباء"],
+    badge: ["جديد", "New"] as const,
+    features: [["شروحات ذكية", "Smart explanations"], ["أسئلة وحالات سريرية", "Questions & clinical cases"], ["محاكاة امتحانات", "Exam simulations"], ["للطلاب والأطباء", "For students & doctors"]] as const,
   },
 ];
 
 export default function OurSitesPage() {
+  const { t, rtl } = useLang();
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]" dir="rtl">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]" dir={rtl ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="border-b border-purple-500/20 px-6 py-4 flex items-center gap-4 sticky top-0 bg-[var(--glass)] backdrop-blur z-10">
         <a href="/" className="text-[var(--muted)] hover:text-purple-400 transition-colors">
@@ -48,16 +53,17 @@ export default function OurSitesPage() {
         </a>
         <div>
           <h1 className="text-lg font-black tracking-wide bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-            مواقعنا وخدماتنا
+            {t("مواقعنا وخدماتنا", "Our sites & services")}
           </h1>
-          <p className="text-xs text-[var(--muted-2)]">مشاريع من تصميم وتطوير فريق Trend</p>
+          <p className="text-xs text-[var(--muted-2)]">{t("مشاريع من تصميم وتطوير فريق Trend", "Projects designed & built by the Trend team")}</p>
         </div>
+        <div className="ms-auto"><LangToggle /></div>
       </div>
 
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-6">
 
         <p className="text-[var(--muted)] text-sm leading-relaxed">
-          نطوّر منصات رقمية متخصصة لخدمة السوق الليبي. كل مشروع مصمم بعناية ليقدم تجربة سلسة وآمنة.
+          {t("نطوّر منصات رقمية متخصصة لخدمة السوق الليبي. كل مشروع مصمم بعناية ليقدم تجربة سلسة وآمنة.", "We build specialized digital platforms for the Libyan market. Every project is carefully crafted for a smooth, secure experience.")}
         </p>
 
         {SITES.map((site) => {
@@ -85,25 +91,25 @@ export default function OurSitesPage() {
                         {site.badge && (
                           <span className="text-xs font-bold px-2 py-0.5 rounded-full"
                             style={{ background: `${site.accent}33`, color: site.accent }}>
-                            {site.badge}
+                            {t(site.badge[0], site.badge[1])}
                           </span>
                         )}
                       </div>
-                      <p className="text-sm font-medium" style={{ color: site.accent }}>{site.tagline}</p>
+                      <p className="text-sm font-medium" style={{ color: site.accent }}>{t(site.tagline[0], site.tagline[1])}</p>
                     </div>
                   </div>
                   <ExternalLink size={16} className="text-[var(--muted-2)] group-hover:text-[var(--text)] transition-colors mt-1 shrink-0" />
                 </div>
 
                 {/* Description */}
-                <p className="text-[var(--muted)] text-sm leading-relaxed mb-5">{site.desc}</p>
+                <p className="text-[var(--muted)] text-sm leading-relaxed mb-5">{t(site.desc[0], site.desc[1])}</p>
 
                 {/* Features */}
                 <div className="flex flex-wrap gap-2 mb-5">
                   {site.features.map(f => (
-                    <span key={f} className="text-xs px-3 py-1 rounded-full border"
+                    <span key={f[0]} className="text-xs px-3 py-1 rounded-full border"
                       style={{ borderColor: `${site.accent}33`, color: `${site.accent}cc`, background: `${site.accent}11` }}>
-                      {f}
+                      {t(f[0], f[1])}
                     </span>
                   ))}
                 </div>
@@ -125,8 +131,8 @@ export default function OurSitesPage() {
           <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center mx-auto mb-3">
             <Globe size={22} className="text-purple-400/50" />
           </div>
-          <p className="text-[var(--muted-2)] font-bold text-sm">مشاريع قادمة قريباً</p>
-          <p className="text-[var(--muted-2)] text-xs mt-1">نعمل على مزيد من المنصات لخدمة السوق الليبي</p>
+          <p className="text-[var(--muted-2)] font-bold text-sm">{t("مشاريع قادمة قريباً", "More projects coming soon")}</p>
+          <p className="text-[var(--muted-2)] text-xs mt-1">{t("نعمل على مزيد من المنصات لخدمة السوق الليبي", "We're building more platforms to serve the Libyan market")}</p>
         </div>
 
       </div>

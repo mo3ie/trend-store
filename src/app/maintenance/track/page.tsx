@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Wrench, Search, ArrowLeft } from "lucide-react";
+import { useLang } from "@/hooks/useLang";
+import LangToggle from "@/components/LangToggle";
 
 type Req = {
   id: string; name?: string; phone: string; device?: string; fault?: string;
@@ -11,15 +13,16 @@ type Req = {
 };
 
 const STEPS = [
-  { key: "new", ar: "قيد المراجعة" },
-  { key: "quoted", ar: "عرض سعر" },
-  { key: "in_progress", ar: "جاري الإصلاح" },
-  { key: "ready", ar: "جاهز للاستلام" },
-  { key: "delivered", ar: "تم التسليم" },
+  { key: "new", ar: "قيد المراجعة", en: "Under review" },
+  { key: "quoted", ar: "عرض سعر", en: "Quoted" },
+  { key: "in_progress", ar: "جاري الإصلاح", en: "In progress" },
+  { key: "ready", ar: "جاهز للاستلام", en: "Ready for pickup" },
+  { key: "delivered", ar: "تم التسليم", en: "Delivered" },
 ];
 
 function Track() {
   const sp = useSearchParams();
+  const { t, rtl } = useLang();
   const [id, setId] = useState(sp.get("id") || "");
   const [req, setReq] = useState<Req | null>(null);
   const [loading, setLoading] = useState(false);
@@ -31,7 +34,7 @@ function Track() {
     const r = await fetch(`/api/maintenance?id=${encodeURIComponent(rid.trim())}`);
     const d = await r.json();
     setLoading(false);
-    if (d.id) setReq(d); else setErr("لم يُعثر على طلب بهذا الرقم");
+    if (d.id) setReq(d); else setErr(t("لم يُعثر على طلب بهذا الرقم", "No request found with this number"));
   };
 
   useEffect(() => { if (sp.get("id")) load(sp.get("id")!); }, []); // eslint-disable-line
@@ -40,32 +43,35 @@ function Track() {
   const cancelled = req?.status === "cancelled";
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] px-4 py-8" dir="rtl">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] px-4 py-8" dir={rtl ? "rtl" : "ltr"}>
       <div className="max-w-lg mx-auto">
-        <a href="/" className="inline-flex items-center gap-2 text-[var(--muted)] hover:text-purple-400 text-sm mb-6"><ArrowLeft size={16} /> الرئيسية</a>
+        <div className="flex items-center justify-between mb-6">
+          <a href="/" className="inline-flex items-center gap-2 text-[var(--muted)] hover:text-purple-400 text-sm"><ArrowLeft size={16} /> {t("الرئيسية", "Home")}</a>
+          <LangToggle />
+        </div>
         <div className="flex items-center gap-2 mb-5">
           <Wrench className="text-purple-400" size={22} />
-          <h1 className="text-xl font-black">تتبّع طلب الصيانة</h1>
+          <h1 className="text-xl font-black">{t("تتبّع طلب الصيانة", "Track repair request")}</h1>
         </div>
 
         <div className="flex gap-2 mb-6">
-          <input value={id} onChange={(e) => setId(e.target.value)} placeholder="أدخل رقم الطلب"
+          <input value={id} onChange={(e) => setId(e.target.value)} placeholder={t("أدخل رقم الطلب", "Enter request number")}
             className="flex-1 px-4 py-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm focus:outline-none focus:border-purple-500/60" />
-          <button onClick={() => load(id)} className="px-4 rounded-xl bg-gradient-to-r from-purple-600 to-blue-500 text-white font-bold flex items-center gap-2"><Search size={16} /> بحث</button>
+          <button onClick={() => load(id)} className="px-4 rounded-xl bg-gradient-to-r from-purple-600 to-blue-500 text-white font-bold flex items-center gap-2"><Search size={16} /> {t("بحث", "Search")}</button>
         </div>
 
-        {loading && <p className="text-[var(--muted-2)] text-sm">جاري التحميل…</p>}
+        {loading && <p className="text-[var(--muted-2)] text-sm">{t("جاري التحميل…", "Loading…")}</p>}
         {err && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{err}</p>}
 
         {req && (
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-5">
             <div className="flex items-center justify-between">
-              <div><p className="text-xs text-[var(--muted)]">رقم الطلب</p><p className="font-black tracking-wider">{req.id.slice(0, 8).toUpperCase()}</p></div>
-              {req.device && <div className="text-left"><p className="text-xs text-[var(--muted)]">الجهاز</p><p className="font-bold text-sm">{req.device}</p></div>}
+              <div><p className="text-xs text-[var(--muted)]">{t("رقم الطلب", "Request number")}</p><p className="font-black tracking-wider">{req.id.slice(0, 8).toUpperCase()}</p></div>
+              {req.device && <div className="text-end"><p className="text-xs text-[var(--muted)]">{t("الجهاز", "Device")}</p><p className="font-bold text-sm">{req.device}</p></div>}
             </div>
 
             {cancelled ? (
-              <p className="text-red-400 font-bold bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-center">تم إلغاء الطلب</p>
+              <p className="text-red-400 font-bold bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-center">{t("تم إلغاء الطلب", "Request cancelled")}</p>
             ) : (
               <div className="space-y-3">
                 {STEPS.map((s, i) => {
@@ -73,7 +79,7 @@ function Track() {
                   return (
                     <div key={s.key} className="flex items-center gap-3">
                       <span className={`w-7 h-7 rounded-full grid place-items-center text-xs font-bold ${done ? "bg-gradient-to-br from-purple-600 to-blue-500 text-white" : "bg-[var(--input)] text-[var(--muted-2)]"}`}>{i + 1}</span>
-                      <span className={done ? "font-bold" : "text-[var(--muted-2)]"}>{s.ar}</span>
+                      <span className={done ? "font-bold" : "text-[var(--muted-2)]"}>{t(s.ar, s.en)}</span>
                     </div>
                   );
                 })}
@@ -82,12 +88,12 @@ function Track() {
 
             {req.quote_price != null && (
               <div className="bg-[var(--input)] rounded-xl px-4 py-3 flex items-center justify-between">
-                <span className="text-[var(--muted)] text-sm">عرض السعر</span>
-                <span className="font-black text-purple-400">{req.quote_price} د.ل</span>
+                <span className="text-[var(--muted)] text-sm">{t("عرض السعر", "Quote")}</span>
+                <span className="font-black text-purple-400">{req.quote_price} {t("د.ل", "LYD")}</span>
               </div>
             )}
             {req.notes && <p className="text-sm text-[var(--muted)] bg-[var(--input)] rounded-xl px-4 py-3">{req.notes}</p>}
-            {req.technician && <p className="text-xs text-[var(--muted-2)]">الفني: {req.technician}</p>}
+            {req.technician && <p className="text-xs text-[var(--muted-2)]">{t("الفني:", "Technician:")} {req.technician}</p>}
           </div>
         )}
       </div>

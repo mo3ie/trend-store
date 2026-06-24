@@ -6,6 +6,8 @@ import { User, Phone, MapPin, Mail, Package, Heart, LogOut, Edit3, Check, X, Sho
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
+import { useLang } from "@/hooks/useLang";
+import LangToggle from "@/components/LangToggle";
 import MapPicker from "@/components/MapPicker";
 import WalletModal from "@/components/WalletModal";
 
@@ -46,14 +48,24 @@ const statusLabels: Record<string, string> = {
   pending: "قيد الانتظار", processing: "جاري التجهيز",
   shipped: "تم الشحن", delivered: "تم التسليم", cancelled: "ملغي",
 };
+const statusLabelsEn: Record<string, string> = {
+  pending: "Pending", processing: "Processing",
+  shipped: "Shipped", delivered: "Delivered", cancelled: "Cancelled",
+};
 
 const ADDRESS_LABELS = ["المنزل", "العمل", "العائلة", "أخرى"];
+const ADDR_LABEL_EN: Record<string, string> = {
+  "المنزل": "Home", "العمل": "Work", "العائلة": "Family", "أخرى": "Other",
+};
 
 export default function AccountPage() {
   const router = useRouter();
   const { user, loading: authLoading, signOut } = useAuth();
   const { count } = useCart();
+  const { t, rtl } = useLang();
   const fileRef = useRef<HTMLInputElement>(null);
+  const statusText = (s: string) => (rtl ? statusLabels[s] : statusLabelsEn[s]) || s;
+  const labelText = (l: string) => t(l, ADDR_LABEL_EN[l] || l);
 
   const [profile,    setProfile]    = useState<Profile>({ full_name: "", phone: "", email: "", address: "", avatar_url: "" });
   const [editMode,   setEditMode]   = useState(false);
@@ -180,8 +192,8 @@ export default function AccountPage() {
 
   const handlePwChange = async () => {
     setPwError("");
-    if (pwData.next.length < 6)        { setPwError("كلمة المرور يجب أن تكون 6 أحرف على الأقل"); return; }
-    if (pwData.next !== pwData.confirm) { setPwError("كلمة المرور وتأكيدها غير متطابقتين"); return; }
+    if (pwData.next.length < 6)        { setPwError(t("كلمة المرور يجب أن تكون 6 أحرف على الأقل", "Password must be at least 6 characters")); return; }
+    if (pwData.next !== pwData.confirm) { setPwError(t("كلمة المرور وتأكيدها غير متطابقتين", "Passwords do not match")); return; }
     setPwSaving(true);
     const { error } = await supabase.auth.updateUser({ password: pwData.next });
     if (error) { setPwError(error.message); setPwSaving(false); return; }
@@ -216,7 +228,7 @@ export default function AccountPage() {
   }
 
   async function handleDeleteAddr(id: string) {
-    if (!confirm("حذف هذا العنوان؟")) return;
+    if (!confirm(t("حذف هذا العنوان؟", "Delete this address?"))) return;
     await fetch("/api/addresses", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
     fetchAddresses();
   }
@@ -248,18 +260,18 @@ export default function AccountPage() {
   if (!user) return null;
 
   const tabs = [
-    { key: "profile",   label: "بياناتي",     icon: User        },
-    { key: "store",     label: "طلبات المتجر", icon: ShoppingBag },
-    { key: "shein",     label: "طلبات شي إن",  icon: Package     },
-    { key: "favorites", label: "المفضلة",      icon: Heart       },
-    { key: "wallet",    label: "محفظتي",       icon: Wallet      },
-    { key: "addresses", label: "مواقعي",       icon: MapPin      },
-    { key: "settings",  label: "الإعدادات",    icon: Settings    },
+    { key: "profile",   label: "بياناتي",      labelEn: "Profile",  icon: User        },
+    { key: "store",     label: "طلبات المتجر", labelEn: "Store orders", icon: ShoppingBag },
+    { key: "shein",     label: "طلبات شي إن",  labelEn: "Shein orders", icon: Package     },
+    { key: "favorites", label: "المفضلة",      labelEn: "Favorites", icon: Heart       },
+    { key: "wallet",    label: "محفظتي",       labelEn: "Wallet",   icon: Wallet      },
+    { key: "addresses", label: "مواقعي",       labelEn: "Addresses", icon: MapPin      },
+    { key: "settings",  label: "الإعدادات",    labelEn: "Settings", icon: Settings    },
   ] as const;
 
   return (
     <>
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]" dir={rtl ? "rtl" : "ltr"}>
       <div className="fixed top-[-150px] right-[-150px] w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[140px] pointer-events-none" />
 
       {/* Header */}
@@ -276,9 +288,10 @@ export default function AccountPage() {
               </span>
             )}
           </a>
+          <LangToggle className="!w-9 !h-9" />
           <button onClick={signOut} className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-all text-sm">
             <LogOut size={16} />
-            <span className="hidden md:inline">تسجيل الخروج</span>
+            <span className="hidden md:inline">{t("تسجيل الخروج", "Sign out")}</span>
           </button>
         </div>
       </header>
@@ -302,14 +315,14 @@ export default function AccountPage() {
           </div>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
           <div>
-            <h1 className="text-xl font-bold">{profile.full_name || "مستخدم"}</h1>
+            <h1 className="text-xl font-bold">{profile.full_name || t("مستخدم", "User")}</h1>
             <p className="text-[var(--muted-2)] text-sm">{user.email}</p>
           </div>
         </div>
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1 -mx-1 px-1">
-          {tabs.map(({ key, label, icon: Icon }) => (
+          {tabs.map(({ key, label, labelEn, icon: Icon }) => (
             <button key={key} onClick={() => setActiveTab(key)}
               className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl text-xs md:text-sm font-medium whitespace-nowrap transition-all ${
                 activeTab === key
@@ -317,7 +330,7 @@ export default function AccountPage() {
                   : "bg-white/5 text-[var(--muted)] hover:text-[var(--text)] hover:bg-white/10 border border-[var(--border)]"
               }`}>
               <Icon size={14} />
-              {label}
+              {rtl ? label : labelEn}
             </button>
           ))}
         </div>
@@ -326,29 +339,29 @@ export default function AccountPage() {
         {activeTab === "profile" && (
           <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 md:p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="font-bold text-lg">البيانات الشخصية</h2>
+              <h2 className="font-bold text-lg">{t("البيانات الشخصية", "Personal details")}</h2>
               {!editMode ? (
                 <button onClick={() => setEditMode(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-400 text-sm transition-all">
-                  <Edit3 size={14} /> تعديل
+                  <Edit3 size={14} /> {t("تعديل", "Edit")}
                 </button>
               ) : (
                 <div className="flex gap-2">
                   <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-500/15 hover:bg-green-500/25 border border-green-500/30 text-green-400 text-sm transition-all">
                     {saving ? <span className="w-3.5 h-3.5 border border-green-400/30 border-t-green-400 rounded-full animate-spin" /> : <Check size={14} />}
-                    حفظ
+                    {t("حفظ", "Save")}
                   </button>
                   <button onClick={() => { setEditMode(false); setEditData(profile); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-sm transition-all">
-                    <X size={14} /> إلغاء
+                    <X size={14} /> {t("إلغاء", "Cancel")}
                   </button>
                 </div>
               )}
             </div>
             <div className="space-y-4">
               {[
-                { label: "الاسم الكامل",       key: "full_name", icon: User,   type: "text"  },
-                { label: "البريد الإلكتروني",   key: "email",     icon: Mail,   type: "email" },
-                { label: "رقم الهاتف",          key: "phone",     icon: Phone,  type: "tel"   },
-                { label: "العنوان",              key: "address",   icon: MapPin, type: "text"  },
+                { label: t("الاسم الكامل", "Full name"),     key: "full_name", icon: User,   type: "text"  },
+                { label: t("البريد الإلكتروني", "Email"),     key: "email",     icon: Mail,   type: "email" },
+                { label: t("رقم الهاتف", "Phone number"),     key: "phone",     icon: Phone,  type: "tel"   },
+                { label: t("العنوان", "Address"),             key: "address",   icon: MapPin, type: "text"  },
               ].map(({ label, key, icon: Icon, type }) => (
                 <div key={key}>
                   <label className="text-[var(--muted-2)] text-xs mb-1.5 flex items-center gap-1.5"><Icon size={12} /> {label}</label>
@@ -358,7 +371,7 @@ export default function AccountPage() {
                       className="w-full px-4 py-2.5 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all" />
                   ) : (
                     <p className="px-4 py-2.5 rounded-xl bg-black/20 border border-[var(--border)] text-sm text-[var(--muted)]">
-                      {editData[key as keyof Profile] || <span className="text-[var(--muted-2)]">غير محدد</span>}
+                      {editData[key as keyof Profile] || <span className="text-[var(--muted-2)]">{t("غير محدد", "Not set")}</span>}
                     </p>
                   )}
                 </div>
@@ -371,22 +384,22 @@ export default function AccountPage() {
         {activeTab === "store" && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-[var(--muted-2)] text-sm">{storeOrders.length} طلب</p>
-              <a href="/orders" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors">عرض الكل <ArrowLeft size={14} /></a>
+              <p className="text-[var(--muted-2)] text-sm">{storeOrders.length} {t("طلب", "orders")}</p>
+              <a href="/orders" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors">{t("عرض الكل", "View all")} <ArrowLeft size={14} /></a>
             </div>
             {storeOrders.length === 0 ? (
               <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-10 text-center text-[var(--muted-2)]">
                 <ShoppingBag size={40} className="mx-auto mb-3 text-purple-500/40" />
-                لا توجد طلبات من المتجر بعد
+                {t("لا توجد طلبات من المتجر بعد", "No store orders yet")}
               </div>
             ) : storeOrders.map((order) => (
               <a key={order.id} href="/orders" className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 flex items-center justify-between hover:border-purple-500/50 transition-all block">
                 <div>
-                  <p className="text-sm font-semibold">طلب #{order.id.slice(0, 8)}</p>
-                  <p className="text-[var(--muted-2)] text-xs mt-0.5">{new Date(order.created_at).toLocaleDateString("ar-LY")}</p>
+                  <p className="text-sm font-semibold">{t("طلب", "Order")} #{order.id.slice(0, 8)}</p>
+                  <p className="text-[var(--muted-2)] text-xs mt-0.5">{new Date(order.created_at).toLocaleDateString(rtl ? "ar-LY" : "en-GB")}</p>
                 </div>
                 <span className={`text-xs px-3 py-1 rounded-full border font-medium ${statusColors[order.status] || "bg-gray-500/20 text-[var(--muted)] border-gray-500/30"}`}>
-                  {statusLabels[order.status] || order.status}
+                  {statusText(order.status)}
                 </span>
               </a>
             ))}
@@ -399,17 +412,17 @@ export default function AccountPage() {
             {sheinOrders.length === 0 ? (
               <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-10 text-center text-[var(--muted-2)]">
                 <Package size={40} className="mx-auto mb-3 text-purple-500/40" />
-                لا توجد طلبات شي إن بعد
+                {t("لا توجد طلبات شي إن بعد", "No Shein orders yet")}
               </div>
             ) : sheinOrders.map((order) => (
               <div key={order.id} className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold">طلب #{order.id.toString().slice(0, 8)}</p>
-                  <p className="text-[var(--muted-2)] text-xs mt-0.5">{new Date(order.created_at).toLocaleDateString("ar-LY")}</p>
+                  <p className="text-sm font-semibold">{t("طلب", "Order")} #{order.id.toString().slice(0, 8)}</p>
+                  <p className="text-[var(--muted-2)] text-xs mt-0.5">{new Date(order.created_at).toLocaleDateString(rtl ? "ar-LY" : "en-GB")}</p>
                   {order.price && <p className="text-purple-400 text-xs mt-0.5">{order.price} $</p>}
                 </div>
                 <span className={`text-xs px-3 py-1 rounded-full border font-medium ${statusColors[order.status] || "bg-gray-500/20 text-[var(--muted)] border-gray-500/30"}`}>
-                  {statusLabels[order.status] || order.status}
+                  {statusText(order.status)}
                 </span>
               </div>
             ))}
@@ -420,9 +433,9 @@ export default function AccountPage() {
         {activeTab === "favorites" && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-[var(--muted-2)] text-sm">{favorites.length} منتج محفوظ</p>
+              <p className="text-[var(--muted-2)] text-sm">{favorites.length} {t("منتج محفوظ", "saved")}</p>
               <a href="/products" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors">
-                تصفح المنتجات <ArrowLeft size={14} />
+                {t("تصفح المنتجات", "Browse products")} <ArrowLeft size={14} />
               </a>
             </div>
             {favLoading ? (
@@ -432,8 +445,8 @@ export default function AccountPage() {
             ) : favorites.length === 0 ? (
               <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-10 text-center text-[var(--muted-2)]">
                 <Heart size={40} className="mx-auto mb-3 text-purple-500/40" />
-                <p>المفضلة فارغة</p>
-                <p className="text-xs mt-1 text-[var(--muted-2)]">أضف منتجات تعجبك من صفحة المنتج</p>
+                <p>{t("المفضلة فارغة", "No favorites yet")}</p>
+                <p className="text-xs mt-1 text-[var(--muted-2)]">{t("أضف منتجات تعجبك من صفحة المنتج", "Add products you like from the product page")}</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
@@ -475,20 +488,20 @@ export default function AccountPage() {
         {activeTab === "wallet" && (
           <div className="space-y-4">
             <div className="bg-gradient-to-br from-purple-900/60 to-blue-900/40 border border-purple-500/30 rounded-2xl p-6">
-              <p className="text-[var(--muted)] text-xs mb-1">الرصيد الحالي</p>
+              <p className="text-[var(--muted)] text-xs mb-1">{t("الرصيد الحالي", "Current balance")}</p>
               <p className="text-3xl font-black bg-gradient-to-r from-purple-300 to-blue-300 bg-clip-text text-transparent">
-                {walletBalance !== null ? walletBalance.toFixed(2) : "—"} <span className="text-lg">د</span>
+                {walletBalance !== null ? walletBalance.toFixed(2) : "—"} <span className="text-lg">{t("د", "LYD")}</span>
               </p>
-              <p className="text-[var(--muted-2)] text-xs mt-1">دينار ليبي</p>
+              <p className="text-[var(--muted-2)] text-xs mt-1">{t("دينار ليبي", "Libyan Dinar")}</p>
             </div>
             <button
               onClick={() => setWalletOpen(true)}
               className="w-full py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
             >
               <Wallet size={18} />
-              شحن الرصيد
+              {t("شحن الرصيد", "Top up")}
             </button>
-            <p className="text-[var(--muted-2)] text-xs text-center">يمكنك شحن رصيد المحفظة واستخدامه لتسديد طلباتك</p>
+            <p className="text-[var(--muted-2)] text-xs text-center">{t("يمكنك شحن رصيد المحفظة واستخدامه لتسديد طلباتك", "Top up your wallet balance and use it to pay for your orders")}</p>
           </div>
         )}
 
@@ -496,9 +509,9 @@ export default function AccountPage() {
         {activeTab === "addresses" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-lg">مواقع التسليم</h2>
+              <h2 className="font-bold text-lg">{t("مواقع التسليم", "Delivery locations")}</h2>
               <button onClick={openAddAddr} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-[var(--text)] text-sm font-medium transition-all">
-                + إضافة موقع
+                + {t("إضافة موقع", "Add location")}
               </button>
             </div>
 
@@ -509,7 +522,7 @@ export default function AccountPage() {
             ) : addresses.length === 0 ? (
               <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-10 text-center text-[var(--muted-2)]">
                 <MapPin size={40} className="mx-auto mb-3 text-purple-500/40" />
-                لا توجد مواقع محفوظة — أضف موقعك الأول!
+                {t("لا توجد مواقع محفوظة — أضف موقعك الأول!", "No saved locations — add your first one!")}
               </div>
             ) : addresses.map((addr) => (
               <div key={addr.id} className={`bg-[var(--surface)] border rounded-2xl p-5 transition-all ${addr.is_default ? "border-purple-500/60 shadow-[0_0_16px_rgba(168,85,247,0.15)]" : "border-purple-500/20"}`}>
@@ -520,10 +533,10 @@ export default function AccountPage() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-sm text-[var(--text)]">{addr.label}</span>
+                        <span className="font-bold text-sm text-[var(--text)]">{labelText(addr.label)}</span>
                         {addr.is_default && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-medium">
-                            افتراضي
+                            {t("افتراضي", "Default")}
                           </span>
                         )}
                       </div>
@@ -535,7 +548,7 @@ export default function AccountPage() {
                           rel="noopener noreferrer"
                           className="text-xs text-purple-400 hover:text-purple-300 mt-1 inline-flex items-center gap-1"
                         >
-                          📍 عرض على الخريطة
+                          📍 {t("عرض على الخريطة", "View on map")}
                         </a>
                       )}
                     </div>
@@ -543,14 +556,14 @@ export default function AccountPage() {
                   <div className="flex flex-col gap-2 shrink-0">
                     {!addr.is_default && (
                       <button onClick={() => handleSetDefault(addr.id)} className="text-xs px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 transition-all">
-                        تعيين افتراضي
+                        {t("تعيين افتراضي", "Set default")}
                       </button>
                     )}
                     <button onClick={() => openEditAddr(addr)} className="text-xs px-3 py-1.5 rounded-xl bg-white/5 border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-white/10 transition-all">
-                      تعديل
+                      {t("تعديل", "Edit")}
                     </button>
                     <button onClick={() => handleDeleteAddr(addr.id)} className="text-xs px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all">
-                      حذف
+                      {t("حذف", "Delete")}
                     </button>
                   </div>
                 </div>
@@ -561,17 +574,17 @@ export default function AccountPage() {
             {showAddrModal && (
               <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowAddrModal(false); }}>
                 <div className="bg-[var(--surface)] border border-purple-500/30 rounded-3xl p-6 w-full max-w-md shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
-                  <h3 className="font-bold text-lg mb-5">{editingAddr ? "تعديل الموقع" : "إضافة موقع جديد"}</h3>
+                  <h3 className="font-bold text-lg mb-5">{editingAddr ? t("تعديل الموقع", "Edit location") : t("إضافة موقع جديد", "Add new location")}</h3>
 
                   <div className="space-y-4">
                     {/* Label */}
                     <div>
-                      <label className="text-[var(--muted)] text-xs mb-2 block">تسمية الموقع</label>
+                      <label className="text-[var(--muted)] text-xs mb-2 block">{t("تسمية الموقع", "Location label")}</label>
                       <div className="flex gap-2 flex-wrap">
                         {ADDRESS_LABELS.map((lbl) => (
                           <button key={lbl} type="button" onClick={() => setAddrForm(f => ({ ...f, label: lbl }))}
                             className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${addrForm.label === lbl ? "bg-purple-600 text-[var(--text)]" : "bg-white/5 border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)]"}`}>
-                            {lbl}
+                            {labelText(lbl)}
                           </button>
                         ))}
                       </div>
@@ -579,11 +592,11 @@ export default function AccountPage() {
 
                     {/* Address text */}
                     <div>
-                      <label className="text-[var(--muted)] text-xs mb-2 block">العنوان التفصيلي</label>
+                      <label className="text-[var(--muted)] text-xs mb-2 block">{t("العنوان التفصيلي", "Detailed address")}</label>
                       <textarea
                         value={addrForm.address_text}
                         onChange={(e) => setAddrForm(f => ({ ...f, address_text: e.target.value }))}
-                        placeholder="مثال: شارع الجمهورية، بنغازي، بجانب مسجد النور"
+                        placeholder={t("مثال: شارع الجمهورية، بنغازي، بجانب مسجد النور", "e.g. Al-Jumhuriya St, Benghazi, next to Al-Nour Mosque")}
                         rows={3}
                         className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all resize-none placeholder:text-[var(--muted-2)]"
                       />
@@ -592,11 +605,11 @@ export default function AccountPage() {
                     {/* GPS / Map */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <label className="text-[var(--muted)] text-xs">الموقع الجغرافي (اختياري)</label>
+                        <label className="text-[var(--muted)] text-xs">{t("الموقع الجغرافي (اختياري)", "GPS location (optional)")}</label>
                         <button type="button" onClick={() => setShowMap(!showMap)}
                           className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors">
                           <MapPin size={12} />
-                          {showMap ? "إخفاء الخريطة" : "اختيار من الخريطة"}
+                          {showMap ? t("إخفاء الخريطة", "Hide map") : t("اختيار من الخريطة", "Pick on map")}
                         </button>
                       </div>
 
@@ -619,7 +632,7 @@ export default function AccountPage() {
 
                       {addrForm.lat && addrForm.lng && (
                         <div className="flex gap-2 items-center text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded-xl px-3 py-2 mb-2">
-                          ✅ موقع محدد: {parseFloat(addrForm.lat).toFixed(4)}، {parseFloat(addrForm.lng).toFixed(4)}
+                          ✅ {t("موقع محدد:", "Location set:")} {parseFloat(addrForm.lat).toFixed(4)}، {parseFloat(addrForm.lng).toFixed(4)}
                         </div>
                       )}
                     </div>
@@ -627,18 +640,18 @@ export default function AccountPage() {
                     {/* Default */}
                     <label className="flex items-center gap-3 cursor-pointer">
                       <input type="checkbox" checked={addrForm.is_default} onChange={(e) => setAddrForm(f => ({ ...f, is_default: e.target.checked }))} className="w-4 h-4 rounded accent-purple-500" />
-                      <span className="text-sm text-[var(--muted)]">تعيين كعنوان افتراضي</span>
+                      <span className="text-sm text-[var(--muted)]">{t("تعيين كعنوان افتراضي", "Set as default address")}</span>
                     </label>
                   </div>
 
                   <div className="flex gap-3 mt-5">
                     <button onClick={handleSaveAddr} disabled={addrSaving || !addrForm.address_text.trim()}
                       className="flex-1 py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:opacity-90 transition-opacity disabled:opacity-50 text-sm">
-                      {addrSaving ? "⏳ جاري الحفظ..." : "حفظ الموقع"}
+                      {addrSaving ? t("⏳ جاري الحفظ...", "⏳ Saving...") : t("حفظ الموقع", "Save location")}
                     </button>
                     <button onClick={() => setShowAddrModal(false)}
                       className="px-5 py-3 rounded-2xl font-medium text-[var(--muted)] bg-white/5 border border-[var(--border)] hover:bg-white/10 transition-all text-sm">
-                      إلغاء
+                      {t("إلغاء", "Cancel")}
                     </button>
                   </div>
                 </div>
@@ -652,17 +665,17 @@ export default function AccountPage() {
           <div className="space-y-4">
             {/* تغيير كلمة المرور */}
             <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 md:p-6">
-              <h2 className="font-bold text-lg mb-1">🔒 تغيير كلمة المرور</h2>
-              <p className="text-[var(--muted-2)] text-sm mb-5">يجب أن تكون 6 أحرف على الأقل</p>
+              <h2 className="font-bold text-lg mb-1">🔒 {t("تغيير كلمة المرور", "Change password")}</h2>
+              <p className="text-[var(--muted-2)] text-sm mb-5">{t("يجب أن تكون 6 أحرف على الأقل", "Must be at least 6 characters")}</p>
               <div className="space-y-3">
                 <div>
-                  <label className="text-[var(--muted-2)] text-xs mb-1.5 block">كلمة المرور الجديدة</label>
+                  <label className="text-[var(--muted-2)] text-xs mb-1.5 block">{t("كلمة المرور الجديدة", "New password")}</label>
                   <input type="password" value={pwData.next} onChange={e => setPwData(d => ({ ...d, next: e.target.value }))}
                     placeholder="••••••••"
                     className="w-full px-4 py-2.5 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all" />
                 </div>
                 <div>
-                  <label className="text-[var(--muted-2)] text-xs mb-1.5 block">تأكيد كلمة المرور</label>
+                  <label className="text-[var(--muted-2)] text-xs mb-1.5 block">{t("تأكيد كلمة المرور", "Confirm password")}</label>
                   <input type="password" value={pwData.confirm} onChange={e => setPwData(d => ({ ...d, confirm: e.target.value }))}
                     placeholder="••••••••"
                     className="w-full px-4 py-2.5 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all" />
@@ -671,19 +684,19 @@ export default function AccountPage() {
               {pwError && <p className="text-red-400 text-sm mt-3">⚠️ {pwError}</p>}
               <button onClick={handlePwChange} disabled={pwSaving}
                 className="mt-4 w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-60">
-                {pwSaving ? "⏳ جاري التغيير..." : pwDone ? "✅ تم تغيير كلمة المرور" : "تغيير كلمة المرور"}
+                {pwSaving ? t("⏳ جاري التغيير...", "⏳ Changing...") : pwDone ? t("✅ تم تغيير كلمة المرور", "✅ Password changed") : t("تغيير كلمة المرور", "Change password")}
               </button>
             </div>
 
             {/* تعديل بيانات الحساب */}
             <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 md:p-6">
-              <h2 className="font-bold text-lg mb-1">✏️ بيانات الحساب</h2>
-              <p className="text-[var(--muted-2)] text-sm mb-5">تعديل الاسم ورقم الهاتف والعنوان</p>
+              <h2 className="font-bold text-lg mb-1">✏️ {t("بيانات الحساب", "Account details")}</h2>
+              <p className="text-[var(--muted-2)] text-sm mb-5">{t("تعديل الاسم ورقم الهاتف والعنوان", "Edit your name, phone and address")}</p>
               <div className="space-y-3">
                 {[
-                  { label: "الاسم الكامل", key: "full_name", type: "text" },
-                  { label: "رقم الهاتف",   key: "phone",     type: "tel"  },
-                  { label: "العنوان",       key: "address",   type: "text" },
+                  { label: t("الاسم الكامل", "Full name"), key: "full_name", type: "text" },
+                  { label: t("رقم الهاتف", "Phone number"), key: "phone",   type: "tel"  },
+                  { label: t("العنوان", "Address"),         key: "address",  type: "text" },
                 ].map(({ label, key, type }) => (
                   <div key={key}>
                     <label className="text-[var(--muted-2)] text-xs mb-1.5 block">{label}</label>
@@ -695,14 +708,14 @@ export default function AccountPage() {
               </div>
               <button onClick={handleSave} disabled={saving}
                 className="mt-4 w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-60">
-                {saving ? "⏳ جاري الحفظ..." : "حفظ التغييرات"}
+                {saving ? t("⏳ جاري الحفظ...", "⏳ Saving...") : t("حفظ التغييرات", "Save changes")}
               </button>
             </div>
 
             {/* الصورة الشخصية */}
             <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 md:p-6">
-              <h2 className="font-bold text-lg mb-1">📸 الصورة الشخصية</h2>
-              <p className="text-[var(--muted-2)] text-sm mb-5">اضغط على الصورة أو زر التغيير لرفع صورة جديدة</p>
+              <h2 className="font-bold text-lg mb-1">📸 {t("الصورة الشخصية", "Profile picture")}</h2>
+              <p className="text-[var(--muted-2)] text-sm mb-5">{t("اضغط على الصورة أو زر التغيير لرفع صورة جديدة", "Click the photo or the change button to upload a new picture")}</p>
               <div className="flex items-center gap-5">
                 <div className="relative group cursor-pointer" onClick={() => !uploading && fileRef.current?.click()}>
                   {avatarUrl ? (
@@ -718,7 +731,7 @@ export default function AccountPage() {
                 </div>
                 <button onClick={() => !uploading && fileRef.current?.click()}
                   className="px-5 py-2.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400 hover:bg-purple-500/25 text-sm font-medium transition-all">
-                  {uploading ? "⏳ جاري الرفع..." : "تغيير الصورة"}
+                  {uploading ? t("⏳ جاري الرفع...", "⏳ Uploading...") : t("تغيير الصورة", "Change picture")}
                 </button>
               </div>
             </div>

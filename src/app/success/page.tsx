@@ -3,12 +3,15 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle, Package, ArrowLeft, ShoppingCart } from "lucide-react";
+import { useLang } from "@/hooks/useLang";
+import LangToggle from "@/components/LangToggle";
 
 function SuccessContent() {
   const params  = useSearchParams();
   const orderId = params.get("orderId");
   const via     = params.get("via");
   const paid    = params.get("paid");
+  const { t, rtl } = useLang();
 
   const [dots, setDots] = useState(".");
   useEffect(() => {
@@ -28,7 +31,8 @@ function SuccessContent() {
   }, [via, paid, orderId]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col items-center justify-center p-6" dir="rtl">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col items-center justify-center p-6" dir={rtl ? "rtl" : "ltr"}>
+      <div className="absolute top-5 end-5"><LangToggle /></div>
       <div className="fixed top-[-150px] right-[-150px] w-[500px] h-[500px] bg-green-600/10 rounded-full blur-[140px] pointer-events-none" />
 
       <div className="max-w-md w-full space-y-6 text-center relative z-10">
@@ -40,35 +44,35 @@ function SuccessContent() {
 
         {/* Title */}
         <div>
-          <h1 className="text-3xl font-black text-[var(--text)] mb-2">تم الطلب بنجاح! 🎉</h1>
+          <h1 className="text-3xl font-black text-[var(--text)] mb-2">{t("تم الطلب بنجاح! 🎉", "Order placed successfully! 🎉")}</h1>
           <p className="text-[var(--muted)] text-sm leading-relaxed">
-            شكراً لك! تم استلام طلبك وسنتواصل معك قريباً لتأكيد التسليم.
+            {t("شكراً لك! تم استلام طلبك وسنتواصل معك قريباً لتأكيد التسليم.", "Thank you! We've received your order and will contact you soon to confirm delivery.")}
           </p>
         </div>
 
         {/* Order ID */}
         {orderId && (
           <div className="bg-[var(--surface)] border border-green-500/20 rounded-2xl p-5">
-            <p className="text-[var(--muted-2)] text-xs mb-1">رقم الطلب</p>
+            <p className="text-[var(--muted-2)] text-xs mb-1">{t("رقم الطلب", "Order number")}</p>
             <p className="text-[var(--text)] font-black text-lg tracking-widest">
               #{orderId.slice(0, 12).toUpperCase()}
             </p>
             {via && (
               <p className="text-[var(--muted-2)] text-xs mt-2">
-                طريقة الدفع: {via === "cash" ? "الدفع عند الاستلام" : via === "dpay" ? "بوابة DPay" : via === "moamalat" ? "معاملات" : via === "yusor" ? "يسر باي" : via === "edfali" ? "ادفع لي" : via}
+                {t("طريقة الدفع:", "Payment method:")} {via === "cash" ? t("الدفع عند الاستلام", "Cash on delivery") : via === "dpay" ? t("بوابة DPay", "DPay gateway") : via === "moamalat" ? t("معاملات", "Moamalat") : via === "yusor" ? t("يسر باي", "Yusor Pay") : via === "edfali" ? t("ادفع لي", "Edfali") : via}
               </p>
             )}
           </div>
         )}
 
         {/* Steps */}
-        <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 text-right">
-          <h3 className="font-bold text-sm text-purple-300 mb-4">ماذا يحدث بعد ذلك؟</h3>
+        <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 text-start">
+          <h3 className="font-bold text-sm text-purple-300 mb-4">{t("ماذا يحدث بعد ذلك؟", "What happens next?")}</h3>
           <div className="space-y-3">
             {[
-              { step: "1", text: "سيتصل بك فريقنا لتأكيد تفاصيل الطلب", done: true },
-              { step: "2", text: "سيتم تجهيز الطلب وشحنه إليك", done: false },
-              { step: "3", text: "يمكنك تتبع حالة طلبك في أي وقت", done: false },
+              { step: "1", text: t("سيتصل بك فريقنا لتأكيد تفاصيل الطلب", "Our team will call you to confirm your order details"), done: true },
+              { step: "2", text: t("سيتم تجهيز الطلب وشحنه إليك", "Your order will be prepared and shipped to you"), done: false },
+              { step: "3", text: t("يمكنك تتبع حالة طلبك في أي وقت", "You can track your order status anytime"), done: false },
             ].map(({ step, text, done }) => (
               <div key={step} className="flex items-start gap-3">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5 ${done ? "bg-green-500 text-[var(--text)]" : "bg-purple-500/20 border border-purple-500/30 text-purple-400"}`}>
@@ -86,19 +90,19 @@ function SuccessContent() {
             href="/orders"
             className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:shadow-[0_0_24px_rgba(168,85,247,0.5)] transition-all flex items-center justify-center gap-2"
           >
-            <Package size={18} /> تتبع طلبك
+            <Package size={18} /> {t("تتبع طلبك", "Track your order")}
           </a>
           <a
             href="/products"
             className="w-full py-3 rounded-2xl font-medium text-[var(--muted)] hover:text-[var(--text)] bg-white/5 hover:bg-white/10 border border-[var(--border)] flex items-center justify-center gap-2 transition-all text-sm"
           >
-            <ShoppingCart size={16} /> مواصلة التسوق
+            <ShoppingCart size={16} /> {t("مواصلة التسوق", "Continue shopping")}
           </a>
           <a
             href="/"
             className="flex items-center justify-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors"
           >
-            <ArrowLeft size={14} /> العودة للرئيسية
+            <ArrowLeft size={14} /> {t("العودة للرئيسية", "Back to home")}
           </a>
         </div>
       </div>
