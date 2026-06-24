@@ -29,10 +29,10 @@ type UserAddress = {
 const ADMIN_EMAIL = "mo3iemohamed@gmail.com";
 
 const PAYMENT_METHODS = [
-  { id: "cash",     name: "الدفع عند الاستلام",        icon: "💵", color: "#16a34a"                  },
-  { id: "yusor",    name: "يسر باي (بطاقة مصرفية)",   icon: "💳", color: "#0ea5e9", needsCard: true, gated: true },
-  { id: "edfali",   name: "ادفع لي",                   icon: "🏧", color: "#7c3aed", needsPhone: true },
-  { id: "moamalat", name: "بطاقة مصرفية (معاملات)", icon: "🏦", color: "#1e40af", lightbox: true },
+  { id: "cash",     name: "الدفع عند الاستلام",        nameEn: "Cash on delivery",        icon: "💵", color: "#16a34a"                  },
+  { id: "yusor",    name: "يسر باي (بطاقة مصرفية)",   nameEn: "Yusor Pay (bank card)",   icon: "💳", color: "#0ea5e9", needsCard: true, gated: true },
+  { id: "edfali",   name: "ادفع لي",                   nameEn: "Edfali",                  icon: "🏧", color: "#7c3aed", needsPhone: true },
+  { id: "moamalat", name: "بطاقة مصرفية (معاملات)", nameEn: "Bank card (Moamalat)",    icon: "🏦", color: "#1e40af", lightbox: true },
 ];
 
 type CheckoutStep = null | "address" | "payment" | "processing";
@@ -95,8 +95,8 @@ export default function CartPage() {
   }
 
   async function submitAddress() {
-    if (!chosenAddress.trim() && selectedAddr !== "__new") { setPayError("يرجى اختيار أو إدخال عنوان"); return; }
-    if (selectedAddr === "__new" && !newAddrText.trim()) { setPayError("يرجى إدخال العنوان"); return; }
+    if (!chosenAddress.trim() && selectedAddr !== "__new") { setPayError(t("يرجى اختيار أو إدخال عنوان", "Please select or enter an address")); return; }
+    if (selectedAddr === "__new" && !newAddrText.trim()) { setPayError(t("يرجى إدخال العنوان", "Please enter an address")); return; }
     setPayError("");
     setStep("payment");
   }
@@ -114,7 +114,7 @@ export default function CartPage() {
       }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "فشل إنشاء الطلب");
+    if (!res.ok) throw new Error(data.error || t("فشل إنشاء الطلب", "Failed to create the order"));
     return data.id as string;
   }
 
@@ -139,7 +139,7 @@ export default function CartPage() {
 
       const res = await fetch("/api/payment/moamalat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId: oid, amountLYD: total }) });
       const p = await res.json();
-      if (!res.ok || !p.success) { setPayError(p.error || "فشل إعداد الدفع"); setOrdering(false); return; }
+      if (!res.ok || !p.success) { setPayError(p.error || t("فشل إعداد الدفع", "Failed to set up payment")); setOrdering(false); return; }
 
       clearCart();
 
@@ -178,7 +178,7 @@ export default function CartPage() {
         body: JSON.stringify({ customerPhone: edfaliPhone, amount: total }),
       });
       const data = await res.json();
-      if (!res.ok) { setPayError(data.error || "فشل إرسال رمز التحقق"); setEdfaliStep("phone"); return; }
+      if (!res.ok) { setPayError(data.error || t("فشل إرسال رمز التحقق", "Failed to send the verification code")); setEdfaliStep("phone"); return; }
       setEdfaliSession(data.sessionId);
       setEdfaliStep("otp");
     } catch (err: any) {
@@ -196,7 +196,7 @@ export default function CartPage() {
         body: JSON.stringify({ session_id: edfaliSession, otp: edfaliOtp, order_id: orderId }),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) { setPayError(data.error || "رمز التحقق غير صحيح"); setOrdering(false); return; }
+      if (!res.ok || !data.success) { setPayError(data.error || t("رمز التحقق غير صحيح", "Invalid verification code")); setOrdering(false); return; }
       clearCart();
       router.push(`/success?orderId=${orderId}&via=edfali`);
     } catch (err: any) {
@@ -205,7 +205,7 @@ export default function CartPage() {
   }
 
   async function startYusor() {
-    if (yusorCard.replace(/\D/g, "").length < 9) { setPayError("رقم البطاقة يجب أن يكون 9 أرقام على الأقل"); return; }
+    if (yusorCard.replace(/\D/g, "").length < 9) { setPayError(t("رقم البطاقة يجب أن يكون 9 أرقام على الأقل", "Card number must be at least 9 digits")); return; }
     setYusorStep("sending");
     setPayError("");
     try {
@@ -218,7 +218,7 @@ export default function CartPage() {
         body: JSON.stringify({ order_id: oid, identityCard: yusorCard, amount: total }),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) { setPayError(data.error || "فشل بدء عملية الدفع"); setYusorStep("card"); return; }
+      if (!res.ok || !data.success) { setPayError(data.error || t("فشل بدء عملية الدفع", "Failed to start the payment")); setYusorStep("card"); return; }
       setYusorStep("otp");
     } catch (err: any) {
       setPayError(err.message); setYusorStep("card");
@@ -235,7 +235,7 @@ export default function CartPage() {
         body: JSON.stringify({ order_id: orderId, otp: yusorOtp }),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) { setPayError(data.error || "رمز التحقق غير صحيح"); setOrdering(false); return; }
+      if (!res.ok || !data.success) { setPayError(data.error || t("رمز التحقق غير صحيح", "Invalid verification code")); setOrdering(false); return; }
       clearCart();
       router.push(`/success?orderId=${orderId}&via=yusor`);
     } catch (err: any) {
@@ -407,7 +407,7 @@ export default function CartPage() {
       {step && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4"
           onClick={(e) => { if (e.target === e.currentTarget && !ordering) closeModal(); }}>
-          <div className="bg-white rounded-3xl md:rounded-3xl rounded-b-none w-full md:w-[400px] max-h-[92vh] overflow-y-auto shadow-[0_24px_60px_rgba(0,0,0,0.35)]" dir="rtl"
+          <div className="bg-white rounded-3xl md:rounded-3xl rounded-b-none w-full md:w-[400px] max-h-[92vh] overflow-y-auto shadow-[0_24px_60px_rgba(0,0,0,0.35)]" dir={rtl ? "rtl" : "ltr"}
             style={{ animation: "slideUp 0.25s cubic-bezier(0.22,1,0.36,1)" }}>
             <style>{`@keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
 
@@ -415,7 +415,7 @@ export default function CartPage() {
             {step === "address" && (
               <div className="p-6">
                 <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-lg font-black text-gray-900">عنوان التسليم</h3>
+                  <h3 className="text-lg font-black text-gray-900">{t("عنوان التسليم", "Delivery address")}</h3>
                   <button onClick={closeModal} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[var(--muted-2)] hover:bg-gray-200 transition-colors">
                     <X size={16} />
                   </button>
@@ -426,20 +426,20 @@ export default function CartPage() {
                   <div className="space-y-2 mb-4">
                     {addresses.map((addr) => (
                       <button key={addr.id} onClick={() => setSelectedAddr(addr.id)}
-                        className={`w-full flex items-start gap-3 p-3.5 rounded-2xl border-2 text-right transition-all ${selectedAddr === addr.id ? "border-purple-500 bg-purple-50" : "border-gray-100 bg-gray-50 hover:border-purple-300"}`}>
+                        className={`w-full flex items-start gap-3 p-3.5 rounded-2xl border-2 text-start transition-all ${selectedAddr === addr.id ? "border-purple-500 bg-purple-50" : "border-gray-100 bg-gray-50 hover:border-purple-300"}`}>
                         <MapPin size={18} className={`shrink-0 mt-0.5 ${selectedAddr === addr.id ? "text-purple-600" : "text-[var(--muted)]"}`} />
                         <div className="flex-1 min-w-0">
                           <p className={`font-bold text-sm ${selectedAddr === addr.id ? "text-purple-700" : "text-gray-800"}`}>
-                            {addr.label} {addr.is_default && <span className="text-xs font-medium text-purple-500">(افتراضي)</span>}
+                            {addr.label} {addr.is_default && <span className="text-xs font-medium text-purple-500">({t("افتراضي", "default")})</span>}
                           </p>
                           <p className="text-[var(--muted-2)] text-xs mt-0.5 leading-relaxed">{addr.address_text}</p>
                         </div>
                       </button>
                     ))}
                     <button onClick={() => setSelectedAddr("__new")}
-                      className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 text-right transition-all ${selectedAddr === "__new" ? "border-purple-500 bg-purple-50" : "border-dashed border-gray-200 hover:border-purple-300"}`}>
+                      className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 text-start transition-all ${selectedAddr === "__new" ? "border-purple-500 bg-purple-50" : "border-dashed border-gray-200 hover:border-purple-300"}`}>
                       <span className="text-2xl">+</span>
-                      <span className={`text-sm font-medium ${selectedAddr === "__new" ? "text-purple-700" : "text-[var(--muted-2)]"}`}>إضافة عنوان جديد</span>
+                      <span className={`text-sm font-medium ${selectedAddr === "__new" ? "text-purple-700" : "text-[var(--muted-2)]"}`}>{t("إضافة عنوان جديد", "Add a new address")}</span>
                     </button>
                   </div>
                 )}
@@ -450,7 +450,7 @@ export default function CartPage() {
                     <textarea
                       value={newAddrText}
                       onChange={e => setNewAddrText(e.target.value)}
-                      placeholder="أدخل عنوان التسليم التفصيلي..."
+                      placeholder={t("أدخل عنوان التسليم التفصيلي...", "Enter your detailed delivery address...")}
                       rows={3}
                       className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-sm focus:outline-none focus:border-purple-400 transition-all resize-none placeholder:text-[var(--muted)]"
                     />
@@ -460,7 +460,7 @@ export default function CartPage() {
                       className="w-full py-2.5 rounded-xl border border-dashed border-purple-300 text-purple-600 text-sm font-medium flex items-center justify-center gap-2 hover:bg-purple-50 transition-colors"
                     >
                       <MapPin size={15} />
-                      {showCartMap ? "إخفاء الخريطة" : "تحديد الموقع على الخريطة (اختياري)"}
+                      {showCartMap ? t("إخفاء الخريطة", "Hide map") : t("تحديد الموقع على الخريطة (اختياري)", "Pick location on map (optional)")}
                     </button>
                     {showCartMap && (
                       <div>
@@ -475,7 +475,7 @@ export default function CartPage() {
                         />
                         {newAddrLat && (
                           <p className="text-xs text-green-600 bg-green-50 rounded-xl px-3 py-2 mt-2">
-                            ✅ تم تحديد الموقع: {newAddrLat.toFixed(4)}، {newAddrLng?.toFixed(4)}
+                            ✅ {t("تم تحديد الموقع:", "Location set:")} {newAddrLat.toFixed(4)}، {newAddrLng?.toFixed(4)}
                           </p>
                         )}
                       </div>
@@ -487,7 +487,7 @@ export default function CartPage() {
 
                 <button onClick={submitAddress}
                   className="mt-5 w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:opacity-90 transition-opacity text-sm">
-                  التالي — اختيار طريقة الدفع →
+                  {t("التالي — اختيار طريقة الدفع", "Next — choose payment method")}
                 </button>
               </div>
             )}
@@ -496,20 +496,20 @@ export default function CartPage() {
             {step === "payment" && !edfaliStep && !yusorStep && (
               <div className="p-6">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-black text-gray-900">اختر طريقة الدفع</h3>
+                  <h3 className="text-lg font-black text-gray-900">{t("اختر طريقة الدفع", "Choose payment method")}</h3>
                   <button onClick={closeModal} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[var(--muted-2)] hover:bg-gray-200 transition-colors">
                     <X size={16} />
                   </button>
                 </div>
-                <p className="text-sm text-[var(--muted)] mb-5">المبلغ الإجمالي: <strong className="text-gray-900">{total} د.ل</strong></p>
+                <p className="text-sm text-[var(--muted)] mb-5">{t("المبلغ الإجمالي:", "Total amount:")} <strong className="text-gray-900">{total} {t("د.ل", "LYD")}</strong></p>
 
                 <div className="space-y-2 mb-4">
                   {visibleMethods.map((pm) => (
                     <button key={pm.id} onClick={() => { setMethod(pm.id); setCardNumber(""); setPayError(""); }}
-                      className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-right transition-all ${method === pm.id ? "border-purple-500 bg-purple-50" : "border-gray-100 bg-gray-50 hover:border-purple-200"}`}>
+                      className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-start transition-all ${method === pm.id ? "border-purple-500 bg-purple-50" : "border-gray-100 bg-gray-50 hover:border-purple-200"}`}>
                       <span className="text-2xl w-9 text-center shrink-0">{pm.icon}</span>
-                      <span className={`font-bold text-sm ${method === pm.id ? "text-purple-800" : "text-gray-800"}`}>{pm.name}</span>
-                      {method === pm.id && <span className="mr-auto text-purple-500">✓</span>}
+                      <span className={`font-bold text-sm ${method === pm.id ? "text-purple-800" : "text-gray-800"}`}>{rtl ? pm.name : pm.nameEn}</span>
+                      {method === pm.id && <span className="ms-auto text-purple-500">✓</span>}
                     </button>
                   ))}
                 </div>
@@ -518,7 +518,7 @@ export default function CartPage() {
 
                 <button
                   onClick={() => {
-                    if (!method) { setPayError("يرجى اختيار طريقة الدفع"); return; }
+                    if (!method) { setPayError(t("يرجى اختيار طريقة الدفع", "Please choose a payment method")); return; }
                     if (method === "cash") { setStep("processing"); payWithCash(); return; }
                     if (method === "yusor") { setYusorStep("card"); return; }
                     if (method === "edfali") { setEdfaliStep("phone"); return; }
@@ -527,11 +527,11 @@ export default function CartPage() {
                   disabled={ordering || !method}
                   className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:opacity-90 transition-opacity disabled:opacity-50 text-sm"
                 >
-                  {ordering ? <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "ادفع الآن →"}
+                  {ordering ? <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : t("ادفع الآن", "Pay now")}
                 </button>
 
                 <button onClick={() => { setStep("address"); setMethod(null); }} className="w-full mt-3 py-2.5 text-sm text-[var(--muted)] hover:text-gray-700 transition-colors">
-                  ← رجوع لاختيار العنوان
+                  {t("رجوع لاختيار العنوان", "Back to address")}
                 </button>
               </div>
             )}
@@ -540,8 +540,8 @@ export default function CartPage() {
             {step === "payment" && edfaliStep === "phone" && (
               <div className="p-6 text-center">
                 <div className="text-4xl mb-4">🏧</div>
-                <h3 className="text-lg font-black text-gray-900 mb-1">ادفع لي</h3>
-                <p className="text-[var(--muted-2)] text-sm mb-5">أدخل رقم هاتفك المرتبط بحساب <strong>ادفع لي</strong></p>
+                <h3 className="text-lg font-black text-gray-900 mb-1">{t("ادفع لي", "Edfali")}</h3>
+                <p className="text-[var(--muted-2)] text-sm mb-5">{t("أدخل رقم هاتفك المرتبط بحساب «ادفع لي»", "Enter the phone number linked to your Edfali account")}</p>
                 <input
                   type="tel"
                   placeholder="9xxxxxxxx"
@@ -551,14 +551,14 @@ export default function CartPage() {
                   style={{ direction: "ltr" }}
                   autoFocus
                 />
-                <p className="text-[var(--muted)] text-xs mb-3 text-center">بدون الصفر — مثال: 918621511</p>
+                <p className="text-[var(--muted)] text-xs mb-3 text-center">{t("بدون الصفر — مثال: 918621511", "Without the leading zero — e.g. 918621511")}</p>
                 {payError && <p className="text-red-500 text-sm mb-3">⚠️ {payError}</p>}
                 <button onClick={startEdfali} disabled={edfaliPhone.length < 9}
                   className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 disabled:opacity-50 mb-3 text-sm">
-                  إرسال رمز التحقق →
+                  {t("إرسال رمز التحقق", "Send verification code")}
                 </button>
                 <button onClick={() => setEdfaliStep(null)} className="w-full py-2.5 text-sm text-[var(--muted)] hover:text-gray-700 transition-colors">
-                  ← رجوع
+                  {t("رجوع", "Back")}
                 </button>
               </div>
             )}
@@ -567,7 +567,7 @@ export default function CartPage() {
             {step === "payment" && edfaliStep === "sending" && (
               <div className="p-10 text-center">
                 <div className="w-14 h-14 border-4 border-purple-100 border-t-purple-600 rounded-full animate-spin mx-auto mb-5" />
-                <p className="text-[var(--muted-2)] text-sm">⏳ جاري إرسال رمز التحقق...</p>
+                <p className="text-[var(--muted-2)] text-sm">⏳ {t("جاري إرسال رمز التحقق...", "Sending verification code...")}</p>
               </div>
             )}
 
@@ -575,8 +575,8 @@ export default function CartPage() {
             {step === "payment" && edfaliStep === "otp" && (
               <div className="p-6 text-center">
                 <div className="text-4xl mb-4">🔐</div>
-                <h3 className="text-lg font-black text-gray-900 mb-1">رمز التحقق</h3>
-                <p className="text-[var(--muted-2)] text-sm mb-5">أُرسل رمز مكوّن من <strong>4 أرقام</strong> إلى هاتفك <strong className="text-purple-600">{edfaliPhone}</strong></p>
+                <h3 className="text-lg font-black text-gray-900 mb-1">{t("رمز التحقق", "Verification code")}</h3>
+                <p className="text-[var(--muted-2)] text-sm mb-5">{t("أُرسل رمز مكوّن من 4 أرقام إلى هاتفك", "A 4-digit code was sent to your phone")} <strong className="text-purple-600">{edfaliPhone}</strong></p>
                 <input
                   type="number"
                   maxLength={4}
@@ -590,10 +590,10 @@ export default function CartPage() {
                 {payError && <p className="text-red-500 text-sm mb-3">⚠️ {payError}</p>}
                 <button onClick={verifyEdfali} disabled={ordering || edfaliOtp.length < 4}
                   className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 disabled:opacity-50 mb-3 text-sm">
-                  {ordering ? <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "تأكيد الدفع ✓"}
+                  {ordering ? <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : t("تأكيد الدفع ✓", "Confirm payment ✓")}
                 </button>
                 <button onClick={() => { setEdfaliStep(null); setEdfaliOtp(""); setOrdering(false); }} className="w-full py-2.5 text-sm text-[var(--muted)] hover:text-gray-700 transition-colors">
-                  ← رجوع
+                  {t("رجوع", "Back")}
                 </button>
               </div>
             )}
@@ -602,26 +602,26 @@ export default function CartPage() {
             {step === "payment" && yusorStep === "card" && (
               <div className="p-6 text-center">
                 <div className="text-4xl mb-4">💳</div>
-                <h3 className="text-lg font-black text-gray-900 mb-1">يسر باي</h3>
-                <p className="text-[var(--muted-2)] text-sm mb-5">أدخل رقم بطاقتك المصرفية لإتمام الدفع</p>
+                <h3 className="text-lg font-black text-gray-900 mb-1">{t("يسر باي", "Yusor Pay")}</h3>
+                <p className="text-[var(--muted-2)] text-sm mb-5">{t("أدخل رقم بطاقتك المصرفية لإتمام الدفع", "Enter your bank card number to complete payment")}</p>
                 <input
                   type="tel"
                   inputMode="numeric"
-                  placeholder="رقم البطاقة"
+                  placeholder={t("رقم البطاقة", "Card number")}
                   value={yusorCard}
                   onChange={e => setYusorCard(e.target.value.replace(/\D/g, "").slice(0, 10))}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 text-gray-900 text-xl text-center font-bold tracking-widest focus:outline-none focus:border-sky-400 transition-all mb-3"
                   style={{ direction: "ltr" }}
                   autoFocus
                 />
-                <p className="text-[var(--muted)] text-xs mb-3 text-center">9 أرقام (رقم البطاقة + البادئة) — أو 10 أرقام لمصرف التجارة والتنمية</p>
+                <p className="text-[var(--muted)] text-xs mb-3 text-center">{t("9 أرقام (رقم البطاقة + البادئة) — أو 10 أرقام لمصرف التجارة والتنمية", "9 digits (card number + prefix) — or 10 digits for Bank of Commerce & Development")}</p>
                 {payError && <p className="text-red-500 text-sm mb-3">⚠️ {payError}</p>}
                 <button onClick={startYusor} disabled={yusorCard.replace(/\D/g, "").length < 9}
                   className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-sky-600 to-blue-500 disabled:opacity-50 mb-3 text-sm">
-                  إرسال رمز التحقق →
+                  {t("إرسال رمز التحقق", "Send verification code")}
                 </button>
                 <button onClick={() => { setYusorStep(null); setYusorCard(""); setPayError(""); }} className="w-full py-2.5 text-sm text-[var(--muted)] hover:text-gray-700 transition-colors">
-                  ← رجوع
+                  {t("رجوع", "Back")}
                 </button>
               </div>
             )}
@@ -630,7 +630,7 @@ export default function CartPage() {
             {step === "payment" && yusorStep === "sending" && (
               <div className="p-10 text-center">
                 <div className="w-14 h-14 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin mx-auto mb-5" />
-                <p className="text-[var(--muted-2)] text-sm">⏳ جاري إرسال رمز التحقق...</p>
+                <p className="text-[var(--muted-2)] text-sm">⏳ {t("جاري إرسال رمز التحقق...", "Sending verification code...")}</p>
               </div>
             )}
 
@@ -638,12 +638,12 @@ export default function CartPage() {
             {step === "payment" && yusorStep === "otp" && (
               <div className="p-6 text-center">
                 <div className="text-4xl mb-4">🔐</div>
-                <h3 className="text-lg font-black text-gray-900 mb-1">رمز التحقق</h3>
-                <p className="text-[var(--muted-2)] text-sm mb-5">أُرسل رمز التحقق إلى هاتفك المرتبط بالبطاقة المصرفية</p>
+                <h3 className="text-lg font-black text-gray-900 mb-1">{t("رمز التحقق", "Verification code")}</h3>
+                <p className="text-[var(--muted-2)] text-sm mb-5">{t("أُرسل رمز التحقق إلى هاتفك المرتبط بالبطاقة المصرفية", "A verification code was sent to the phone linked to your bank card")}</p>
                 <input
                   type="tel"
                   inputMode="numeric"
-                  placeholder="رمز التحقق"
+                  placeholder={t("رمز التحقق", "Verification code")}
                   value={yusorOtp}
                   onChange={e => setYusorOtp(e.target.value.replace(/\D/g, "").slice(0, 8))}
                   className="w-full px-4 py-4 rounded-xl border border-gray-200 text-gray-900 text-3xl text-center font-black tracking-widest focus:outline-none focus:border-sky-400 transition-all mb-4"
@@ -653,10 +653,10 @@ export default function CartPage() {
                 {payError && <p className="text-red-500 text-sm mb-3">⚠️ {payError}</p>}
                 <button onClick={verifyYusor} disabled={ordering || yusorOtp.length < 4}
                   className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-sky-600 to-blue-500 disabled:opacity-50 mb-3 text-sm">
-                  {ordering ? <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "تأكيد الدفع ✓"}
+                  {ordering ? <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : t("تأكيد الدفع ✓", "Confirm payment ✓")}
                 </button>
                 <button onClick={() => { setYusorStep("card"); setYusorOtp(""); setOrdering(false); }} className="w-full py-2.5 text-sm text-[var(--muted)] hover:text-gray-700 transition-colors">
-                  ← رجوع
+                  {t("رجوع", "Back")}
                 </button>
               </div>
             )}
@@ -665,8 +665,8 @@ export default function CartPage() {
             {step === "processing" && (
               <div className="p-10 text-center">
                 <div className="w-14 h-14 border-4 border-purple-100 border-t-purple-600 rounded-full animate-spin mx-auto mb-5" />
-                <p className="text-gray-700 font-medium mb-1">جاري معالجة الدفع...</p>
-                <p className="text-[var(--muted)] text-sm">لا تغلق هذه النافذة</p>
+                <p className="text-gray-700 font-medium mb-1">{t("جاري معالجة الدفع...", "Processing payment...")}</p>
+                <p className="text-[var(--muted)] text-sm">{t("لا تغلق هذه النافذة", "Don't close this window")}</p>
               </div>
             )}
           </div>
