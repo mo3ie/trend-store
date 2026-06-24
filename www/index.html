@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>ترند</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #0b0f1a; color: #e6eaf2;
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; }
+    .wrap { height: 100%; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 16px; padding: 24px; text-align: center; }
+    .logo { font-size: 40px; font-weight: 900; letter-spacing: .15em;
+      background: linear-gradient(90deg,#a78bfa,#60a5fa); -webkit-background-clip: text;
+      background-clip: text; color: transparent; }
+    .msg { color: #94a3b8; font-size: 15px; max-width: 320px; line-height: 1.9; }
+    button { margin-top: 8px; padding: 12px 28px; border: 0; border-radius: 14px;
+      font-size: 15px; font-weight: 700; color: #fff; cursor: pointer;
+      background: linear-gradient(90deg,#7c3aed,#3b82f6); }
+    .spin { width: 34px; height: 34px; border: 3px solid rgba(168,85,247,.25);
+      border-top-color: #a78bfa; border-radius: 50%; animation: s 1s linear infinite; }
+    @keyframes s { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo">TREND</div>
+    <div class="spin"></div>
+    <div class="msg">جارٍ الاتصال بمتجر ترند… تأكد من اتصالك بالإنترنت.</div>
+    <button onclick="location.href='https://trendstore-ly.com'">إعادة المحاولة</button>
+  </div>
+</body>
+</html>
