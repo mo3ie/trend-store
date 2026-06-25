@@ -99,6 +99,38 @@ export async function getUserPages(userToken: string): Promise<MetaPage[]> {
   return data.data;
 }
 
+// ── Page posts (pages_read_engagement) ────────────────────────────────────────
+
+export interface PagePost {
+  id:           string; // "{pageId}_{postId}"
+  postId:       string; // numeric post id only
+  message:      string;
+  createdTime:  string;
+  picture?:     string;
+  permalinkUrl?: string;
+}
+
+// Lists a Page's recent published posts using the stored PAGE access token.
+// This read demonstrates the `pages_read_engagement` permission end-to-end.
+export async function getPagePosts(pageToken: string, limit = 15): Promise<PagePost[]> {
+  const data = await graph<{ data: Array<{
+    id: string; message?: string; created_time: string; full_picture?: string; permalink_url?: string;
+  }> }>(
+    `me/published_posts?fields=id,message,created_time,full_picture,permalink_url&limit=${limit}`,
+    "GET",
+    undefined,
+    pageToken
+  );
+  return (data.data || []).map((p) => ({
+    id:           p.id,
+    postId:       p.id.includes("_") ? p.id.split("_")[1] : p.id,
+    message:      p.message || "",
+    createdTime:  p.created_time,
+    picture:      p.full_picture,
+    permalinkUrl: p.permalink_url,
+  }));
+}
+
 // ── Post ID extraction ────────────────────────────────────────────────────────
 
 export function extractPostId(postUrl: string): string | null {

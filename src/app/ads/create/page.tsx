@@ -16,6 +16,7 @@ const BLUE     = "#1877f2";
 const CARD_BG  = "rgba(255,255,255,0.04)";
 
 interface ConnectedPage { id: string; page_id: string; page_name: string; page_picture?: string; }
+interface PagePost { id: string; postId: string; message: string; createdTime: string; picture?: string; permalinkUrl?: string; }
 
 const INPUT_STYLE: React.CSSProperties = {
   width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
@@ -34,6 +35,10 @@ function CreateCampaignInner() {
   const [pages, setPages]   = useState<ConnectedPage[]>([]);
   const [selectedPage, setSelectedPage] = useState("");
   const [postUrl, setPostUrl]   = useState("");
+  const [posts, setPosts]       = useState<PagePost[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState("");
+  const [manualMode, setManualMode] = useState(false);
   const [budget, setBudget]     = useState("");
   const [days, setDays]         = useState("7");
   const [usePackage, setUsePackage] = useState<string | null>(pkgId);
@@ -57,10 +62,27 @@ function CreateCampaignInner() {
       });
   }, []);
 
+  // Load the selected Page's posts (reads via pages_read_engagement)
+  useEffect(() => {
+    if (!selectedPage) return;
+    setLoadingPosts(true);
+    setSelectedPostId("");
+    setPostUrl("");
+    fetch(`/api/promo/posts?pageId=${encodeURIComponent(selectedPage)}`)
+      .then((r) => r.json())
+      .then((d) => { setPosts(d.posts || []); setLoadingPosts(false); })
+      .catch(() => { setPosts([]); setLoadingPosts(false); });
+  }, [selectedPage]);
+
+  function pickPost(p: PagePost) {
+    setSelectedPostId(p.id);
+    setPostUrl(`https://www.facebook.com/${selectedPage}/posts/${p.postId}`);
+  }
+
   async function submit() {
     setError("");
     if (!selectedPage) { setError(t("اختر صفحتك أولاً", "Select your Page first")); return; }
-    if (!postUrl)       { setError(t("أدخل رابط المنشور", "Enter the post link")); return; }
+    if (!postUrl)       { setError(t("اختر منشورًا أو الصق رابطًا", "Select a post or paste a link")); return; }
 
     const budgetVal = pkg ? pkg.budget : Number(budget);
     const daysVal   = pkg ? pkg.durationDays : Number(days);
@@ -148,23 +170,74 @@ function CreateCampaignInner() {
           </div>
         </div>
 
-        {/* Post URL */}
+        {/* Post selector */}
         <div style={{ background: CARD_BG, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
-          <label style={{ fontWeight: 700, fontSize: 14, marginBottom: 12, display: "block" }}>
-            <Link2 size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
-            {t("رابط المنشور", "Post link")}
-          </label>
-          <input
-            type="url"
-            value={postUrl}
-            onChange={(e) => setPostUrl(e.target.value)}
-            placeholder="https://www.facebook.com/PageName/posts/123456..."
-            style={INPUT_STYLE}
-          />
-          <p style={{ color: "#64748b", fontSize: 12, marginTop: 8, lineHeight: 1.6 }}>
-            {t("افتح المنشور من صفحتك، انقر على “نسخ الرابط”، والصقه هنا",
-               "Open the post on your Page, tap “Copy link”, and paste it here")}
-          </p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 12 }}>
+            <label style={{ fontWeight: 700, fontSize: 14 }}>
+              <Link2 size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
+              {t("المنشور المراد تمويله", "The post to boost")}
+            </label>
+            <button type="button" onClick={() => setManualMode((m) => !m)}
+              style={{ background: "none", border: "none", color: "#93c5fd", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+              {manualMode ? t("اختيار من المنشورات", "Pick from posts") : t("أو الصق رابطًا", "Or paste a link")}
+            </button>
+          </div>
+
+          {manualMode ? (
+            <>
+              <input
+                type="url"
+                value={postUrl}
+                onChange={(e) => { setPostUrl(e.target.value); setSelectedPostId(""); }}
+                placeholder="https://www.facebook.com/PageName/posts/123456..."
+                style={INPUT_STYLE}
+              />
+              <p style={{ color: "#64748b", fontSize: 12, marginTop: 8, lineHeight: 1.6 }}>
+                {t("افتح المنشور من صفحتك، انقر على “نسخ الرابط”، والصقه هنا",
+                   "Open the post on your Page, tap “Copy link”, and paste it here")}
+              </p>
+            </>
+          ) : loadingPosts ? (
+            <div style={{ textAlign: "center", padding: 24, color: "#64748b" }}>
+              <Loader2 size={22} className="spin" />
+            </div>
+          ) : posts.length === 0 ? (
+            <p style={{ color: "#94a3b8", fontSize: 13, lineHeight: 1.7 }}>
+              {t("لا توجد منشورات على هذه الصفحة، أو تعذّر تحميلها. استخدم “الصق رابطًا”.",
+                 "No posts found on this Page, or they couldn't be loaded. Use “Or paste a link”.")}
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 340, overflowY: "auto" }}>
+              {posts.map((p) => {
+                const active = selectedPostId === p.id;
+                return (
+                  <button key={p.id} type="button" onClick={() => pickPost(p)}
+                    style={{ display: "flex", gap: 12, alignItems: "center", textAlign: rtl ? "right" : "left",
+                      padding: 10, borderRadius: 12, cursor: "pointer",
+                      border: active ? `1px solid ${BLUE}` : "1px solid rgba(255,255,255,0.10)",
+                      background: active ? `${BLUE}18` : "rgba(255,255,255,0.02)", transition: "all 0.15s" }}>
+                    {p.picture ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.picture} alt="" style={{ width: 52, height: 52, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 52, height: 52, borderRadius: 8, background: "rgba(255,255,255,0.06)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Globe size={20} color="#475569" />
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, color: "#e2e8f0", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                        {p.message ? (p.message.length > 90 ? p.message.slice(0, 90) + "…" : p.message) : t("(منشور بدون نص)", "(post with no text)")}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
+                        {new Date(p.createdTime).toLocaleDateString(rtl ? "ar-LY" : "en-GB")}
+                      </div>
+                    </div>
+                    {active && <CheckCircle size={18} color={BLUE} style={{ flexShrink: 0 }} />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Packages */}

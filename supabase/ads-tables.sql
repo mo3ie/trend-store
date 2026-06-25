@@ -87,6 +87,27 @@ create policy "admin_only_ad_accounts" on ad_accounts for all using (
   exists (select 1 from profiles where id = auth.uid() and role = 'admin')
 );
 
+-- Wallet (ad-checkout deducts from here — /api/promo/checkout reads wallets.balance)
+-- NOTE: the legacy top-up wallet uses profiles.wallet_balance + wallet_transactions;
+-- the ads checkout path uses this dedicated table.
+create table if not exists wallets (
+  user_id    uuid primary key references auth.users not null,
+  balance    numeric not null default 0,
+  updated_at timestamptz default now()
+);
+
+alter table wallets enable row level security;
+do $$ begin
+  if not exists (select 1 from pg_policies where tablename='wallets' and policyname='users_own_wallet') then
+    create policy "users_own_wallet" on wallets for all using (auth.uid() = user_id);
+  end if;
+  if not exists (select 1 from pg_policies where tablename='wallets' and policyname='admin_all_wallets') then
+    create policy "admin_all_wallets" on wallets for all using (
+      exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+    );
+  end if;
+end $$;
+
 -- Index for fast lookups
 create index if not exists idx_ad_campaigns_user on ad_campaigns(user_id);
 create index if not exists idx_ad_campaigns_status on ad_campaigns(status);
