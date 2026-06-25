@@ -35,15 +35,18 @@ export async function DELETE(req: Request) {
   if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const id = searchParams.get("id");
-  if (!id) return NextResponse.json({ error: "id مطلوب" }, { status: 400 });
+  const id  = searchParams.get("id");
+  const ids = searchParams.get("ids"); // bulk: comma-separated uuids
+
+  const list = ids ? ids.split(",").map((s) => s.trim()).filter(Boolean) : id ? [id] : [];
+  if (list.length === 0) return NextResponse.json({ error: "id مطلوب" }, { status: 400 });
 
   const { error } = await supabaseAdmin
     .from("connected_pages")
     .delete()
-    .eq("id", id)
+    .in("id", list)
     .eq("user_id", user.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, deleted: list.length });
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Globe, CheckCircle, XCircle, Trash2, Plus, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { Globe, CheckCircle, XCircle, Trash2, Plus, ArrowLeft, ArrowRight, Loader2, Search, CheckSquare, Square } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import LangToggle from "@/components/LangToggle";
 
@@ -27,6 +27,9 @@ function ConnectPageInner() {
   const [connecting, setConnecting] = useState(false);
   const [error, setError]     = useState("");
   const [success, setSuccess] = useState("");
+  const [search, setSearch]   = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const s = searchParams.get("success");
@@ -70,6 +73,36 @@ function ConnectPageInner() {
     if (!confirm(t("هل تريد إلغاء ربط هذه الصفحة؟", "Disconnect this Page?"))) return;
     await fetch(`/api/promo/pages?id=${id}`, { method: "DELETE" });
     setPages((p) => p.filter((x) => x.id !== id));
+    setSelected((s) => { const n = new Set(s); n.delete(id); return n; });
+  }
+
+  function toggleSelect(id: string) {
+    setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+
+  async function deleteSelected() {
+    if (selected.size === 0) return;
+    if (!confirm(t(`إلغاء ربط ${selected.size} صفحة؟`, `Disconnect ${selected.size} Page(s)?`))) return;
+    setDeleting(true);
+    const ids = Array.from(selected);
+    await fetch(`/api/promo/pages?ids=${ids.join(",")}`, { method: "DELETE" });
+    setPages((p) => p.filter((x) => !selected.has(x.id)));
+    setSelected(new Set());
+    setDeleting(false);
+  }
+
+  const filteredPages = pages.filter((p) => {
+    const q = search.trim().toLowerCase();
+    return !q || p.page_name.toLowerCase().includes(q) || p.page_id.includes(q);
+  });
+  const allFilteredSelected = filteredPages.length > 0 && filteredPages.every((p) => selected.has(p.id));
+  function toggleSelectAll() {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (allFilteredSelected) filteredPages.forEach((p) => n.delete(p.id));
+      else filteredPages.forEach((p) => n.add(p.id));
+      return n;
+    });
   }
 
   return (
@@ -120,9 +153,34 @@ function ConnectPageInner() {
         </div>
 
         {/* Pages list */}
-        <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14, color: "#cbd5e1" }}>
-          {t("الصفحات المرتبطة", "Connected Pages")} ({pages.length})
-        </h2>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: "#cbd5e1" }}>
+            {t("الصفحات المرتبطة", "Connected Pages")} ({pages.length})
+          </h2>
+          {selected.size > 0 && (
+            <button onClick={deleteSelected} disabled={deleting}
+              style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: 10, padding: "8px 14px", color: "#fca5a5", cursor: "pointer", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+              {deleting ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
+              {t(`حذف المحدد (${selected.size})`, `Delete selected (${selected.size})`)}
+            </button>
+          )}
+        </div>
+
+        {pages.length > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div style={{ position: "relative", flex: 1 }}>
+              <Search size={15} color="#64748b" style={{ position: "absolute", insetInlineStart: 12, top: "50%", transform: "translateY(-50%)" }} />
+              <input value={search} onChange={(e) => setSearch(e.target.value)}
+                placeholder={t("ابحث في صفحاتك...", "Search your Pages...")}
+                style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: "10px 14px", paddingInlineStart: 36, color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+            </div>
+            <button onClick={toggleSelectAll}
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: "10px 14px", color: "#94a3b8", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
+              {allFilteredSelected ? <CheckSquare size={15} color={BLUE} /> : <Square size={15} />}
+              {t("تحديد الكل", "Select all")}
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div style={{ textAlign: "center", padding: 40, color: "#64748b" }}>
@@ -132,10 +190,18 @@ function ConnectPageInner() {
           <div style={{ background: CARD_BG, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 32, textAlign: "center", color: "#64748b" }}>
             {t("لم تربط أي صفحة بعد — اضغط الزر أعلاه للبدء", "No Pages connected yet — tap the button above to start")}
           </div>
+        ) : filteredPages.length === 0 ? (
+          <div style={{ background: CARD_BG, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 24, textAlign: "center", color: "#64748b" }}>
+            {t("لا توجد صفحات مطابقة للبحث", "No Pages match your search")}
+          </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {pages.map((page) => (
-              <div key={page.id} style={{ background: CARD_BG, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "16px 20px", display: "flex", alignItems: "center", gap: 14 }}>
+            {filteredPages.map((page) => {
+              const isSel = selected.has(page.id);
+              return (
+              <div key={page.id} onClick={() => toggleSelect(page.id)}
+                style={{ background: isSel ? `${BLUE}18` : CARD_BG, border: `1px solid ${isSel ? `${BLUE}55` : "rgba(255,255,255,0.08)"}`, borderRadius: 14, padding: "16px 20px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
+                {isSel ? <CheckSquare size={20} color={BLUE} style={{ flexShrink: 0 }} /> : <Square size={20} color="#64748b" style={{ flexShrink: 0 }} />}
                 {page.page_picture ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={page.page_picture} alt="" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />
@@ -144,17 +210,17 @@ function ConnectPageInner() {
                     <Globe size={20} color={BLUE} />
                   </div>
                 )}
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{page.page_name}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{page.page_name}</div>
                   <div style={{ color: "#64748b", fontSize: 12 }}>ID: {page.page_id}</div>
                 </div>
-                <CheckCircle size={18} color="#22c55e" />
-                <button onClick={() => deletePage(page.id)}
-                  style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "6px 10px", color: "#f87171", cursor: "pointer" }}>
+                <button onClick={(e) => { e.stopPropagation(); deletePage(page.id); }}
+                  style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "6px 10px", color: "#f87171", cursor: "pointer", flexShrink: 0 }}>
                   <Trash2 size={14} />
                 </button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
