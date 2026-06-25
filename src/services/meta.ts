@@ -190,7 +190,10 @@ export async function boostPost(params: BoostParams): Promise<BoostResult> {
     "POST",
     {
       name:                  params.campaignName,
-      objective:             "POST_ENGAGEMENT",
+      // ODAX objective (Meta deprecated the legacy POST_ENGAGEMENT campaign
+      // objective; post-boost engagement now lives under OUTCOME_ENGAGEMENT
+      // with the ad set optimizing for POST_ENGAGEMENT).
+      objective:             "OUTCOME_ENGAGEMENT",
       status:                "ACTIVE",
       special_ad_categories: [],
     }
