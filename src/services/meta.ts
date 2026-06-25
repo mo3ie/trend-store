@@ -90,13 +90,21 @@ export interface MetaPage {
 }
 
 export async function getUserPages(userToken: string): Promise<MetaPage[]> {
-  const data = await graph<{ data: MetaPage[] }>(
-    "me/accounts?fields=id,name,picture,access_token",
-    "GET",
-    undefined,
-    userToken
-  );
-  return data.data;
+  // me/accounts returns 25 pages per page by default — without pagination,
+  // anyone managing more than 25 pages loses the rest (incl. their own).
+  const pages: MetaPage[] = [];
+  const FIELDS = "fields=id,name,picture,access_token&limit=100";
+  let path: string | null = `me/accounts?${FIELDS}`;
+  let guard = 0;
+  while (path && guard < 20) {
+    const data: { data: MetaPage[]; paging?: { next?: string; cursors?: { after?: string } } } =
+      await graph(path, "GET", undefined, userToken);
+    pages.push(...(data.data || []));
+    const after = data.paging?.cursors?.after;
+    path = data.paging?.next && after ? `me/accounts?${FIELDS}&after=${after}` : null;
+    guard++;
+  }
+  return pages;
 }
 
 // ── Page posts (pages_read_engagement) ────────────────────────────────────────
@@ -129,6 +137,25 @@ export async function getPagePosts(pageToken: string, limit = 15): Promise<PageP
     picture:      p.full_picture,
     permalinkUrl: p.permalink_url,
   }));
+}
+
+// ── Geo targeting (city search) ───────────────────────────────────────────────
+
+export interface GeoCity {
+  key:    string; // Meta targeting key (required — names are not accepted)
+  name:   string;
+  region?: string;
+}
+
+// Searches Libyan cities via Meta's targeting search. Uses SYS_TOKEN.
+export async function searchCities(q: string): Promise<GeoCity[]> {
+  const data = await graph<{ data: Array<{ key: string; name: string; region?: string; country_code?: string }> }>(
+    `search?type=adgeolocation&location_types=${encodeURIComponent('["city"]')}&country_code=LY&q=${encodeURIComponent(q)}&limit=20`,
+    "GET"
+  );
+  return (data.data || [])
+    .filter((c) => !c.country_code || c.country_code === "LY")
+    .map((c) => ({ key: c.key, name: c.name, region: c.region }));
 }
 
 // ── Post ID extraction ────────────────────────────────────────────────────────
@@ -200,11 +227,17 @@ export async function boostPost(params: BoostParams): Promise<BoostResult> {
   );
 
   // 2) AdSet
+  const t = (params.targeting ?? {}) as Record<string, unknown>;
+  const geo = (t.geo_locations ?? {}) as Record<string, unknown>;
   const targeting = {
-    geo_locations: { countries: ["LY"] },
     age_min: 18,
     age_max: 65,
-    ...params.targeting,
+    ...t,
+    // Always keep Libya as the country; merge any selected cities on top.
+    geo_locations: {
+      countries: ["LY"],
+      ...geo,
+    },
   };
 
   const adset = await graph<{ id: string }>(

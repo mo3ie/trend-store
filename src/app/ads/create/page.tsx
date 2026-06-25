@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Link2, DollarSign, Calendar, Globe,
-  Loader2, CheckCircle, AlertCircle, ChevronDown,
+  Loader2, CheckCircle, AlertCircle, ChevronDown, Search, X, MapPin, Users2, Target,
 } from "lucide-react";
 import { Suspense } from "react";
 import { PACKAGES, calculateFees } from "@/services/campaigns";
@@ -17,6 +17,7 @@ const CARD_BG  = "rgba(255,255,255,0.04)";
 
 interface ConnectedPage { id: string; page_id: string; page_name: string; page_picture?: string; }
 interface PagePost { id: string; postId: string; message: string; createdTime: string; picture?: string; permalinkUrl?: string; }
+interface GeoCity { key: string; name: string; region?: string; }
 
 const INPUT_STYLE: React.CSSProperties = {
   width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
@@ -45,6 +46,19 @@ function CreateCampaignInner() {
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState("");
   const [loadingPages, setLoadingPages] = useState(true);
+
+  // Page selector (custom searchable dropdown — replaces the unreadable native <select>)
+  const [pageMenuOpen, setPageMenuOpen] = useState(false);
+  const [pageSearch, setPageSearch]     = useState("");
+
+  // Targeting
+  const [cities, setCities]         = useState<GeoCity[]>([]);
+  const [citySearch, setCitySearch] = useState("");
+  const [cityResults, setCityResults] = useState<GeoCity[]>([]);
+  const [citySearching, setCitySearching] = useState(false);
+  const [ageMin, setAgeMin] = useState(18);
+  const [ageMax, setAgeMax] = useState(65);
+  const [gender, setGender] = useState<"all" | "male" | "female">("all");
 
   const pkg  = PACKAGES.find((p) => p.id === usePackage);
   const fees = pkg
@@ -79,6 +93,48 @@ function CreateCampaignInner() {
     setPostUrl(`https://www.facebook.com/${selectedPage}/posts/${p.postId}`);
   }
 
+  // Debounced city search (Meta geo keys)
+  useEffect(() => {
+    const q = citySearch.trim();
+    if (q.length < 2) { setCityResults([]); return; }
+    setCitySearching(true);
+    const id = setTimeout(() => {
+      fetch(`/api/promo/geo?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d) => setCityResults(d.cities || []))
+        .catch(() => setCityResults([]))
+        .finally(() => setCitySearching(false));
+    }, 350);
+    return () => clearTimeout(id);
+  }, [citySearch]);
+
+  function addCity(c: GeoCity) {
+    if (!cities.some((x) => x.key === c.key)) setCities([...cities, c]);
+    setCitySearch("");
+    setCityResults([]);
+  }
+  function removeCity(key: string) {
+    setCities(cities.filter((c) => c.key !== key));
+  }
+
+  function buildTargeting() {
+    const targeting: Record<string, unknown> = { age_min: ageMin, age_max: ageMax };
+    if (gender === "male")   targeting.genders = [1];
+    if (gender === "female") targeting.genders = [2];
+    if (cities.length > 0) {
+      targeting.geo_locations = {
+        countries: ["LY"],
+        cities: cities.map((c) => ({ key: c.key, radius: 25, distance_unit: "kilometer" })),
+      };
+    }
+    return targeting;
+  }
+
+  const selectedPageObj = pages.find((p) => p.page_id === selectedPage);
+  const filteredPages = pages.filter((p) =>
+    p.page_name.toLowerCase().includes(pageSearch.trim().toLowerCase())
+  );
+
   async function submit() {
     setError("");
     if (!selectedPage) { setError(t("اختر صفحتك أولاً", "Select your Page first")); return; }
@@ -101,6 +157,7 @@ function CreateCampaignInner() {
         postUrl,
         budget:      budgetVal,
         durationDays: daysVal,
+        targeting:   buildTargeting(),
       }),
     });
     const data = await res.json();
@@ -160,13 +217,54 @@ function CreateCampaignInner() {
             {t("الصفحة المراد تمويل منشورها", "The Page whose post you want to boost")}
           </label>
           <div style={{ position: "relative" }}>
-            <select value={selectedPage} onChange={(e) => setSelectedPage(e.target.value)}
-              style={{ ...INPUT_STYLE, appearance: "none", paddingInlineStart: 36 }}>
-              {pages.map((p) => (
-                <option key={p.id} value={p.page_id}>{p.page_name}</option>
-              ))}
-            </select>
-            <ChevronDown size={16} style={{ position: "absolute", insetInlineStart: 12, top: "50%", transform: "translateY(-50%)", color: "#64748b", pointerEvents: "none" }} />
+            <button type="button" onClick={() => setPageMenuOpen((o) => !o)}
+              style={{ ...INPUT_STYLE, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", textAlign: rtl ? "right" : "left" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                {selectedPageObj?.page_picture && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={selectedPageObj.page_picture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0 }} />
+                )}
+                {selectedPageObj ? selectedPageObj.page_name : t("اختر صفحة", "Choose a Page")}
+              </span>
+              <ChevronDown size={16} color="#64748b" style={{ flexShrink: 0, transform: pageMenuOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+            </button>
+
+            {pageMenuOpen && (
+              <div style={{ position: "absolute", insetInlineStart: 0, insetInlineEnd: 0, top: "calc(100% + 6px)", zIndex: 30,
+                background: "#0d1b2a", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.5)", overflow: "hidden" }}>
+                <div style={{ position: "relative", padding: 8, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                  <Search size={15} color="#64748b" style={{ position: "absolute", insetInlineStart: 18, top: "50%", transform: "translateY(-50%)" }} />
+                  <input autoFocus value={pageSearch} onChange={(e) => setPageSearch(e.target.value)}
+                    placeholder={t("ابحث عن صفحة...", "Search a Page...")}
+                    style={{ ...INPUT_STYLE, paddingInlineStart: 36, padding: "9px 14px 9px 36px" }} />
+                </div>
+                <div style={{ maxHeight: 260, overflowY: "auto" }}>
+                  {filteredPages.length === 0 ? (
+                    <div style={{ padding: 16, color: "#64748b", fontSize: 13, textAlign: "center" }}>
+                      {t("لا توجد نتائج", "No matches")}
+                    </div>
+                  ) : filteredPages.map((p) => {
+                    const active = p.page_id === selectedPage;
+                    return (
+                      <button key={p.id} type="button"
+                        onClick={() => { setSelectedPage(p.page_id); setPageMenuOpen(false); setPageSearch(""); }}
+                        style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
+                          background: active ? `${BLUE}22` : "transparent", border: "none", cursor: "pointer",
+                          color: active ? "#93c5fd" : "#e2e8f0", textAlign: rtl ? "right" : "left", fontSize: 14 }}>
+                        {p.page_picture ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.page_picture} alt="" style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ width: 26, height: 26, borderRadius: "50%", background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
+                        )}
+                        <span style={{ flex: 1, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{p.page_name}</span>
+                        {active && <CheckCircle size={15} color={BLUE} style={{ flexShrink: 0 }} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -240,6 +338,81 @@ function CreateCampaignInner() {
           )}
         </div>
 
+        {/* Targeting */}
+        <div style={{ background: CARD_BG, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
+          <label style={{ fontWeight: 700, fontSize: 14, marginBottom: 16, display: "block" }}>
+            <Target size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
+            {t("الاستهداف", "Targeting")}
+          </label>
+
+          {/* Cities */}
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ fontSize: 12, color: "#94a3b8", display: "block", marginBottom: 6 }}>
+              <MapPin size={12} style={{ verticalAlign: "middle", marginInlineEnd: 4 }} />
+              {t("المدن (اتركها فارغة لكل ليبيا)", "Cities (leave empty for all of Libya)")}
+            </label>
+            {cities.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                {cities.map((c) => (
+                  <span key={c.key} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${BLUE}22`, border: `1px solid ${BLUE}40`, color: "#93c5fd", borderRadius: 100, padding: "4px 10px", fontSize: 12 }}>
+                    {c.name}{c.region ? ` — ${c.region}` : ""}
+                    <X size={13} style={{ cursor: "pointer" }} onClick={() => removeCity(c.key)} />
+                  </span>
+                ))}
+              </div>
+            )}
+            <div style={{ position: "relative" }}>
+              <Search size={15} color="#64748b" style={{ position: "absolute", insetInlineStart: 12, top: "50%", transform: "translateY(-50%)" }} />
+              <input value={citySearch} onChange={(e) => setCitySearch(e.target.value)}
+                placeholder={t("ابحث عن مدينة (مثال: طرابلس، بنغازي)", "Search a city (e.g. Tripoli, Benghazi)")}
+                style={{ ...INPUT_STYLE, paddingInlineStart: 36 }} />
+              {(citySearching || cityResults.length > 0) && citySearch.trim().length >= 2 && (
+                <div style={{ position: "absolute", insetInlineStart: 0, insetInlineEnd: 0, top: "calc(100% + 6px)", zIndex: 20,
+                  background: "#0d1b2a", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.5)", maxHeight: 220, overflowY: "auto" }}>
+                  {citySearching ? (
+                    <div style={{ padding: 14, textAlign: "center", color: "#64748b" }}><Loader2 size={16} className="spin" /></div>
+                  ) : cityResults.map((c) => (
+                    <button key={c.key} type="button" onClick={() => addCity(c)}
+                      style={{ width: "100%", textAlign: rtl ? "right" : "left", padding: "10px 14px", background: "transparent", border: "none", cursor: "pointer", color: "#e2e8f0", fontSize: 13 }}>
+                      {c.name}{c.region ? <span style={{ color: "#64748b" }}> — {c.region}</span> : ""}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Age + Gender */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+            <div>
+              <label style={{ fontSize: 12, color: "#94a3b8", display: "block", marginBottom: 6 }}>
+                <Users2 size={12} style={{ verticalAlign: "middle", marginInlineEnd: 4 }} />
+                {t("العمر من", "Age from")}
+              </label>
+              <input type="number" min={13} max={65} value={ageMin}
+                onChange={(e) => setAgeMin(Math.max(13, Math.min(65, Number(e.target.value) || 13)))} style={INPUT_STYLE} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: "#94a3b8", display: "block", marginBottom: 6 }}>{t("العمر إلى", "Age to")}</label>
+              <input type="number" min={13} max={65} value={ageMax}
+                onChange={(e) => setAgeMax(Math.max(13, Math.min(65, Number(e.target.value) || 65)))} style={INPUT_STYLE} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: "#94a3b8", display: "block", marginBottom: 6 }}>{t("الجنس", "Gender")}</label>
+              <div style={{ display: "flex", gap: 6 }}>
+                {([["all", t("الكل", "All")], ["male", t("ذكر", "Male")], ["female", t("أنثى", "Female")]] as const).map(([g, lbl]) => (
+                  <button key={g} type="button" onClick={() => setGender(g)}
+                    style={{ flex: 1, padding: "10px 4px", borderRadius: 10, fontSize: 12, cursor: "pointer",
+                      border: gender === g ? `1px solid ${BLUE}` : "1px solid rgba(255,255,255,0.12)",
+                      background: gender === g ? `${BLUE}22` : "transparent", color: gender === g ? "#93c5fd" : "#94a3b8" }}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Packages */}
         <div style={{ background: CARD_BG, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
           <label style={{ fontWeight: 700, fontSize: 14, marginBottom: 16, display: "block" }}>
@@ -310,7 +483,7 @@ function CreateCampaignInner() {
         {/* Duration note */}
         <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: 12, padding: "12px 16px", fontSize: 13, color: "#fbbf24", display: "flex", alignItems: "flex-start", gap: 10 }}>
           <Calendar size={16} style={{ flexShrink: 0, marginTop: 2 }} />
-          <span>{t("الاستهداف الافتراضي: ", "Default targeting: ")}<strong>{t("ليبيا كاملة، كل المدن، عمر 18–65", "all of Libya, all cities, ages 18–65")}</strong>{t(". يمكنك طلب استهداف مخصص عبر الدعم.", ". You can request custom targeting via support.")}</span>
+          <span>{t("سيبدأ إعلانك خلال دقائق من تأكيد الدفع، ويعمل على ", "Your ad starts within minutes of payment, running for ")}<strong>{t(`${days} أيام`, `${days} days`)}</strong>{cities.length > 0 ? t(` في ${cities.length} مدينة محددة.`, ` in ${cities.length} selected cit${cities.length === 1 ? "y" : "ies"}.`) : t(" في كل ليبيا.", " across all of Libya.")}</span>
         </div>
 
         {/* Submit */}
