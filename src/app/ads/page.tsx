@@ -7,7 +7,7 @@ import {
   Star, TrendingUp, Globe,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
-import { PACKAGES } from "@/services/campaigns";
+import { priceFor, mergeAdsPricing, DEFAULT_ADS_PRICING, type AdsPricing, type Tier } from "@/services/campaigns";
 import { useLang } from "@/hooks/useLang";
 import LangToggle from "@/components/LangToggle";
 
@@ -21,6 +21,8 @@ export default function AdsLandingPage() {
   const { t, rtl } = useLang();
   const [user, setUser] = useState<{ id: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tier, setTier]       = useState<Tier>("regular");
+  const [pricing, setPricing] = useState<AdsPricing>(DEFAULT_ADS_PRICING);
 
   const Back = rtl ? ArrowLeft : ArrowRight;
   const Fwd  = rtl ? ChevronLeft : ChevronRight;
@@ -45,6 +47,10 @@ export default function AdsLandingPage() {
       setUser(data.user);
       setLoading(false);
     });
+    fetch("/api/promo/me")
+      .then((r) => r.json())
+      .then((d) => { setTier(d.tier === "vip" ? "vip" : "regular"); setPricing(mergeAdsPricing(d.pricing)); })
+      .catch(() => {});
   }, []);
 
   function handleStart() {
@@ -126,7 +132,9 @@ export default function AdsLandingPage() {
           <p style={{ color: "#94a3b8", fontSize: 14 }}>{t("أو حدد ميزانية مخصصة عند إنشاء الحملة", "Or set a custom budget when creating the campaign")}</p>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: 20 }}>
-          {PACKAGES.map((pkg) => (
+          {pricing.packages.map((pkg) => {
+            const totalLyd = priceFor(pkg.usd, tier, pricing).totalLyd;
+            return (
             <div key={pkg.id} style={{
               background:    pkg.highlight ? `linear-gradient(135deg, ${BLUE}22, #6b46c122)` : CARD_BG,
               border:        pkg.highlight ? `1px solid ${BLUE}60` : "1px solid rgba(255,255,255,0.08)",
@@ -141,15 +149,15 @@ export default function AdsLandingPage() {
                 </div>
               )}
               <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>{t(pkg.name, pkg.nameEn)}</div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 16 }}>
-                <span style={{ fontSize: 36, fontWeight: 900, color: pkg.highlight ? "#93c5fd" : "#fff" }}>{pkg.total}</span>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 4 }}>
+                <span style={{ fontSize: 36, fontWeight: 900, color: pkg.highlight ? "#93c5fd" : "#fff" }}>{totalLyd}</span>
                 <span style={{ color: "#94a3b8", fontSize: 13 }}>{t("د.ل", "LYD")}</span>
               </div>
+              <div style={{ color: "#64748b", fontSize: 12, marginBottom: 16 }}>${pkg.usd} {t("ميزانية إعلان", "ad budget")}</div>
               <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
                 {[
-                  t(`ميزانية إعلان: ${pkg.budget} د.ل`, `Ad budget: ${pkg.budget} LYD`),
-                  t(`مدة: ${pkg.durationDays} أيام`, `Duration: ${pkg.durationDays} days`),
-                  t(`رسوم الخدمة: ${pkg.serviceFee} د.ل`, `Service fee: ${pkg.serviceFee} LYD`),
+                  t(`مدة: ${pkg.days} أيام`, `Duration: ${pkg.days} days`),
+                  t(`وصول تقديري: ~${pkg.reach}`, `Est. reach: ~${pkg.reachEn}`),
                   t("استهداف ليبيا كاملة", "Targets all of Libya"),
                 ].map((item) => (
                   <div key={item} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#cbd5e1" }}>
@@ -163,7 +171,8 @@ export default function AdsLandingPage() {
                 {t("اختيار هذه الباقة", "Choose this package")}
               </button>
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

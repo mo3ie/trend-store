@@ -4,9 +4,9 @@ import { useState, useEffect } from "react";
 import {
   BarChart3, TrendingUp, DollarSign, AlertCircle,
   CheckCircle, Clock, ExternalLink, RefreshCw, Loader2,
-  Users, Activity,
+  Users, Activity, Settings, Save, Star, Plus, Trash2,
 } from "lucide-react";
-import { CAMPAIGN_STATUS_LABELS, CAMPAIGN_STATUS_COLORS } from "@/services/campaigns";
+import { CAMPAIGN_STATUS_LABELS, CAMPAIGN_STATUS_COLORS, DEFAULT_ADS_PRICING, mergeAdsPricing, type AdsPricing } from "@/services/campaigns";
 import { supabase } from "@/lib/supabaseClient";
 
 interface Campaign {
@@ -37,12 +37,59 @@ export default function AdminAdsPage() {
   const [updating, setUpdating]   = useState<string | null>(null);
   const [token, setToken]         = useState<string | null>(null);
 
+  // Pricing + VIP settings
+  const [showSettings, setShowSettings] = useState(false);
+  const [pricing, setPricing]   = useState<AdsPricing>(DEFAULT_ADS_PRICING);
+  const [savingPricing, setSavingPricing] = useState(false);
+  const [pricingMsg, setPricingMsg] = useState("");
+  const [vips, setVips]         = useState<{ id: string; email: string; full_name?: string }[]>([]);
+  const [vipEmail, setVipEmail] = useState("");
+  const [vipBusy, setVipBusy]   = useState(false);
+  const [vipMsg, setVipMsg]     = useState("");
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setToken(data.session?.access_token || null);
       loadCampaigns();
     });
+    loadPricing();
+    loadVips();
   }, []);
+
+  async function loadPricing() {
+    const res = await fetch("/api/promo/admin/pricing");
+    if (res.ok) { const d = await res.json(); setPricing(mergeAdsPricing(d.pricing)); }
+  }
+  async function loadVips() {
+    const res = await fetch("/api/promo/admin/tier");
+    if (res.ok) { const d = await res.json(); setVips(d.vips || []); }
+  }
+  async function savePricing() {
+    setSavingPricing(true); setPricingMsg("");
+    const res = await fetch("/api/promo/admin/pricing", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pricing),
+    });
+    const d = await res.json();
+    setPricingMsg(res.ok ? "✅ تم الحفظ" : `❌ ${d.error || "فشل"}`);
+    setSavingPricing(false);
+    setTimeout(() => setPricingMsg(""), 3000);
+  }
+  async function setVip(email: string, tier: "vip" | "regular") {
+    if (!email.trim()) return;
+    setVipBusy(true); setVipMsg("");
+    const res = await fetch("/api/promo/admin/tier", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email.trim(), tier }),
+    });
+    const d = await res.json();
+    if (res.ok) { setVipEmail(""); await loadVips(); setVipMsg("✅ تم التحديث"); }
+    else setVipMsg(`❌ ${d.error || "فشل"}`);
+    setVipBusy(false);
+    setTimeout(() => setVipMsg(""), 3000);
+  }
+
+  function updatePkg(idx: number, patch: Partial<AdsPricing["packages"][number]>) {
+    setPricing((p) => ({ ...p, packages: p.packages.map((pk, i) => i === idx ? { ...pk, ...patch } : pk) }));
+  }
 
   async function loadCampaigns() {
     setLoading(true);
@@ -114,12 +161,100 @@ export default function AdminAdsPage() {
           <BarChart3 size={22} color={BLUE} />
           لوحة إدارة الإعلانات
         </h1>
-        <button onClick={loadCampaigns} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "8px 14px", color: "#94a3b8", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-          <RefreshCw size={14} /> تحديث
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => setShowSettings((s) => !s)} style={{ background: showSettings ? `${BLUE}22` : "rgba(255,255,255,0.06)", border: `1px solid ${showSettings ? BLUE + "55" : "rgba(255,255,255,0.1)"}`, borderRadius: 8, padding: "8px 14px", color: showSettings ? "#93c5fd" : "#94a3b8", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+            <Settings size={14} /> الأسعار والعملاء
+          </button>
+          <button onClick={loadCampaigns} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "8px 14px", color: "#94a3b8", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+            <RefreshCw size={14} /> تحديث
+          </button>
+        </div>
       </div>
 
       <div style={{ padding: "28px" }}>
+
+        {/* Pricing + VIP settings */}
+        {showSettings && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 20, marginBottom: 32 }}>
+
+            {/* Rates + commissions */}
+            <div style={{ background: CARD, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 22 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 800, margin: "0 0 16px", display: "flex", alignItems: "center", gap: 8 }}>
+                <DollarSign size={18} color={BLUE} /> أسعار الصرف والعمولات
+              </h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                {([
+                  ["سعر VIP (د.ل/دولار)", "vipRate"],
+                  ["سعر العادي (د.ل/دولار)", "regularRate"],
+                  ["عمولة VIP (%)", "vipCommission"],
+                  ["عمولة العادي (%)", "regularCommission"],
+                ] as const).map(([lbl, key]) => (
+                  <div key={key}>
+                    <label style={{ fontSize: 12, color: "#94a3b8", display: "block", marginBottom: 6 }}>{lbl}</label>
+                    <input type="number" min={0} step="0.1" value={pricing[key]}
+                      onChange={(e) => setPricing((p) => ({ ...p, [key]: Number(e.target.value) }))}
+                      style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+                  </div>
+                ))}
+              </div>
+
+              <h4 style={{ fontSize: 13, fontWeight: 700, margin: "20px 0 10px", color: "#cbd5e1" }}>الباقات (بالدولار)</h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {pricing.packages.map((pk, i) => (
+                  <div key={pk.id} style={{ display: "grid", gridTemplateColumns: "1.4fr 0.8fr 0.8fr 1.4fr", gap: 8, alignItems: "center" }}>
+                    <input value={pk.name} onChange={(e) => updatePkg(i, { name: e.target.value })} placeholder="الاسم"
+                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "7px 8px", color: "#fff", fontSize: 12, outline: "none", minWidth: 0 }} />
+                    <input type="number" min={1} value={pk.usd} onChange={(e) => updatePkg(i, { usd: Number(e.target.value) })} title="دولار"
+                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "7px 8px", color: "#fff", fontSize: 12, outline: "none", minWidth: 0 }} />
+                    <input type="number" min={1} value={pk.days} onChange={(e) => updatePkg(i, { days: Number(e.target.value) })} title="أيام"
+                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "7px 8px", color: "#fff", fontSize: 12, outline: "none", minWidth: 0 }} />
+                    <input value={pk.reach} onChange={(e) => updatePkg(i, { reach: e.target.value })} placeholder="وصول تقديري"
+                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "7px 8px", color: "#fff", fontSize: 12, outline: "none", minWidth: 0 }} />
+                  </div>
+                ))}
+              </div>
+              <p style={{ fontSize: 11, color: "#64748b", margin: "10px 0 0" }}>الأعمدة: الاسم · الدولار · الأيام · الوصول التقديري</p>
+
+              <button onClick={savePricing} disabled={savingPricing}
+                style={{ marginTop: 16, width: "100%", background: `linear-gradient(135deg,${BLUE},#6b46c1)`, border: "none", borderRadius: 10, padding: "11px 0", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                {savingPricing ? <Loader2 size={16} className="spin" /> : <Save size={16} />} حفظ الأسعار
+              </button>
+              {pricingMsg && <div style={{ textAlign: "center", marginTop: 10, fontSize: 13, color: "#cbd5e1" }}>{pricingMsg}</div>}
+            </div>
+
+            {/* VIP customers */}
+            <div style={{ background: CARD, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 22 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 800, margin: "0 0 16px", display: "flex", alignItems: "center", gap: 8 }}>
+                <Star size={18} color="#fbbf24" /> العملاء المميّزون (VIP)
+              </h3>
+              <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                <input value={vipEmail} onChange={(e) => setVipEmail(e.target.value)} placeholder="بريد العميل"
+                  style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 13, outline: "none", minWidth: 0 }} />
+                <button onClick={() => setVip(vipEmail, "vip")} disabled={vipBusy}
+                  style={{ background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.4)", borderRadius: 8, padding: "9px 14px", color: "#fbbf24", cursor: "pointer", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                  {vipBusy ? <Loader2 size={14} className="spin" /> : <Plus size={14} />} إضافة
+                </button>
+              </div>
+              {vipMsg && <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 10 }}>{vipMsg}</div>}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {vips.length === 0 ? (
+                  <div style={{ color: "#64748b", fontSize: 13, textAlign: "center", padding: 16 }}>لا يوجد عملاء VIP بعد</div>
+                ) : vips.map((v) => (
+                  <div key={v.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "10px 12px" }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.full_name || "—"}</div>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>{v.email}</div>
+                    </div>
+                    <button onClick={() => setVip(v.email, "regular")} disabled={vipBusy} title="إزالة من VIP"
+                      style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "6px 10px", color: "#f87171", cursor: "pointer", flexShrink: 0 }}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 16, marginBottom: 32 }}>

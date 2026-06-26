@@ -31,10 +31,12 @@ create table if not exists ad_campaigns (
   page_name           text,
   post_url            text not null,
   external_post_id    text,
-  budget              numeric not null,
+  budget              numeric not null,        -- LYD equivalent of the ad spend (display)
+  budget_usd          numeric,                 -- USD ad budget actually sent to Meta
+  tier                text not null default 'regular', -- 'vip' | 'regular' (pricing tier at purchase)
   duration_days       int not null default 7,
-  service_fee         numeric not null,
-  total_price         numeric not null,
+  service_fee         numeric not null,        -- commission in LYD
+  total_price         numeric not null,        -- what the customer pays (LYD)
   status              text not null default 'pending_payment',
   -- pending_payment | paid | creating | active | completed | failed
   external_campaign_id text,
@@ -86,6 +88,9 @@ alter table ad_accounts enable row level security;
 create policy "admin_only_ad_accounts" on ad_accounts for all using (
   exists (select 1 from profiles where id = auth.uid() and role = 'admin')
 );
+
+-- Customer pricing tier (admin marks VIP/merchants → USD pricing window)
+alter table profiles add column if not exists tier text not null default 'regular';
 
 -- Wallet (ad-checkout deducts from here — /api/promo/checkout reads wallets.balance)
 -- NOTE: the legacy top-up wallet uses profiles.wallet_balance + wallet_transactions;

@@ -192,7 +192,8 @@ interface BoostParams {
   pageId:       string;
   postId:       string;
   pageToken:    string;
-  budgetLyd:    number;
+  budgetUsd?:   number; // preferred — the campaign stores the USD ad budget
+  budgetLyd?:   number; // legacy fallback (older campaigns) — converted via LYD_TO_USD
   durationDays: number;
   campaignName: string;
   targeting?:   Record<string, unknown>;
@@ -205,7 +206,7 @@ interface BoostResult {
 }
 
 export async function boostPost(params: BoostParams): Promise<BoostResult> {
-  const budgetUsd = params.budgetLyd / LYD_TO_USD;
+  const budgetUsd = params.budgetUsd ?? (params.budgetLyd ?? 0) / LYD_TO_USD;
   // Meta expects lifetime_budget in cents
   const lifetimeBudget = Math.round(budgetUsd * 100);
   const startTime = Math.floor(Date.now() / 1000) + 60; // 1 min from now

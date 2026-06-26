@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
       pageId:       campaign.page_id,
       postId,
       pageToken:    page.page_access_token,
+      budgetUsd:    campaign.budget_usd ?? undefined,
       budgetLyd:    campaign.budget,
       durationDays: campaign.duration_days,
       campaignName: `TrendStore - ${page.page_name || campaign.page_id} - ${campaignId.slice(0, 8)}`,
