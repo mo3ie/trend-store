@@ -224,6 +224,11 @@ export async function boostPost(params: BoostParams): Promise<BoostResult> {
       objective:             "OUTCOME_ENGAGEMENT",
       status:                "ACTIVE",
       special_ad_categories: [],
+      // Budget lives on the ad set (not the campaign). Meta now *requires* this
+      // flag to be explicit when campaign budget optimization is off — omitting
+      // it fails campaign creation with "Must specify True or False in
+      // is_adset_budget_sharing_enabled field".
+      is_adset_budget_sharing_enabled: false,
     }
   );
 
@@ -252,6 +257,14 @@ export async function boostPost(params: BoostParams): Promise<BoostResult> {
       end_time:          endTime,
       billing_event:     "IMPRESSIONS",
       optimization_goal: "POST_ENGAGEMENT",
+      // Automatic (lowest-cost) bidding — without an explicit strategy this
+      // account defaults to a bid-cap strategy and rejects the ad set with
+      // "Bid amount or bid constraints required for bid strategy".
+      bid_strategy:      "LOWEST_COST_WITHOUT_CAP",
+      // The ad promotes engagement on the post itself; without ON_POST the ad
+      // creation step treats the campaign as conversions and demands a tracking
+      // pixel ("Tracking Pixel Required").
+      destination_type:  "ON_POST",
       targeting,
       status:            "ACTIVE",
       pacing_type:       ["standard"],
