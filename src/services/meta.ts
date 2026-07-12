@@ -139,6 +139,19 @@ export async function getPagePosts(pageToken: string, limit = 15): Promise<PageP
   }));
 }
 
+// Fetches a fresh Page access token via the system-user token. Works for pages
+// assigned to the system user / in the store's Business — used as a fallback
+// when a customer's stored OAuth token has expired or been invalidated
+// (code 190 / subcode 460). Returns null if the system user can't reach the page.
+export async function getSystemPageToken(pageId: string): Promise<string | null> {
+  try {
+    const data = await graph<{ access_token?: string }>(`${pageId}?fields=access_token`);
+    return data.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Geo targeting (city search) ───────────────────────────────────────────────
 
 export interface GeoCity {

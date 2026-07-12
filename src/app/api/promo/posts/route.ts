@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getPagePosts } from "@/services/meta";
+import { getPagePosts, getSystemPageToken } from "@/services/meta";
 
 async function getUser() {
   const store = await cookies();
@@ -39,6 +39,17 @@ export async function GET(req: Request) {
     const posts = await getPagePosts(page.page_access_token);
     return NextResponse.json({ posts });
   } catch (err: unknown) {
+    // The stored OAuth page token can expire or be invalidated (code 190 /
+    // subcode 460 after a password change or Meta security reset). For pages
+    // the store's system user manages, fetch a fresh page token and retry so
+    // the post picker keeps working without forcing a re-connect.
+    const sysToken = await getSystemPageToken(pageId);
+    if (sysToken) {
+      try {
+        const posts = await getPagePosts(sysToken);
+        return NextResponse.json({ posts });
+      } catch { /* fall through to the original error */ }
+    }
     const msg = err instanceof Error ? err.message : "Meta API error";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
