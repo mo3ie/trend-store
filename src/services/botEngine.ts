@@ -9,6 +9,7 @@ import {
   sendPrivateReply,
   type BotAttachment,
 } from "@/services/meta";
+import { generateAiReply, aiAvailable } from "@/services/botAi";
 
 export interface BotRule {
   id:            string;
@@ -87,6 +88,28 @@ export function matchRule(message: string, rules: BotRule[]): BotRule | null {
     }
   }
   return null;
+}
+
+// ── Throttle (primary anti-block defense) ────────────────────────────────────
+// When a post goes viral, hundreds of comments arrive at once. Replying to all of
+// them instantly is exactly what trips Facebook's spam detection and gets the
+// account temporarily blocked. We cap replies per page per minute using the
+// bot_reply_log as the counter (durable across serverless instances) and add a
+// small human-like jitter before each reply.
+async function throttleGate(configId: string, perMin: number): Promise<boolean> {
+  const since = new Date(Date.now() - 60_000).toISOString();
+  const { count } = await supabaseAdmin
+    .from("bot_reply_log")
+    .select("id", { count: "exact", head: true })
+    .eq("config_id", configId)
+    .gte("created_at", since)
+    .or("public_status.eq.sent,private_status.eq.sent");
+
+  if ((count ?? 0) >= perMin) return false; // over budget → defer this comment
+
+  // Human-like pacing: 400–1600 ms before we touch the Graph API.
+  await new Promise((r) => setTimeout(r, 400 + Math.random() * 1200));
+  return true;
 }
 
 interface PoolToken { id: string; access_token: string; }
@@ -174,7 +197,7 @@ export async function processComment(ev: CommentEvent): Promise<string> {
   // Load an active config for this page.
   const { data: config } = await supabaseAdmin
     .from("bot_configs")
-    .select("id, user_id, enabled, reply_public, reply_private, default_public_reply")
+    .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, ai_enabled, ai_persona, page_name, throttle_per_min")
     .eq("page_id", ev.pageId)
     .eq("platform", "meta")
     .eq("enabled", true)
@@ -206,6 +229,34 @@ export async function processComment(ev: CommentEvent): Promise<string> {
   });
   if (claimErr) return "duplicate"; // unique(comment_id) violation
 
+  return deliverComment(config as BotConfig, ev);
+}
+
+export interface BotConfig {
+  id:                   string;
+  user_id:              string;
+  reply_public:         boolean;
+  reply_private:        boolean;
+  default_public_reply: string | null;
+  ai_enabled:           boolean;
+  ai_persona:           string | null;
+  page_name:            string | null;
+  throttle_per_min:     number;
+}
+
+// Matches rules (or asks the AI), then sends the replies for an ALREADY-CLAIMED
+// comment. Shared by the live webhook path and the deferred-queue drain, so a comment
+// held back by the throttle is delivered later instead of being dropped.
+export async function deliverComment(config: BotConfig, ev: CommentEvent): Promise<string> {
+  // Throttle: over the per-minute budget → park it for the drain job.
+  const perMin = config.throttle_per_min || 20;
+  if (!(await throttleGate(config.id, perMin))) {
+    await supabaseAdmin.from("bot_reply_log")
+      .update({ public_status: "deferred", private_status: "deferred", error: "throttled" })
+      .eq("comment_id", ev.commentId);
+    return "deferred";
+  }
+
   // Match a rule.
   const { data: rules } = await supabaseAdmin
     .from("bot_rules")
@@ -215,19 +266,29 @@ export async function processComment(ev: CommentEvent): Promise<string> {
 
   const update: Record<string, unknown> = { matched_rule_id: rule?.id ?? null };
 
+  // No keyword rule matched → let the AI answer (if the page enabled it and a key is
+  // configured). The AI text becomes the private reply; the public reply falls back to
+  // the page default. Without AI we stay silent rather than guess.
+  let aiPrivate: string | null = null;
   if (!rule) {
-    update.public_status = "skipped";
-    update.private_status = "skipped";
-    update.error = "no_rule_match";
-    await supabaseAdmin.from("bot_reply_log").update(update).eq("comment_id", ev.commentId);
-    return "no_rule_match";
+    if (config.ai_enabled && aiAvailable()) {
+      aiPrivate = await generateAiReply(ev.message, config.ai_persona, config.page_name);
+    }
+    if (!aiPrivate) {
+      update.public_status = "skipped";
+      update.private_status = "skipped";
+      update.error = config.ai_enabled ? "ai_unavailable" : "no_rule_match";
+      await supabaseAdmin.from("bot_reply_log").update(update).eq("comment_id", ev.commentId);
+      return "no_rule_match";
+    }
+    update.error = "ai_reply";
   }
 
   const errors: string[] = [];
 
   // 1) Public reply.
   if (config.reply_public) {
-    const text = rule.public_reply || config.default_public_reply;
+    const text = rule?.public_reply || config.default_public_reply;
     if (text) {
       const res = await withRotation(config.id, (tok) =>
         replyToComment(ev.commentId, text, tok)
@@ -239,10 +300,14 @@ export async function processComment(ev: CommentEvent): Promise<string> {
     }
   }
 
-  // 2) Private reply (DM) with attachments.
-  if (config.reply_private && (rule.private_reply || rule.attachments?.length)) {
+  // 2) Private reply (DM) with attachments. Body comes from the matched rule, or from
+  // the AI when no rule matched. Attachments only ever come from a rule.
+  const privateBody = rule ? (rule.private_reply || "") : (aiPrivate || "");
+  const privateAtts = rule?.attachments || [];
+
+  if (config.reply_private && (privateBody || privateAtts.length)) {
     const res = await withRotation(config.id, (tok) =>
-      sendPrivateReply(ev.pageId, ev.commentId, rule.private_reply || "", tok, rule.attachments || [])
+      sendPrivateReply(ev.pageId, ev.commentId, privateBody, tok, privateAtts)
     );
     if (res.ok) { update.private_status = "sent"; update.used_token_id = res.tokenId; }
     else { update.private_status = "failed"; errors.push(`private: ${res.error}`); }
@@ -253,4 +318,49 @@ export async function processComment(ev: CommentEvent): Promise<string> {
   if (errors.length) update.error = errors.join(" | ");
   await supabaseAdmin.from("bot_reply_log").update(update).eq("comment_id", ev.commentId);
   return errors.length ? "partial" : "ok";
+}
+
+// Drains comments parked by the throttle (status 'deferred'), oldest first. Run on a
+// schedule (Vercel cron → /api/bot/cron/drain). Each call delivers what the current
+// per-minute budget allows; the rest stay queued for the next run — so a 500-comment
+// burst is answered steadily instead of in one spam-flagged blast.
+export async function drainDeferred(limit = 50): Promise<{ processed: number; sent: number }> {
+  const { data: rows } = await supabaseAdmin
+    .from("bot_reply_log")
+    .select("comment_id, post_id, page_id, commenter_id, commenter_name, comment_message, config_id")
+    .eq("public_status", "deferred")
+    .order("created_at", { ascending: true })
+    .limit(limit);
+  if (!rows?.length) return { processed: 0, sent: 0 };
+
+  // Cache configs so we don't refetch per row.
+  const configs = new Map<string, BotConfig | null>();
+  let sent = 0;
+
+  for (const row of rows) {
+    if (!configs.has(row.config_id)) {
+      const { data } = await supabaseAdmin
+        .from("bot_configs")
+        .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, ai_enabled, ai_persona, page_name, throttle_per_min")
+        .eq("id", row.config_id)
+        .eq("enabled", true)
+        .maybeSingle();
+      configs.set(row.config_id, (data as BotConfig | null) ?? null);
+    }
+    const config = configs.get(row.config_id);
+    if (!config) continue; // bot turned off since — leave the row parked
+
+    const res = await deliverComment(config, {
+      pageId:    row.page_id,
+      commentId: row.comment_id,
+      postId:    row.post_id ?? "",
+      message:   row.comment_message ?? "",
+      fromId:    row.commenter_id ?? "",
+      fromName:  row.commenter_name ?? "",
+    });
+    if (res === "deferred") break;      // budget exhausted → stop, retry next run
+    if (res === "ok" || res === "partial") sent++;
+  }
+
+  return { processed: rows.length, sent };
 }
