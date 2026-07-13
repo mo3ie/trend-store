@@ -1,5 +1,7 @@
 // Meta Graph Marketing API service
-// Handles: OAuth, Pages, Campaigns, AdSets, Ads
+// Handles: OAuth, Pages, Campaigns, AdSets, Ads, and the comment auto-reply bot.
+
+import crypto from "crypto";
 
 // Strip BOM/whitespace — env values added via PowerShell pipes or pasted into
 // the Vercel dashboard can carry an invisible U+FEFF prefix that makes Meta
@@ -150,6 +152,100 @@ export async function getSystemPageToken(pageId: string): Promise<string | null>
   } catch {
     return null;
   }
+}
+
+// ── Comment auto-reply bot (pages_manage_engagement + pages_messaging) ─────────
+
+// Posts a PUBLIC reply on a comment (e.g. "we messaged you privately ✅").
+// Requires pages_manage_engagement. Returns the new comment id.
+export async function replyToComment(
+  commentId: string,
+  message: string,
+  pageToken: string
+): Promise<string> {
+  const data = await graph<{ id: string }>(
+    `${commentId}/comments`,
+    "POST",
+    { message },
+    pageToken
+  );
+  return data.id;
+}
+
+// Sends a PRIVATE reply (DM) to whoever wrote a comment, via the Send API using
+// `recipient: { comment_id }`. This form supports attachments (images/files) and
+// works outside the 24h window because commenting opens the messaging window.
+// A comment can only be private-replied ONCE — idempotency is enforced upstream
+// by the UNIQUE(comment_id) row in bot_reply_log. Requires pages_messaging.
+export interface BotAttachment {
+  type: "image" | "file" | "video" | "audio";
+  url:  string;
+}
+
+export async function sendPrivateReply(
+  pageId: string,
+  commentId: string,
+  message: string,
+  pageToken: string,
+  attachments: BotAttachment[] = []
+): Promise<void> {
+  // Text first (if any), then each attachment as its own message.
+  if (message && message.trim()) {
+    await graph(
+      `${pageId}/messages`,
+      "POST",
+      {
+        recipient:      { comment_id: commentId },
+        messaging_type: "RESPONSE",
+        message:        { text: message },
+      },
+      pageToken
+    );
+  }
+  for (const att of attachments) {
+    await graph(
+      `${pageId}/messages`,
+      "POST",
+      {
+        recipient:      { comment_id: commentId },
+        messaging_type: "RESPONSE",
+        message: {
+          attachment: {
+            type:    att.type,
+            payload: { url: att.url, is_reusable: true },
+          },
+        },
+      },
+      pageToken
+    );
+  }
+}
+
+// Subscribes a Page to this app's webhooks (feed field → comments). Must be called
+// once per page with a PAGE access token before comment events are delivered.
+export async function subscribePageToWebhook(pageId: string, pageToken: string): Promise<void> {
+  await graph(
+    `${pageId}/subscribed_apps`,
+    "POST",
+    { subscribed_fields: ["feed"] },
+    pageToken
+  );
+}
+
+export async function unsubscribePageFromWebhook(pageId: string, pageToken: string): Promise<void> {
+  await graph(`${pageId}/subscribed_apps`, "DELETE", undefined, pageToken);
+}
+
+// Verifies the X-Hub-Signature-256 header Meta sends on every webhook POST, so we
+// only trust payloads actually signed with our app secret. Compares in constant time.
+export function verifyWebhookSignature(rawBody: string, signatureHeader: string | null): boolean {
+  const secret = cleanEnv(process.env.META_APP_SECRET);
+  if (!secret || !signatureHeader) return false;
+  const expected =
+    "sha256=" + crypto.createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signatureHeader);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 // ── Geo targeting (city search) ───────────────────────────────────────────────
