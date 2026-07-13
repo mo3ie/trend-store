@@ -83,6 +83,9 @@ create table if not exists bot_reply_log (
   private_status  text default 'skipped', -- sent | skipped | failed
   used_token_id   uuid,
   error           text,
+  -- when we actually called the Graph API. The throttle counts replies/min off THIS,
+  -- not created_at (a deferred comment is created early but sent much later).
+  sent_at         timestamptz,
   created_at      timestamptz default now()
 );
 
@@ -185,5 +188,8 @@ create index if not exists idx_bot_configs_page      on bot_configs(page_id);
 create index if not exists idx_bot_rules_config      on bot_rules(config_id);
 create index if not exists idx_bot_reply_log_config  on bot_reply_log(config_id);
 create index if not exists idx_bot_reply_log_comment on bot_reply_log(comment_id);
+-- Throttle counter (replies per config in the last minute) + drain queue scan.
+create index if not exists idx_bot_reply_log_sent     on bot_reply_log(config_id, sent_at);
+create index if not exists idx_bot_reply_log_deferred on bot_reply_log(public_status, created_at);
 create index if not exists idx_bot_page_tokens_config on bot_page_tokens(config_id);
 create index if not exists idx_bot_subs_user         on bot_subscriptions(user_id);

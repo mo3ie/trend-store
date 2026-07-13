@@ -98,12 +98,14 @@ export function matchRule(message: string, rules: BotRule[]): BotRule | null {
 // small human-like jitter before each reply.
 async function throttleGate(configId: string, perMin: number): Promise<boolean> {
   const since = new Date(Date.now() - 60_000).toISOString();
+  // Count by sent_at (when we actually hit the Graph API), NOT created_at (when the
+  // comment arrived) — otherwise drained rows carry an old created_at, never count
+  // toward the current minute, and the drain blows straight through the cap.
   const { count } = await supabaseAdmin
     .from("bot_reply_log")
     .select("id", { count: "exact", head: true })
     .eq("config_id", configId)
-    .gte("created_at", since)
-    .or("public_status.eq.sent,private_status.eq.sent");
+    .gte("sent_at", since);
 
   if ((count ?? 0) >= perMin) return false; // over budget → defer this comment
 
@@ -252,7 +254,7 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
   const perMin = config.throttle_per_min || 20;
   if (!(await throttleGate(config.id, perMin))) {
     await supabaseAdmin.from("bot_reply_log")
-      .update({ public_status: "deferred", private_status: "deferred", error: "throttled" })
+      .update({ public_status: "deferred", private_status: "deferred", error: "throttled", sent_at: null })
       .eq("comment_id", ev.commentId);
     return "deferred";
   }
@@ -264,7 +266,16 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
     .eq("config_id", config.id);
   const rule = matchRule(ev.message, (rules || []) as BotRule[]);
 
-  const update: Record<string, unknown> = { matched_rule_id: rule?.id ?? null };
+  // Seed both statuses to 'skipped' and stamp sent_at NOW: this row has consumed a
+  // throttle slot, and — critically — it must not stay 'deferred' when a reply type is
+  // disabled, or the drain job would re-pick it forever.
+  const update: Record<string, unknown> = {
+    matched_rule_id: rule?.id ?? null,
+    public_status:   "skipped",
+    private_status:  "skipped",
+    sent_at:         new Date().toISOString(),
+    error:           null,
+  };
 
   // No keyword rule matched → let the AI answer (if the page enabled it and a key is
   // configured). The AI text becomes the private reply; the public reply falls back to
