@@ -60,7 +60,10 @@ export function buildOAuthUrl(redirectUri: string, state: string): string {
   if (configId) {
     params.set("config_id", configId);
   } else {
-    params.set("scope", "pages_manage_ads,pages_read_engagement,pages_show_list,ads_management");
+    // pages_manage_engagement + pages_messaging power the comment auto-reply bot
+    // (public reply + private DM). In production the config_id (Login for Business)
+    // carries the permission set — keep the dashboard config in sync with this list.
+    params.set("scope", "pages_manage_ads,pages_read_engagement,pages_show_list,ads_management,pages_manage_engagement,pages_messaging");
   }
 
   return `https://www.facebook.com/dialog/oauth?${params}`;
