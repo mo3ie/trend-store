@@ -114,6 +114,10 @@ create table if not exists bot_page_tokens (
   label          text,                    -- e.g. the FB account/admin name
   fb_user_id     text,
   access_token   text not null,
+  -- TikTok access tokens are short-lived and must be refreshed (Meta page tokens are
+  -- long-lived, so these stay null on the Meta side).
+  refresh_token  text,
+  expires_at     timestamptz,
   status         text not null default 'active', -- active | cooldown | dead
   cooldown_until timestamptz,
   fail_count     int not null default 0,

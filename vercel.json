@@ -3,6 +3,10 @@
     {
       "path": "/api/bot/cron/drain",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/tiktok/cron/poll",
+      "schedule": "*/2 * * * *"
     }
   ]
 }
