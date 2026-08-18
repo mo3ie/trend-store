@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Wallet, X, ArrowDownCircle, ArrowUpCircle, Phone, Hash } from "lucide-react";
+import { Wallet, X, ArrowDownCircle, ArrowUpCircle, Phone, Hash, CreditCard } from "lucide-react";
 
 type Transaction = {
   id: string;
@@ -16,6 +16,7 @@ type Transaction = {
 const PAYMENT_METHODS = [
   { id: "edfali",       label: "ادفع لي",  icon: "🏧", desc: "محفظة ادفع لي"        },
   { id: "moamalat",     label: "معاملات",   icon: "💳", desc: "بوابة معاملات"        },
+  { id: "mobicash",     label: "موبي كاش",  icon: "📲", desc: "بطاقة موبي كاش"       },
   // prepaid_card temporarily disabled: no card-inventory validation exists yet,
   // so it must not be selectable until a real card system is built (see /api/wallet).
 ];
@@ -45,11 +46,14 @@ export default function WalletModal({ onClose }: Props) {
   const [recharging,  setRecharging]  = useState(false);
   const [rechMsg,     setRechMsg]     = useState("");
 
-  // Edfali OTP step
-  const [edfaliStep,    setEdfaliStep]    = useState<null | "sending" | "otp">(null);
+  const [cardNumber,    setCardNumber]    = useState("");
+
+  // OTP step — shared by Edfali (phone-based) and MobiCash (card-based)
+  const [otpStep,       setOtpStep]       = useState<null | "sending" | "otp">(null);
+  const [otpProvider,   setOtpProvider]   = useState<"edfali" | "mobicash">("edfali");
   const [edfaliSession, setEdfaliSession] = useState("");
-  const [edfaliTxId,    setEdfaliTxId]    = useState("");
-  const [edfaliOtp,     setEdfaliOtp]     = useState("");
+  const [otpTxId,       setOtpTxId]       = useState("");
+  const [otpCode,       setOtpCode]       = useState("");
   const [confirming,    setConfirming]    = useState(false);
 
   useEffect(() => {
@@ -61,8 +65,8 @@ export default function WalletModal({ onClose }: Props) {
 
   const selectedMethod = PAYMENT_METHODS.find(m => m.id === method);
 
-  function resetEdfali() {
-    setEdfaliStep(null); setEdfaliSession(""); setEdfaliTxId(""); setEdfaliOtp("");
+  function resetOtp() {
+    setOtpStep(null); setEdfaliSession(""); setOtpTxId(""); setOtpCode("");
   }
 
   async function handleRecharge() {
@@ -71,6 +75,7 @@ export default function WalletModal({ onClose }: Props) {
     const amt = parseFloat(amount);
     if (!amt || amt < 10) { setRechMsg("الحد الأدنى للشحن 10 د"); return; }
     if (method === "edfali" && !phone.trim()) { setRechMsg("يرجى إدخال رقم هاتف ادفع لي"); return; }
+    if (method === "mobicash" && cardNumber.replace(/\D/g, "").length < 5) { setRechMsg("يرجى إدخال رقم بطاقة موبي كاش"); return; }
     if (method === "prepaid_card" && !reference.trim()) { setRechMsg("يرجى إدخال رقم الكرت"); return; }
 
     setRecharging(true);
@@ -78,7 +83,8 @@ export default function WalletModal({ onClose }: Props) {
     // ── ادفع لي: Adfali 2-step ──────────────────────────────────────────────
     if (method === "edfali") {
       try {
-        setEdfaliStep("sending");
+        setOtpProvider("edfali");
+        setOtpStep("sending");
         const r = await fetch("/api/wallet/topup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -87,17 +93,44 @@ export default function WalletModal({ onClose }: Props) {
         const d = await r.json();
         if (!r.ok || !d.sessionId) {
           setRechMsg(d.error || "فشل إرسال رمز التحقق");
-          resetEdfali();
+          resetOtp();
           setRecharging(false);
           return;
         }
         setEdfaliSession(d.sessionId);
-        setEdfaliTxId(d.txId);
-        setEdfaliStep("otp");
+        setOtpTxId(d.txId);
+        setOtpStep("otp");
       } catch {
         setRechMsg("خطأ في الاتصال بالخادم");
-        resetEdfali();
+        resetOtp();
         setRecharging(false);
+      }
+      setRecharging(false);
+      return;
+    }
+
+    // ── موبي كاش: card charge then OTP ───────────────────────────────────────
+    if (method === "mobicash") {
+      try {
+        setOtpProvider("mobicash");
+        setOtpStep("sending");
+        const r = await fetch("/api/wallet/topup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: amt, method: "mobicash", cardNumber: cardNumber.replace(/\D/g, "") }),
+        });
+        const d = await r.json();
+        if (!r.ok || !d.mobicash) {
+          setRechMsg(d.error || "فشل إرسال رمز التحقق");
+          resetOtp();
+          setRecharging(false);
+          return;
+        }
+        setOtpTxId(d.txId);
+        setOtpStep("otp");
+      } catch {
+        setRechMsg("خطأ في الاتصال بالخادم");
+        resetOtp();
       }
       setRecharging(false);
       return;
@@ -184,15 +217,19 @@ export default function WalletModal({ onClose }: Props) {
     }
   }
 
-  async function confirmEdfaliOtp() {
-    if (!edfaliOtp || edfaliOtp.length < 4) return;
+  async function confirmOtp() {
+    if (!otpCode || otpCode.length < 4) return;
     setConfirming(true);
     setRechMsg("");
     try {
-      const r = await fetch("/api/wallet/edfali-confirm", {
+      const url  = otpProvider === "mobicash" ? "/api/wallet/mobicash-confirm" : "/api/wallet/edfali-confirm";
+      const body = otpProvider === "mobicash"
+        ? { txId: otpTxId, otp: otpCode }
+        : { sessionId: edfaliSession, otp: otpCode, txId: otpTxId };
+      const r = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: edfaliSession, otp: edfaliOtp, txId: edfaliTxId }),
+        body: JSON.stringify(body),
       });
       const d = await r.json();
       if (!r.ok) { setRechMsg(d.error || "رمز التحقق غير صحيح"); return; }
@@ -200,8 +237,8 @@ export default function WalletModal({ onClose }: Props) {
       const fresh = await fetch("/api/wallet").then(r => r.json());
       setTransactions(fresh.transactions || []);
       setRechMsg("✅ تم شحن المحفظة بنجاح!");
-      setAmount(""); setPhone(""); setMethod("");
-      resetEdfali();
+      setAmount(""); setPhone(""); setCardNumber(""); setMethod("");
+      resetOtp();
       setTimeout(() => setTab("overview"), 1500);
     } catch {
       setRechMsg("خطأ في تأكيد الدفع");
@@ -213,7 +250,7 @@ export default function WalletModal({ onClose }: Props) {
   return (
     <div
       className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-4"
-      onClick={(e) => { if (e.target === e.currentTarget && !edfaliStep) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget && !otpStep) onClose(); }}
     >
       <div className="bg-[var(--surface)] border border-purple-500/30 rounded-3xl w-full max-w-md shadow-[0_20px_60px_rgba(0,0,0,0.7)] flex flex-col max-h-[90vh] overflow-hidden">
 
@@ -246,7 +283,7 @@ export default function WalletModal({ onClose }: Props) {
           {(["overview", "recharge"] as const).map(t => (
             <button
               key={t}
-              onClick={() => { if (!edfaliStep) setTab(t); }}
+              onClick={() => { if (!otpStep) setTab(t); }}
               className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
                 tab === t ? "bg-purple-600 text-[var(--text)]" : "bg-white/5 text-[var(--muted)] hover:text-[var(--text)] border border-[var(--border)]"
               }`}
@@ -304,7 +341,7 @@ export default function WalletModal({ onClose }: Props) {
             </>
           )}
 
-          {tab === "recharge" && !edfaliStep && (
+          {tab === "recharge" && !otpStep && (
             <div className="space-y-4">
               {/* Amount */}
               <div>
@@ -335,7 +372,7 @@ export default function WalletModal({ onClose }: Props) {
                 <div className="grid grid-cols-2 gap-2">
                   {PAYMENT_METHODS.map(m => (
                     <button key={m.id} type="button"
-                      onClick={() => { setMethod(m.id); setRechMsg(""); setPhone(""); }}
+                      onClick={() => { setMethod(m.id); setRechMsg(""); setPhone(""); setCardNumber(""); }}
                       className={`p-3 rounded-xl text-right transition-all border ${
                         method === m.id
                           ? "bg-purple-600/20 border-purple-500/60 text-[var(--text)]"
@@ -364,6 +401,25 @@ export default function WalletModal({ onClose }: Props) {
                     className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all"
                   />
                   <p className="text-[var(--muted-2)] text-xs mt-1">بدون الصفر — مثال: 918621511</p>
+                </div>
+              )}
+
+              {/* Card number for MobiCash */}
+              {method === "mobicash" && (
+                <div>
+                  <label className="text-[var(--muted)] text-xs mb-2 flex items-center gap-1 block">
+                    <CreditCard size={12} /> رقم بطاقة موبي كاش
+                  </label>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    value={cardNumber}
+                    onChange={e => setCardNumber(e.target.value.replace(/\D/g, "").slice(0, 19))}
+                    placeholder="رقم البطاقة"
+                    className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all font-mono"
+                    style={{ direction: "ltr" }}
+                  />
+                  <p className="text-[var(--muted-2)] text-xs mt-1">سيصلك رمز تحقق على هاتفك المرتبط بالبطاقة</p>
                 </div>
               )}
 
@@ -402,6 +458,8 @@ export default function WalletModal({ onClose }: Props) {
                   <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> جاري...</>
                 ) : method === "edfali" ? (
                   <>🏧 إرسال رمز التحقق {amount ? `— ${amount} د` : ""}</>
+                ) : method === "mobicash" ? (
+                  <>📲 إرسال رمز التحقق {amount ? `— ${amount} د` : ""}</>
                 ) : (
                   <>شحن {amount ? `${amount} د` : ""}</>
                 )}
@@ -410,30 +468,37 @@ export default function WalletModal({ onClose }: Props) {
           )}
 
           {/* ── Edfali OTP step ─────────────────────────────────────── */}
-          {tab === "recharge" && edfaliStep === "sending" && (
+          {tab === "recharge" && otpStep === "sending" && (
             <div className="py-16 text-center">
               <div className="w-14 h-14 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto mb-5" />
               <p className="text-[var(--muted)] text-sm">جاري إرسال رمز التحقق...</p>
             </div>
           )}
 
-          {tab === "recharge" && edfaliStep === "otp" && (
+          {tab === "recharge" && otpStep === "otp" && (
             <div className="space-y-5 py-4">
               <div className="text-center">
                 <div className="text-5xl mb-3">🔐</div>
                 <h3 className="font-bold text-[var(--text)] mb-1">رمز التحقق</h3>
-                <p className="text-[var(--muted)] text-sm">
-                  أُرسل رمز مكوّن من <strong>4 أرقام</strong> إلى هاتفك{" "}
-                  <strong className="text-purple-400">{phone}</strong>
-                </p>
+                {otpProvider === "mobicash" ? (
+                  <p className="text-[var(--muted)] text-sm">
+                    أُرسل رمز التحقق إلى هاتفك المرتبط بالبطاقة — صالح لمدة <strong>5 دقائق</strong>
+                  </p>
+                ) : (
+                  <p className="text-[var(--muted)] text-sm">
+                    أُرسل رمز مكوّن من <strong>4 أرقام</strong> إلى هاتفك{" "}
+                    <strong className="text-purple-400">{phone}</strong>
+                  </p>
+                )}
               </div>
 
               <input
-                type="number"
-                maxLength={4}
-                placeholder="0000"
-                value={edfaliOtp}
-                onChange={e => setEdfaliOtp(e.target.value.slice(0, 4))}
+                type="tel"
+                inputMode="numeric"
+                maxLength={8}
+                placeholder={otpProvider === "mobicash" ? "000000" : "0000"}
+                value={otpCode}
+                onChange={e => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
                 className="w-full px-4 py-4 rounded-2xl bg-[var(--input)] border border-purple-500/40 text-[var(--text)] text-3xl text-center font-black tracking-widest focus:outline-none focus:border-purple-500 transition-all"
                 style={{ direction: "ltr" }}
                 autoFocus
@@ -446,8 +511,8 @@ export default function WalletModal({ onClose }: Props) {
               )}
 
               <button
-                onClick={confirmEdfaliOtp}
-                disabled={confirming || edfaliOtp.length < 4}
+                onClick={confirmOtp}
+                disabled={confirming || otpCode.length < 4}
                 className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {confirming
@@ -457,10 +522,10 @@ export default function WalletModal({ onClose }: Props) {
               </button>
 
               <button
-                onClick={() => { resetEdfali(); setRechMsg(""); }}
+                onClick={() => { resetOtp(); setRechMsg(""); }}
                 className="w-full py-2.5 text-sm text-[var(--muted-2)] hover:text-[var(--muted)] transition-colors"
               >
-                ← رجوع لتغيير الرقم
+                ← رجوع
               </button>
             </div>
           )}

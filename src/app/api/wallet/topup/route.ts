@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { doPTrans } from "@/lib/adfali";
+import { initiateCardPayment } from "@/lib/mobicash";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,12 +26,13 @@ export async function POST(req: Request) {
   const user = await getUser();
   if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
 
-  const { amount, method, phone } = await req.json();
+  const { amount, method, phone, cardNumber } = await req.json();
 
   const amt = parseFloat(amount);
   if (!amt || amt < 10) return NextResponse.json({ error: "الحد الأدنى للشحن 10 د.ل" }, { status: 400 });
   if (!method)         return NextResponse.json({ error: "يرجى اختيار طريقة الدفع" }, { status: 400 });
   if (method === "edfali" && !phone) return NextResponse.json({ error: "رقم الهاتف مطلوب" }, { status: 400 });
+  if (method === "mobicash" && !cardNumber) return NextResponse.json({ error: "رقم البطاقة مطلوب" }, { status: 400 });
 
   // Create pending transaction first
   const { data: tx, error: txErr } = await supabaseAdmin.from("wallet_transactions").insert({
@@ -52,6 +54,24 @@ export async function POST(req: Request) {
         .update({ reference: sessionId })
         .eq("id", tx.id);
       return NextResponse.json({ edfali: true, sessionId, txId: tx.id });
+    } catch (err: any) {
+      await supabaseAdmin.from("wallet_transactions").delete().eq("id", tx.id);
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+  }
+
+  // ── MobiCash: card charge, OTP confirmed at /api/wallet/mobicash-confirm ──
+  if (method === "mobicash") {
+    try {
+      const { paymentUuid } = await initiateCardPayment({
+        cardNumber,
+        amount: Math.round(amt),
+        description: `Trend Store wallet top-up ${tx.id}`,
+      });
+      await supabaseAdmin.from("wallet_transactions")
+        .update({ reference: paymentUuid })
+        .eq("id", tx.id);
+      return NextResponse.json({ mobicash: true, txId: tx.id });
     } catch (err: any) {
       await supabaseAdmin.from("wallet_transactions").delete().eq("id", tx.id);
       return NextResponse.json({ error: err.message }, { status: 400 });

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, Wallet, Loader2, AlertCircle, CheckCircle, Phone } from "lucide-react";
+import { ArrowLeft, ArrowRight, Wallet, Loader2, AlertCircle, CheckCircle, Phone, CreditCard } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import LangToggle from "@/components/LangToggle";
 
@@ -23,7 +23,7 @@ interface Campaign {
 const PAY_METHODS = [
   { id: "edfali",   label: "ادفع لي",    labelEn: "Edfali",   needsPhone: true  },
   { id: "moamalat", label: "معاملات",    labelEn: "Moamalat", needsPhone: true  },
-  { id: "mobicash", label: "موبي كاش",   labelEn: "MobiCash", needsPhone: false },
+  { id: "mobicash", label: "موبي كاش",   labelEn: "MobiCash", needsPhone: false, needsCard: true },
   { id: "wallet",   label: "المحفظة",    labelEn: "Wallet",   needsPhone: false },
 ];
 
@@ -44,6 +44,9 @@ function CheckoutInner() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [method, setMethod]     = useState("edfali");
   const [phone, setPhone]       = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [otpStep, setOtpStep]   = useState(false);
+  const [otp, setOtp]           = useState("");
   const [loading, setLoading]   = useState(true);
   const [paying, setPaying]     = useState(false);
   const [error, setError]       = useState("");
@@ -59,19 +62,29 @@ function CheckoutInner() {
   async function pay() {
     if (!campaign) return;
     setError("");
-    const needsPhone = PAY_METHODS.find((m) => m.id === method)?.needsPhone;
-    if (needsPhone && !phone) { setError(t("رقم الهاتف مطلوب لهذه الطريقة", "A phone number is required for this method")); return; }
+    const chosen = PAY_METHODS.find((m) => m.id === method);
+    if (chosen?.needsPhone && !phone) { setError(t("رقم الهاتف مطلوب لهذه الطريقة", "A phone number is required for this method")); return; }
+    if (chosen?.needsCard && cardNumber.replace(/\D/g, "").length < 5) {
+      setError(t("رقم البطاقة مطلوب لهذه الطريقة", "A card number is required for this method")); return;
+    }
 
     setPaying(true);
     const res  = await fetch("/api/promo/checkout", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ campaignId: campaign.id, method, phone }),
+      body: JSON.stringify({ campaignId: campaign.id, method, phone, cardNumber: cardNumber.replace(/\D/g, "") }),
     });
     const data = await res.json();
 
     if (!res.ok) {
       setError(data.error || t("حدث خطأ في الدفع", "A payment error occurred"));
+      setPaying(false);
+      return;
+    }
+
+    // MobiCash: the bank sent the customer an OTP — confirm it before boosting.
+    if (data.mobicash) {
+      setOtpStep(true);
       setPaying(false);
       return;
     }
@@ -84,6 +97,24 @@ function CheckoutInner() {
       setError(t("لم نتلق رابط الدفع", "We didn't receive a payment link"));
       setPaying(false);
     }
+  }
+
+  async function confirmOtp() {
+    if (!campaign || otp.length < 4) return;
+    setError("");
+    setPaying(true);
+    const res  = await fetch("/api/promo/mobicash-verify", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ campaignId: campaign.id, otp }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      setError(data.error || t("رمز التحقق غير صحيح", "Invalid verification code"));
+      setPaying(false);
+      return;
+    }
+    router.push(data.redirect || "/ads/campaigns?paid=1");
   }
 
   if (loading || !campaign) {
@@ -148,7 +179,7 @@ function CheckoutInner() {
             <Wallet size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
             {t("طريقة الدفع", "Payment method")}
           </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+          <div style={{ display: otpStep ? "none" : "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
             {PAY_METHODS.map((m) => (
               <button key={m.id} onClick={() => setMethod(m.id)}
                 style={{ padding: "12px 14px", borderRadius: 10, border: method === m.id ? `1px solid ${BLUE}` : "1px solid rgba(255,255,255,0.10)", background: method === m.id ? `${BLUE}18` : "transparent", color: method === m.id ? "#93c5fd" : "#94a3b8", fontWeight: method === m.id ? 700 : 400, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.15s" }}>
@@ -158,6 +189,37 @@ function CheckoutInner() {
               </button>
             ))}
           </div>
+
+          {selectedMethod.needsCard && !otpStep && (
+            <div>
+              <label style={{ fontSize: 12, color: "#94a3b8", display: "block", marginBottom: 6 }}>
+                <CreditCard size={12} style={{ verticalAlign: "middle", marginInlineEnd: 4 }} />
+                {t("رقم بطاقة موبي كاش", "MobiCash card number")}
+              </label>
+              <input type="tel" inputMode="numeric" value={cardNumber}
+                onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, "").slice(0, 19))}
+                placeholder={t("رقم البطاقة", "Card number")} style={{ ...INPUT_STYLE, direction: "ltr" }} />
+              <p style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>
+                {t("سيصلك رمز تحقق على هاتفك المرتبط بالبطاقة", "A verification code will be sent to the phone linked to the card")}
+              </p>
+            </div>
+          )}
+
+          {otpStep && (
+            <div>
+              <label style={{ fontSize: 12, color: "#94a3b8", display: "block", marginBottom: 6 }}>
+                {t("رمز التحقق — صالح لمدة 5 دقائق", "Verification code — valid for 5 minutes")}
+              </label>
+              <input type="tel" inputMode="numeric" value={otp} autoFocus
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                placeholder="000000"
+                style={{ ...INPUT_STYLE, direction: "ltr", textAlign: "center", fontSize: 24, fontWeight: 800, letterSpacing: 6 }} />
+              <button onClick={() => { setOtpStep(false); setOtp(""); setError(""); }}
+                style={{ background: "none", border: "none", color: "#64748b", fontSize: 12, marginTop: 10, cursor: "pointer" }}>
+                {t("← رجوع لتغيير البطاقة", "← Back to change the card")}
+              </button>
+            </div>
+          )}
 
           {selectedMethod.needsPhone && (
             <div>
@@ -172,10 +234,14 @@ function CheckoutInner() {
         </div>
 
         {/* Pay button */}
-        <button onClick={pay} disabled={paying}
+        <button onClick={otpStep ? confirmOtp : pay} disabled={paying || (otpStep && otp.length < 4)}
           style={{ width: "100%", background: `linear-gradient(135deg,${BLUE},#6b46c1)`, border: "none", borderRadius: 14, padding: "17px 0", color: "#fff", fontWeight: 700, fontSize: 17, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, opacity: paying ? 0.7 : 1, boxShadow: "0 8px 24px rgba(24,119,242,0.3)" }}>
           {paying ? <Loader2 size={20} className="spin" /> : <CheckCircle size={20} />}
-          {paying ? t("جارٍ المعالجة...", "Processing...") : t(`ادفع ${campaign.total_price} د.ل`, `Pay ${campaign.total_price} LYD`)}
+          {paying
+            ? t("جارٍ المعالجة...", "Processing...")
+            : otpStep
+              ? t("تأكيد الدفع ✓", "Confirm payment ✓")
+              : t(`ادفع ${campaign.total_price} د.ل`, `Pay ${campaign.total_price} LYD`)}
         </button>
 
         <p style={{ textAlign: "center", fontSize: 12, color: "#475569", lineHeight: 1.7 }}>

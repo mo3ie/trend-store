@@ -59,7 +59,7 @@ function SuccessContent() {
             </p>
             {via && (
               <p className="text-[var(--muted-2)] text-xs mt-2">
-                {t("طريقة الدفع:", "Payment method:")} {via === "cash" ? t("الدفع عند الاستلام", "Cash on delivery") : via === "dpay" ? t("بوابة DPay", "DPay gateway") : via === "moamalat" ? t("معاملات", "Moamalat") : via === "yusor" ? t("يسر باي", "Yusor Pay") : via === "edfali" ? t("ادفع لي", "Edfali") : via}
+                {t("طريقة الدفع:", "Payment method:")} {via === "cash" ? t("الدفع عند الاستلام", "Cash on delivery") : via === "dpay" ? t("بوابة DPay", "DPay gateway") : via === "moamalat" ? t("معاملات", "Moamalat") : via === "yusor" ? t("يسر باي", "Yusor Pay") : via === "edfali" ? t("ادفع لي", "Edfali") : via === "mobicash" ? t("موبي كاش", "MobiCash") : via}
               </p>
             )}
           </div>

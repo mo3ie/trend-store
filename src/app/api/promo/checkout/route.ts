@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { initiateCardPayment } from "@/lib/mobicash";
 
 async function getUser() {
   const store = await cookies();
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
   const user = await getUser();
   if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
 
-  const { campaignId, method, phone } = await req.json();
+  const { campaignId, method, phone, cardNumber } = await req.json();
   if (!campaignId || !method) {
     return NextResponse.json({ error: "campaignId و method مطلوبان" }, { status: 400 });
   }
@@ -82,6 +83,44 @@ export async function POST(req: Request) {
     }).catch(() => {});
 
     return NextResponse.json({ success: true, redirect: `${base}/ads/campaigns?paid=1` });
+  }
+
+  // MobiCash card payment — charge the card, bank sends the customer an OTP,
+  // which /api/promo/mobicash-verify confirms before the campaign is boosted.
+  if (method === "mobicash") {
+    if (!cardNumber) return NextResponse.json({ error: "رقم البطاقة مطلوب" }, { status: 400 });
+
+    // Drop any earlier unconfirmed attempt for this campaign so only one
+    // pending payment_uuid is ever live.
+    await supabaseAdmin
+      .from("ad_payments")
+      .delete()
+      .eq("campaign_id", campaignId)
+      .eq("user_id", user.id)
+      .eq("provider", "mobicash")
+      .eq("status", "pending");
+
+    try {
+      const { paymentUuid } = await initiateCardPayment({
+        cardNumber,
+        amount: Number(campaign.total_price),
+        description: `Trend Ads campaign ${campaignId}`,
+      });
+
+      const { error: payErr } = await supabaseAdmin.from("ad_payments").insert({
+        user_id:          user.id,
+        campaign_id:      campaignId,
+        amount:           campaign.total_price,
+        provider:         "mobicash",
+        provider_session: paymentUuid,
+        status:           "pending",
+      });
+      if (payErr) return NextResponse.json({ error: payErr.message }, { status: 500 });
+
+      return NextResponse.json({ mobicash: true });
+    } catch (err) {
+      return NextResponse.json({ error: (err as Error).message }, { status: 400 });
+    }
   }
 
   return NextResponse.json({ error: "طريقة الدفع غير متاحة، يرجى استخدام المحفظة" }, { status: 400 });
