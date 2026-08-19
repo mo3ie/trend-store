@@ -51,6 +51,13 @@ type VerifyContent = {
 // strings, fall back to the raw message so nothing is swallowed.
 function arabicError(raw: string): string {
   const e = (raw || "").toLowerCase();
+  // Gateway-side outage. MobiCash wraps its own upstream failures inside the
+  // same "failed to get customer details" text, so this must be checked first
+  // — otherwise a MobiCash outage is reported to the customer as a bad card.
+  if (e.includes("deadline exceeded") || e.includes("timeout") ||
+      e.includes("failed to send request") || e.includes("connection refused") ||
+      e.includes("no such host") || e.includes("bad gateway"))
+    return "خدمة موبي كاش لا تستجيب حاليًا (عطل مؤقت لدى المزوّد) — يرجى المحاولة لاحقًا";
   if (e.includes("failed to get customer details")) return "رقم البطاقة غير صحيح أو غير مفعّل لدى موبي كاش";
   if (e.includes("invalid otp"))                    return "رمز التحقق غير صحيح";
   if (e.includes("maximum verification attempts"))  return "تم تجاوز عدد محاولات إدخال الرمز — يرجى بدء عملية دفع جديدة";
