@@ -15,7 +15,9 @@ function cleanEnv(v: string | undefined): string {
   return (v ?? "").replace(/^﻿/, "").trim();
 }
 
-const BASE_URL = cleanEnv(process.env.MOBICASH_BASE_URL) || "https://sandbox.wahda.mobi";
+// Trailing slashes are stripped so a value like "https://api.wahda.mobi/" —
+// the form MobiCash hands out — cannot produce a double-slashed request path.
+const BASE_URL = (cleanEnv(process.env.MOBICASH_BASE_URL) || "https://api.wahda.mobi").replace(/\/+$/, "");
 const API_KEY  = cleanEnv(process.env.MOBICASH_API_KEY);
 
 // Session lifetime advertised by the API (expires_in, seconds).
