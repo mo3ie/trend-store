@@ -39,6 +39,7 @@ const paymentLabels: Record<string, { ar: string; en: string }> = {
   wallet: { ar: "محفظة ترند", en: "Trend Wallet" }, stripe: { ar: "بطاقة", en: "Card" },
   edfali: { ar: "ادفع لي", en: "Edfali" }, mobicash: { ar: "موبي كاش", en: "MobiCash" },
   moamalat: { ar: "معاملات", en: "Moamalat" }, yousrpay: { ar: "يسر باي", en: "Yusor Pay" },
+  yusor: { ar: "يسر باي", en: "Yusor Pay" }, masarafi: { ar: "مصرفي باي", en: "Masarafi Pay" },
 };
 
 // Printed receipt stays Arabic (local document).

@@ -24,14 +24,15 @@ type UserAddress = {
 };
 
 
-// يسر باي وموبي كاش مخفيان عن الزبائن حتى الإطلاق الرسمي: يظهران فقط للأدمن
-// (للاختبار) أو عند ضبط NEXT_PUBLIC_YUSOR_ENABLED / NEXT_PUBLIC_MOBICASH_ENABLED
-// = true (إطلاق للجميع).
+// يسر باي ومصرفي باي وموبي كاش مخفيّة عن الزبائن حتى الإطلاق الرسمي: تظهر فقط للأدمن
+// (للاختبار) أو عند ضبط NEXT_PUBLIC_YUSOR_ENABLED / NEXT_PUBLIC_MASARAFI_ENABLED /
+// NEXT_PUBLIC_MOBICASH_ENABLED = true (إطلاق للجميع).
 const ADMIN_EMAIL = "mo3iemohamed@gmail.com";
 
 const PAYMENT_METHODS = [
   { id: "cash",     name: "الدفع عند الاستلام",        nameEn: "Cash on delivery",        icon: "💵", color: "#16a34a"                  },
   { id: "yusor",    name: "يسر باي (بطاقة مصرفية)",   nameEn: "Yusor Pay (bank card)",   icon: "💳", color: "#0ea5e9", needsCard: true, gated: true },
+  { id: "masarafi", name: "مصرفي باي (مصرف الجمهورية)", nameEn: "Masarafi Pay (Jumhouria Bank)", icon: "🏛️", color: "#059669", needsCard: true, gated: true },
   { id: "mobicash", name: "موبي كاش (بطاقة الوحدة)",  nameEn: "MobiCash (Wahda card)",   icon: "📲", color: "#f97316", needsCard: true, gated: true },
   { id: "edfali",   name: "ادفع لي",                   nameEn: "Edfali",                  icon: "🏧", color: "#7c3aed", needsPhone: true },
   { id: "moamalat", name: "بطاقة مصرفية (معاملات)", nameEn: "Bank card (Moamalat)",    icon: "🏦", color: "#1e40af", lightbox: true },
@@ -40,6 +41,7 @@ const PAYMENT_METHODS = [
 type CheckoutStep = null | "address" | "payment" | "processing";
 type EdfaliStep   = null | "phone" | "sending" | "otp";
 type YusorStep    = null | "card" | "sending" | "otp";
+type MasarafiStep = null | "card" | "sending" | "otp";
 type MobicashStep = null | "card" | "sending" | "otp";
 
 export default function CartPage() {
@@ -68,6 +70,9 @@ export default function CartPage() {
   const [yusorStep,     setYusorStep]     = useState<YusorStep>(null);
   const [yusorCard,     setYusorCard]     = useState("");
   const [yusorOtp,      setYusorOtp]      = useState("");
+  const [masarafiStep,  setMasarafiStep]  = useState<MasarafiStep>(null);
+  const [masarafiCard,  setMasarafiCard]  = useState("");
+  const [masarafiOtp,   setMasarafiOtp]   = useState("");
   const [mcStep,        setMcStep]        = useState<MobicashStep>(null);
   const [mcCard,        setMcCard]        = useState("");
   const [mcOtp,         setMcOtp]         = useState("");
@@ -84,10 +89,14 @@ export default function CartPage() {
 
   const yusorVisible =
     process.env.NEXT_PUBLIC_YUSOR_ENABLED === "true" || user?.email === ADMIN_EMAIL;
+  const masarafiVisible =
+    process.env.NEXT_PUBLIC_MASARAFI_ENABLED === "true" || user?.email === ADMIN_EMAIL;
   const mobicashVisible =
     process.env.NEXT_PUBLIC_MOBICASH_ENABLED === "true" || user?.email === ADMIN_EMAIL;
   const visibleMethods = PAYMENT_METHODS.filter(pm =>
-    pm.id === "yusor" ? yusorVisible : pm.id === "mobicash" ? mobicashVisible : true);
+    pm.id === "yusor" ? yusorVisible
+      : pm.id === "masarafi" ? masarafiVisible
+      : pm.id === "mobicash" ? mobicashVisible : true);
 
   const chosenAddress = selectedAddr === "__new"
     ? newAddrText
@@ -252,6 +261,45 @@ export default function CartPage() {
     }
   }
 
+  async function startMasarafi() {
+    if (masarafiCard.replace(/\D/g, "").length < 9) { setPayError(t("رقم البطاقة يجب أن يكون 9 أرقام على الأقل", "Card number must be at least 9 digits")); return; }
+    setMasarafiStep("sending");
+    setPayError("");
+    try {
+      const oid = orderId || await createOrder("masarafi");
+      setOrderId(oid);
+
+      const res = await fetch("/api/masarafi/initiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: oid, identityCard: masarafiCard, amount: total }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) { setPayError(data.error || t("فشل بدء عملية الدفع", "Failed to start the payment")); setMasarafiStep("card"); return; }
+      setMasarafiStep("otp");
+    } catch (err: any) {
+      setPayError(err.message); setMasarafiStep("card");
+    }
+  }
+
+  async function verifyMasarafi() {
+    if (!masarafiOtp || !orderId) return;
+    setOrdering(true);
+    try {
+      const res = await fetch("/api/masarafi/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderId, otp: masarafiOtp }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) { setPayError(data.error || t("رمز التحقق غير صحيح", "Invalid verification code")); setOrdering(false); return; }
+      clearCart();
+      router.push(`/success?orderId=${orderId}&via=masarafi`);
+    } catch (err: any) {
+      setPayError(err.message); setOrdering(false);
+    }
+  }
+
   async function startMobicash() {
     if (mcCard.replace(/\D/g, "").length < 5) { setPayError(t("رقم البطاقة غير صحيح", "Invalid card number")); return; }
     setMcStep("sending");
@@ -294,7 +342,8 @@ export default function CartPage() {
   const closeModal = () => {
     setStep(null); setMethod(null); setCardNumber(""); setEdfaliStep(null);
     setEdfaliPhone(""); setEdfaliOtp(""); setYusorStep(null); setYusorCard("");
-    setYusorOtp(""); setMcStep(null); setMcCard(""); setMcOtp("");
+    setYusorOtp(""); setMasarafiStep(null); setMasarafiCard(""); setMasarafiOtp("");
+    setMcStep(null); setMcCard(""); setMcOtp("");
     setPayError(""); setOrdering(false);
   };
 
@@ -542,7 +591,7 @@ export default function CartPage() {
             )}
 
             {/* ── STEP 2: Payment ── */}
-            {step === "payment" && !edfaliStep && !yusorStep && !mcStep && (
+            {step === "payment" && !edfaliStep && !yusorStep && !masarafiStep && !mcStep && (
               <div className="p-6">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-black text-gray-900">{t("اختر طريقة الدفع", "Choose payment method")}</h3>
@@ -570,6 +619,7 @@ export default function CartPage() {
                     if (!method) { setPayError(t("يرجى اختيار طريقة الدفع", "Please choose a payment method")); return; }
                     if (method === "cash") { setStep("processing"); payWithCash(); return; }
                     if (method === "yusor") { setYusorStep("card"); return; }
+                    if (method === "masarafi") { setMasarafiStep("card"); return; }
                     if (method === "mobicash") { setMcStep("card"); return; }
                     if (method === "edfali") { setEdfaliStep("phone"); return; }
                     if (method === "moamalat") { setStep("processing"); payWithMoamalat(); return; }
@@ -706,6 +756,69 @@ export default function CartPage() {
                   {ordering ? <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : t("تأكيد الدفع ✓", "Confirm payment ✓")}
                 </button>
                 <button onClick={() => { setYusorStep("card"); setYusorOtp(""); setOrdering(false); }} className="w-full py-2.5 text-sm text-[var(--muted)] hover:text-gray-700 transition-colors">
+                  {t("رجوع", "Back")}
+                </button>
+              </div>
+            )}
+
+            {/* ── MASARAFI: Card step ── */}
+            {step === "payment" && masarafiStep === "card" && (
+              <div className="p-6 text-center">
+                <div className="text-4xl mb-4">🏛️</div>
+                <h3 className="text-lg font-black text-gray-900 mb-1">{t("مصرفي باي", "Masarafi Pay")}</h3>
+                <p className="text-[var(--muted-2)] text-sm mb-5">{t("أدخل رقم بطاقتك من مصرف الجمهورية لإتمام الدفع", "Enter your Jumhouria Bank card number to complete payment")}</p>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder={t("رقم البطاقة", "Card number")}
+                  value={masarafiCard}
+                  onChange={e => setMasarafiCard(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-gray-900 text-xl text-center font-bold tracking-widest focus:outline-none focus:border-emerald-400 transition-all mb-3"
+                  style={{ direction: "ltr" }}
+                  autoFocus
+                />
+                <p className="text-[var(--muted)] text-xs mb-3 text-center">{t("9 أرقام (رقم البطاقة + البادئة)", "9 digits (card number + prefix)")}</p>
+                {payError && <p className="text-red-500 text-sm mb-3">⚠️ {payError}</p>}
+                <button onClick={startMasarafi} disabled={masarafiCard.replace(/\D/g, "").length < 9}
+                  className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-emerald-600 to-green-500 disabled:opacity-50 mb-3 text-sm">
+                  {t("إرسال رمز التحقق", "Send verification code")}
+                </button>
+                <button onClick={() => { setMasarafiStep(null); setMasarafiCard(""); setPayError(""); }} className="w-full py-2.5 text-sm text-[var(--muted)] hover:text-gray-700 transition-colors">
+                  {t("رجوع", "Back")}
+                </button>
+              </div>
+            )}
+
+            {/* ── MASARAFI: Sending ── */}
+            {step === "payment" && masarafiStep === "sending" && (
+              <div className="p-10 text-center">
+                <div className="w-14 h-14 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin mx-auto mb-5" />
+                <p className="text-[var(--muted-2)] text-sm">⏳ {t("جاري إرسال رمز التحقق...", "Sending verification code...")}</p>
+              </div>
+            )}
+
+            {/* ── MASARAFI: OTP ── */}
+            {step === "payment" && masarafiStep === "otp" && (
+              <div className="p-6 text-center">
+                <div className="text-4xl mb-4">🔐</div>
+                <h3 className="text-lg font-black text-gray-900 mb-1">{t("رمز التحقق", "Verification code")}</h3>
+                <p className="text-[var(--muted-2)] text-sm mb-5">{t("أُرسل رمز التحقق إلى هاتفك المرتبط ببطاقة مصرف الجمهورية", "A verification code was sent to the phone linked to your Jumhouria Bank card")}</p>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder={t("رمز التحقق", "Verification code")}
+                  value={masarafiOtp}
+                  onChange={e => setMasarafiOtp(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                  className="w-full px-4 py-4 rounded-xl border border-gray-200 text-gray-900 text-3xl text-center font-black tracking-widest focus:outline-none focus:border-emerald-400 transition-all mb-4"
+                  style={{ direction: "ltr" }}
+                  autoFocus
+                />
+                {payError && <p className="text-red-500 text-sm mb-3">⚠️ {payError}</p>}
+                <button onClick={verifyMasarafi} disabled={ordering || masarafiOtp.length < 4}
+                  className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-emerald-600 to-green-500 disabled:opacity-50 mb-3 text-sm">
+                  {ordering ? <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : t("تأكيد الدفع ✓", "Confirm payment ✓")}
+                </button>
+                <button onClick={() => { setMasarafiStep("card"); setMasarafiOtp(""); setOrdering(false); }} className="w-full py-2.5 text-sm text-[var(--muted)] hover:text-gray-700 transition-colors">
                   {t("رجوع", "Back")}
                 </button>
               </div>

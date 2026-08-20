@@ -57,7 +57,8 @@ const paymentLabels: Record<string, string> = {
   cash_on_delivery: "دفع عند الاستلام",
   wallet: "محفظة", stripe: "بطاقة",
   edfali: "ادفع لي", mobicash: "موبي كاش",
-  moamalat: "معاملات", yousrpay: "يسر باي",
+  moamalat: "معاملات", yousrpay: "يسر باي", yusor: "يسر باي",
+  masarafi: "مصرفي باي",
 };
 
 const sheinStatuses = ["الكل", "pending", "processing", "shipped", "delivered", "cancelled", "paid"];

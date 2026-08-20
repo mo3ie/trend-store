@@ -1,0 +1,28 @@
+[Unit]
+Description=Masarafi Pay (مصرفي باي — مصرف الجمهورية) static-IP mTLS relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/musrfy-relay
+ExecStart=/usr/bin/node /opt/musrfy-relay/server.js
+Restart=always
+RestartSec=3
+# --- config: edit these ---
+Environment=RELAY_PORT=8081
+# Production Masarafi endpoint (Jumhouria Bank via Masarat). Separate host AND
+# port from Yusor (40110 vs 40120) — requires ITS OWN client cert (mTLS).
+Environment=UPSTREAM_ORIGIN=https://musrefypay-online.mitflink.ly:40110
+Environment=UPSTREAM_CLIENT_CERT=/opt/musrfy-relay/certs/client.pem
+Environment=UPSTREAM_CLIENT_KEY=/opt/musrfy-relay/certs/client.key
+Environment=UPSTREAM_CA=/opt/musrfy-relay/certs/ca.pem
+# Put the real secret here (same value you set as MUSRFY_RELAY_KEY on Vercel):
+Environment=RELAY_KEY=CHANGE_ME
+# hardening
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
