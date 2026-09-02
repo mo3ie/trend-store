@@ -24,6 +24,8 @@ export default function ProductView() {
   const { user } = useAuth();
   const { addItem, count } = useCart();
   const { t, rtl } = useLang();
+  // Owner sees true stock (quantities / sold-out); customers only ever see "available".
+  const isOwner = user?.email === "mo3iemohamed@gmail.com";
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,7 +67,9 @@ export default function ProductView() {
       if (!selectedVars[v.name]) { alert(`${t("يرجى اختيار", "Please choose")} ${v.name}`); return; }
     }
     addItem({
-      id: product.id, name: product.name, price: product.price, image_url: product.image_url, stock: product.stock,
+      id: product.id, name: product.name, price: product.price, image_url: product.image_url,
+      // Customers never see stock limits, so the cart doesn't cap them; the owner keeps real caps.
+      stock: isOwner ? product.stock : Math.max(product.stock, 999),
       variants: Object.keys(selectedVars).length > 0 ? selectedVars : undefined,
     });
     setAdded(true);
@@ -74,6 +78,8 @@ export default function ProductView() {
 
   const images = product?.images?.length ? product.images : product?.image_url ? [product.image_url] : [];
   const inStock = (product?.stock ?? 0) > 0;
+  // Customers can always add to cart (they never see "sold out"); the owner is gated by real stock.
+  const canAdd = isOwner ? inStock : true;
 
   return (
     <div className="flex flex-col bg-[var(--bg)] text-[var(--text)] min-h-screen" dir={rtl ? "rtl" : "ltr"}>
@@ -160,9 +166,13 @@ export default function ProductView() {
                   <span className="text-4xl font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">{product.price}</span>
                   <span className="text-[var(--muted)] text-lg mb-1">{t("دينار", "LYD")}</span>
                 </div>
-                <div className={`flex items-center gap-2 text-sm font-medium ${inStock ? "text-green-400" : "text-red-400"}`}>
-                  {inStock ? <CheckCircle size={16} /> : <XCircle size={16} />}
-                  {inStock ? (product.stock < 5 ? `${t("متبقي", "Only")} ${product.stock} ${t("فقط", "left")}` : t("متوفر في المخزن", "In stock")) : t("نفد من المخزن", "Out of stock")}
+                <div className={`flex items-center gap-2 text-sm font-medium ${!isOwner || inStock ? "text-green-400" : "text-red-400"}`}>
+                  {!isOwner || inStock ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                  {!isOwner
+                    ? t("متوفر", "Available")
+                    : inStock
+                      ? (product.stock < 5 ? `${t("متبقي", "Only")} ${product.stock} ${t("فقط", "left")}` : t("متوفر في المخزن", "In stock"))
+                      : t("نفذ من المخزن", "Sold out")}
                 </div>
                 {product.description && (
                   <div className="bg-[var(--surface)] border border-purple-500/15 rounded-2xl p-4">
@@ -196,8 +206,8 @@ export default function ProductView() {
                 )}
 
                 <div className="space-y-3 pt-2">
-                  <button onClick={handleAddToCart} disabled={!inStock}
-                    className={`w-full py-3.5 rounded-2xl font-bold text-white flex items-center justify-center gap-2 transition-all ${inStock ? (added ? "bg-green-600 shadow-[0_0_20px_rgba(34,197,94,0.4)]" : "bg-gradient-to-r from-purple-600 to-blue-500 hover:shadow-[0_0_24px_rgba(168,85,247,0.5)]") : "bg-gray-700 opacity-50 cursor-not-allowed"}`}>
+                  <button onClick={handleAddToCart} disabled={!canAdd}
+                    className={`w-full py-3.5 rounded-2xl font-bold text-white flex items-center justify-center gap-2 transition-all ${canAdd ? (added ? "bg-green-600 shadow-[0_0_20px_rgba(34,197,94,0.4)]" : "bg-gradient-to-r from-purple-600 to-blue-500 hover:shadow-[0_0_24px_rgba(168,85,247,0.5)]") : "bg-gray-700 opacity-50 cursor-not-allowed"}`}>
                     {added ? <><CheckCircle size={18} /> {t("تمت الإضافة!", "Added!")}</> : <><ShoppingCart size={18} /> {t("أضف إلى السلة", "Add to cart")}</>}
                   </button>
                   <a href={`https://wa.me/2180945798033?text=${encodeURIComponent(`${t("مرحبا، أريد الاستفسار عن:", "Hello, I'd like to ask about:")} ${product.name}`)}`} target="_blank" rel="noopener noreferrer"
@@ -208,7 +218,7 @@ export default function ProductView() {
 
                 <div className="border-t border-purple-500/15 pt-4 space-y-2 text-xs text-[var(--muted-2)]">
                   <div className="flex justify-between"><span>{t("التصنيف", "Category")}</span><span className="text-[var(--muted)]">{product.category}</span></div>
-                  <div className="flex justify-between"><span>{t("الحالة", "Status")}</span><span className={inStock ? "text-green-400" : "text-red-400"}>{inStock ? t("متوفر", "Available") : t("غير متوفر", "Unavailable")}</span></div>
+                  <div className="flex justify-between"><span>{t("الحالة", "Status")}</span><span className={!isOwner || inStock ? "text-green-400" : "text-red-400"}>{!isOwner || inStock ? t("متوفر", "Available") : t("نفذ", "Sold out")}</span></div>
                   {product.created_at && (
                     <div className="flex justify-between"><span>{t("تاريخ الإضافة", "Added on")}</span><span className="text-[var(--muted)]">{new Date(product.created_at).toLocaleDateString(rtl ? "ar-EG" : "en-GB", { year: "numeric", month: "long", day: "numeric" })}</span></div>
                   )}

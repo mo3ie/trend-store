@@ -61,7 +61,9 @@ export default function Home() {
   const img = settings?.images || {};
 
   const toggleTheme = () => { const n = !light; setLight(n); document.documentElement.classList.toggle("light", n); try { localStorage.setItem("theme", n ? "light" : "dark"); } catch {} };
-  const addToCart = (p: Product) => addItem({ id: p.id, name: p.name, price: p.price, image_url: p.image_url, stock: p.stock });
+  // Customers never see stock limits, so the cart doesn't cap them; the owner keeps real caps.
+  const isOwner = user?.email === "mo3iemohamed@gmail.com";
+  const addToCart = (p: Product) => addItem({ id: p.id, name: p.name, price: p.price, image_url: p.image_url, stock: isOwner ? p.stock : Math.max(p.stock, 999) });
   const go = (href?: string) => { if (href) window.location.href = href; };
   const closeModal = () => { setModal(null); setMDoneId(null); };
 
