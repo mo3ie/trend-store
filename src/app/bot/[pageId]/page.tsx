@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Loader2, Bot, MessageSquare, Users, Activity,
   Settings2, Plus, Trash2, Save, AlertTriangle, Upload, X,
-  Sparkles, CreditCard, Power,
+  Sparkles, CreditCard, Power, Clock, Newspaper, Star, CheckCircle2, RefreshCw,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import LangToggle from "@/components/LangToggle";
@@ -16,16 +16,20 @@ const BLUE = "#1877f2", GREEN = "#22c55e", CARD = "rgba(255,255,255,0.04)", BORD
 interface Attachment { type: "image" | "file"; url: string; }
 interface Rule {
   id: string; name: string | null; keywords: string[]; match_type: string;
-  public_reply: string | null; private_reply: string | null; attachments: Attachment[];
+  public_reply: string | null; public_replies: string[]; private_reply: string | null; attachments: Attachment[];
   enabled: boolean; priority: number;
 }
 interface Config {
   id: string; enabled: boolean; reply_public: boolean; reply_private: boolean;
   ai_enabled: boolean; ai_persona: string | null; default_public_reply: string | null;
   throttle_per_min: number; webhook_subscribed: boolean;
+  like_comments: boolean; min_delay_sec: number; max_delay_sec: number;
+  default_private_reply: string | null; public_replies: string[];
+  post_filter: string[]; post_filter_enabled: boolean; active_token_id: string | null;
 }
 interface Sub { status: string; expires_at: string | null; }
 interface Token { id: string; label: string | null; status: string; cooldown_until: string | null; fail_count: number; last_used_at: string | null; }
+interface Post { id: string; postId: string; message: string; createdTime: string; picture?: string; permalinkUrl?: string; }
 interface LogRow { id: string; comment_id: string; commenter_name: string | null; comment_message: string | null; public_status: string; private_status: string; matched_rule_id: string | null; error: string | null; created_at: string; }
 
 function subActive(s: Sub | null): boolean {
@@ -44,7 +48,7 @@ export default function BotManage() {
   const [config, setConfig] = useState<Config | null>(null);
   const [sub, setSub] = useState<Sub | null>(null);
   const [price, setPrice] = useState(50);
-  const [tab, setTab] = useState<"settings" | "rules" | "accounts" | "activity">("rules");
+  const [tab, setTab] = useState<"settings" | "rules" | "posts" | "accounts" | "activity">("rules");
   const [toast, setToast] = useState("");
   const [subscribing, setSubscribing] = useState(false);
 
@@ -76,8 +80,8 @@ export default function BotManage() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function patchConfig(patch: Partial<Config>) {
-    if (!config) return;
+  async function patchConfig(patch: Partial<Config>): Promise<boolean> {
+    if (!config) return false;
     const res = await fetch("/api/bot/configs", {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: config.id, ...patch }),
@@ -157,6 +161,7 @@ export default function BotManage() {
           {([
             ["rules", MessageSquare, t("القواعد", "Rules")],
             ["settings", Settings2, t("الإعدادات", "Settings")],
+            ["posts", Newspaper, t("المنشورات", "Posts")],
             ["accounts", Users, t("الحسابات", "Accounts")],
             ["activity", Activity, t("النشاط", "Activity")],
           ] as const).map(([k, Icon, label]) => (
@@ -169,7 +174,8 @@ export default function BotManage() {
 
         {config && tab === "rules" && <RulesTab configId={config.id} flash={flash} t={t} />}
         {config && tab === "settings" && <SettingsTab config={config} patch={patchConfig} t={t} />}
-        {config && tab === "accounts" && <AccountsTab configId={config.id} t={t} />}
+        {config && tab === "posts" && <PostsTab config={config} pageId={pageId} patch={patchConfig} flash={flash} t={t} />}
+        {config && tab === "accounts" && <AccountsTab config={config} patch={patchConfig} flash={flash} t={t} />}
         {config && tab === "activity" && <ActivityTab configId={config.id} t={t} />}
       </div>
 
@@ -206,11 +212,24 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 }
 
 function SettingsTab({ config, patch, t }: { config: Config; patch: (p: Partial<Config>) => Promise<boolean>; t: TF }) {
-  const [reply, setReply] = useState(config.default_public_reply || "");
+  // Public-reply variants: one per line. Seeded from the array, or the legacy single value.
+  const [pubVariants, setPubVariants] = useState(
+    (config.public_replies?.length ? config.public_replies : (config.default_public_reply ? [config.default_public_reply] : [])).join("\n")
+  );
+  const [priv, setPriv] = useState(config.default_private_reply || "");
   const [persona, setPersona] = useState(config.ai_persona || "");
   const [throttle, setThrottle] = useState(config.throttle_per_min);
+  const [minD, setMinD] = useState(config.min_delay_sec ?? 2);
+  const [maxD, setMaxD] = useState(config.max_delay_sec ?? 6);
 
+  const numInput: React.CSSProperties = { width: 64, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 9, padding: "8px 10px", color: "#fff", textAlign: "center" };
   const box: React.CSSProperties = { background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: "6px 20px" };
+
+  function saveVariants() {
+    const list = pubVariants.split("\n").map((s) => s.trim()).filter(Boolean);
+    patch({ public_replies: list, default_public_reply: list[0] || "" });
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={box}>
@@ -220,6 +239,9 @@ function SettingsTab({ config, patch, t }: { config: Config; patch: (p: Partial<
         <Row label={t("الرد الخاص (رسالة)", "Private reply (DM)")} hint={t("إرسال السعر والتفاصيل في الخاص", "Send price & details in a private message")}>
           <Toggle on={config.reply_private} onChange={(v) => patch({ reply_private: v })} />
         </Row>
+        <Row label={t("الإعجاب بالتعليق", "Like the comment")} hint={t("يضيف إعجاباً على كل تعليق يردّ عليه", "Add a like on every comment it replies to")}>
+          <Toggle on={config.like_comments} onChange={(v) => patch({ like_comments: v })} />
+        </Row>
         <Row label={t("الردود الذكية (AI)", "Smart AI replies")} hint={t("رد بالذكاء الاصطناعي عند عدم مطابقة أي قاعدة", "Use AI when no keyword rule matches")}>
           <Toggle on={config.ai_enabled} onChange={(v) => patch({ ai_enabled: v })} />
         </Row>
@@ -227,18 +249,48 @@ function SettingsTab({ config, patch, t }: { config: Config; patch: (p: Partial<
           <input type="number" min={1} max={60} value={throttle}
             onChange={(e) => setThrottle(Number(e.target.value))}
             onBlur={() => throttle !== config.throttle_per_min && patch({ throttle_per_min: throttle })}
-            style={{ width: 70, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 9, padding: "8px 10px", color: "#fff", textAlign: "center" }} />
+            style={numInput} />
+        </Row>
+        <Row label={t("التأخير بين تعليق وتعليق (ثوانٍ)", "Delay between replies (seconds)")} hint={t("انتظار عشوائي بين كل رد وآخر ليبدو بشرياً", "Random wait before each reply so it looks human")}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input type="number" min={0} max={120} value={minD}
+              onChange={(e) => setMinD(Number(e.target.value))}
+              onBlur={() => minD !== config.min_delay_sec && patch({ min_delay_sec: minD })}
+              style={numInput} />
+            <Clock size={14} color="#64748b" />
+            <input type="number" min={0} max={300} value={maxD}
+              onChange={(e) => setMaxD(Number(e.target.value))}
+              onBlur={() => maxD !== config.max_delay_sec && patch({ max_delay_sec: maxD })}
+              style={numInput} />
+          </div>
         </Row>
       </div>
 
       <div style={{ ...box, padding: 20 }}>
-        <label style={{ fontSize: 14, fontWeight: 600, display: "block", marginBottom: 8 }}>{t("نص الرد العلني الافتراضي", "Default public reply text")}</label>
+        <label style={{ fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+          <RefreshCw size={14} color={BLUE} /> {t("نصوص الرد العلني (تنويع)", "Public reply texts (variety)")}
+        </label>
+        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 8 }}>
+          {t("سطر لكل نص — يختار البوت واحداً عشوائياً في كل مرة كي لا تتكرّر الردود.", "One text per line — the bot picks one at random each time so replies don't repeat.")}
+        </div>
+        <textarea value={pubVariants} onChange={(e) => setPubVariants(e.target.value)} onBlur={saveVariants} rows={4}
+          placeholder={t("تمّت مراسلتك في الخاص ✅\nراسلناك على الخاص 📩\nتفقّد رسائلك 💬", "We've DMed you ✅\nCheck your inbox 📩\nSent you a private message 💬")}
+          style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 9, padding: "11px 14px", color: "#fff", boxSizing: "border-box", resize: "vertical" }} />
+      </div>
+
+      <div style={{ ...box, padding: 20 }}>
+        <label style={{ fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+          <MessageSquare size={14} color={BLUE} /> {t("الرسالة الخاصة الافتراضية", "Default private message")}
+        </label>
+        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 8 }}>
+          {t("تُرسل في الخاص عندما لا تحدّد القاعدة رسالة خاصة خاصة بها.", "Sent privately when a matched rule has no private message of its own.")}
+        </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <input value={reply} onChange={(e) => setReply(e.target.value)}
-            placeholder={t("تمّت مراسلتك في الخاص ✅", "We've messaged you privately ✅")}
-            style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 9, padding: "11px 14px", color: "#fff" }} />
-          <button onClick={() => patch({ default_public_reply: reply })}
-            style={{ background: `${BLUE}22`, border: `1px solid ${BLUE}55`, borderRadius: 9, padding: "0 16px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontWeight: 700 }}>
+          <textarea value={priv} onChange={(e) => setPriv(e.target.value)} rows={3}
+            placeholder={t("شكراً لتواصلك! أرسل لنا استفسارك وسنردّ فوراً 🌟", "Thanks for reaching out! Send us your question and we'll reply right away 🌟")}
+            style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 9, padding: "11px 14px", color: "#fff", boxSizing: "border-box", resize: "vertical" }} />
+          <button onClick={() => patch({ default_private_reply: priv })}
+            style={{ background: `${BLUE}22`, border: `1px solid ${BLUE}55`, borderRadius: 9, padding: "0 16px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontWeight: 700, alignSelf: "stretch" }}>
             <Save size={15} /> {t("حفظ", "Save")}
           </button>
         </div>
@@ -280,7 +332,7 @@ function RulesTab({ configId, flash, t }: { configId: string; flash: (m: string)
   useEffect(() => { loadRules(); }, [loadRules]);
 
   function newRule() {
-    setEditing({ id: "", name: "", keywords: [], match_type: "any_contains", public_reply: "", private_reply: "", attachments: [], enabled: true, priority: 0 });
+    setEditing({ id: "", name: "", keywords: [], match_type: "any_contains", public_reply: "", public_replies: [], private_reply: "", attachments: [], enabled: true, priority: 0 });
   }
 
   async function del(id: string) {
@@ -331,7 +383,9 @@ function RuleEditor({ rule, configId, t, onClose, onSaved }: { rule: Rule; confi
   const [name, setName] = useState(rule.name || "");
   const [kwText, setKwText] = useState(rule.keywords.join("، "));
   const [matchType, setMatchType] = useState(rule.match_type);
-  const [pub, setPub] = useState(rule.public_reply || "");
+  const [pubVariants, setPubVariants] = useState(
+    (rule.public_replies?.length ? rule.public_replies : (rule.public_reply ? [rule.public_reply] : [])).join("\n")
+  );
   const [priv, setPriv] = useState(rule.private_reply || "");
   const [atts, setAtts] = useState<Attachment[]>(rule.attachments || []);
   const [enabled, setEnabled] = useState(rule.enabled);
@@ -351,7 +405,8 @@ function RuleEditor({ rule, configId, t, onClose, onSaved }: { rule: Rule; confi
   async function save() {
     setSaving(true);
     const keywords = kwText.split(/[،,\n]/).map((s) => s.trim()).filter(Boolean);
-    const payload = { name, keywords, match_type: matchType, public_reply: pub, private_reply: priv, attachments: atts, enabled, priority };
+    const publicList = pubVariants.split("\n").map((s) => s.trim()).filter(Boolean);
+    const payload = { name, keywords, match_type: matchType, public_reply: publicList[0] || "", public_replies: publicList, private_reply: priv, attachments: atts, enabled, priority };
     if (rule.id) {
       await fetch("/api/bot/rules", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: rule.id, ...payload }) });
     } else {
@@ -386,8 +441,8 @@ function RuleEditor({ rule, configId, t, onClose, onSaved }: { rule: Rule; confi
         </>
       )}
 
-      <label style={lbl}>{t("الرد العلني (اختياري — يستبدل الافتراضي)", "Public reply (optional — overrides default)")}</label>
-      <input value={pub} onChange={(e) => setPub(e.target.value)} style={inp} placeholder={t("تمّت مراسلتك في الخاص ✅", "We've DMed you ✅")} />
+      <label style={lbl}>{t("الرد العلني — سطر لكل نص للتنويع (اختياري)", "Public reply — one text per line for variety (optional)")}</label>
+      <textarea value={pubVariants} onChange={(e) => setPubVariants(e.target.value)} rows={3} style={{ ...inp, resize: "vertical" }} placeholder={t("تمّت مراسلتك في الخاص ✅\nراسلناك على الخاص 📩", "We've DMed you ✅\nCheck your inbox 📩")} />
 
       <label style={lbl}>{t("الرسالة الخاصة (السعر/التفاصيل)", "Private message (price/details)")}</label>
       <textarea value={priv} onChange={(e) => setPriv(e.target.value)} rows={4} style={{ ...inp, resize: "vertical" }} placeholder={t("السعر 250 د.ل، متوفر، للطلب أرسل عنوانك 📦", "Price is 250 LYD, in stock. Send your address to order 📦")} />
@@ -431,9 +486,11 @@ function RuleEditor({ rule, configId, t, onClose, onSaved }: { rule: Rule; confi
 }
 
 // ── Accounts (rotation pool) tab ─────────────────────────────────────────────
-function AccountsTab({ configId, t }: { configId: string; t: TF }) {
+function AccountsTab({ config, patch, flash, t }: { config: Config; patch: (p: Partial<Config>) => Promise<boolean>; flash: (m: string) => void; t: TF }) {
+  const configId = config.id;
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
+  const activeId = config.active_token_id;
 
   const loadTokens = useCallback(async () => {
     setLoading(true);
@@ -442,6 +499,11 @@ function AccountsTab({ configId, t }: { configId: string; t: TF }) {
     setLoading(false);
   }, [configId]);
   useEffect(() => { loadTokens(); }, [loadTokens]);
+
+  async function makeActive(tk: Token) {
+    const ok = await patch({ active_token_id: tk.id });
+    if (ok) flash(t("تم اختيار الحساب للرد ✅", "Account set as active ✅"));
+  }
 
   async function toggle(tk: Token) {
     const status = tk.status === "dead" ? "active" : "dead";
@@ -461,8 +523,8 @@ function AccountsTab({ configId, t }: { configId: string; t: TF }) {
     <div>
       <div style={{ background: `${BLUE}12`, border: `1px solid ${BLUE}33`, borderRadius: 12, padding: "14px 16px", marginBottom: 16, fontSize: 13, color: "#cbd5e1", lineHeight: 1.8 }}>
         {t(
-          "اربط عدة حسابات فيسبوك (كلها مشرفة على نفس الصفحة) ليوزّع البوت الردود بينها ويبدّل تلقائياً عند حدوث حظر مؤقت — حماية من إيقاف الحساب عند كثرة التعليقات.",
-          "Link several Facebook accounts (all admins of the same Page) so the bot spreads replies across them and auto-switches on a temporary block — protection against getting blocked during comment bursts.",
+          "اربط عدة حسابات فيسبوك (كلها مشرفة على نفس الصفحة). اختر الحساب الذي يردّ بضغطة واحدة (⭐)، وعند أي حظر مؤقت يبدّل البوت تلقائياً لبقية الحسابات — حماية من إيقاف الحساب عند كثرة التعليقات.",
+          "Link several Facebook accounts (all admins of the same Page). Pick which one replies with one tap (⭐); on any temporary block the bot auto-switches to the rest — protection against getting blocked during comment bursts.",
         )}
       </div>
 
@@ -478,23 +540,125 @@ function AccountsTab({ configId, t }: { configId: string; t: TF }) {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {tokens.map((tk) => (
-              <div key={tk.id} style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
+            {tokens.map((tk) => {
+              const isActive = activeId === tk.id;
+              return (
+              <div key={tk.id} style={{ background: isActive ? `${GREEN}10` : CARD, border: `1px solid ${isActive ? `${GREEN}55` : BORDER}`, borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <div style={{ width: 10, height: 10, borderRadius: "50%", background: statusColor[tk.status] || "#94a3b8", flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tk.label || t("حساب", "Account")}</div>
+                <div style={{ flex: 1, minWidth: 120 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 6 }}>
+                    {tk.label || t("حساب", "Account")}
+                    {isActive && <span style={{ fontSize: 11, color: GREEN, background: `${GREEN}22`, padding: "2px 8px", borderRadius: 6, display: "inline-flex", alignItems: "center", gap: 3 }}><CheckCircle2 size={11} /> {t("يردّ الآن", "Replying")}</span>}
+                  </div>
                   <div style={{ fontSize: 12, color: statusColor[tk.status] || "#94a3b8", marginTop: 3 }}>
                     {statusLabel(tk.status)}{tk.fail_count > 0 ? ` · ${t("إخفاقات", "fails")}: ${tk.fail_count}` : ""}
                   </div>
                 </div>
+                {!isActive && tk.status !== "dead" && (
+                  <button onClick={() => makeActive(tk)} title={t("اجعله الحساب الذي يردّ", "Make this the replying account")}
+                    style={{ background: `${GREEN}18`, border: `1px solid ${GREEN}44`, borderRadius: 8, padding: "6px 10px", color: "#86efac", cursor: "pointer", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+                    <Star size={13} /> {t("اجعله النشط", "Set active")}
+                  </button>
+                )}
                 <button onClick={() => toggle(tk)} style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "6px 12px", color: "#cbd5e1", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
                   {tk.status === "dead" ? t("تفعيل", "Enable") : t("إيقاف", "Disable")}
                 </button>
                 <button onClick={() => remove(tk.id)} style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, padding: "6px 8px", color: "#f87171", cursor: "pointer" }}><Trash2 size={14} /></button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
+    </div>
+  );
+}
+
+// ── Posts targeting tab ──────────────────────────────────────────────────────
+function PostsTab({ config, pageId, patch, flash, t }: { config: Config; pageId: string; patch: (p: Partial<Config>) => Promise<boolean>; flash: (m: string) => void; t: TF }) {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [targeted, setTargeted] = useState(config.post_filter_enabled);
+  const [selected, setSelected] = useState<Set<string>>(new Set(config.post_filter || []));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/promo/posts?pageId=${pageId}`).then((r) => r.json()).then((d) => {
+      if (d.error) setErr(d.error); else setPosts(d.posts || []);
+      setLoading(false);
+    }).catch(() => { setErr(t("تعذّر تحميل المنشورات", "Couldn't load posts")); setLoading(false); });
+  }, [pageId, t]);
+
+  function toggleSel(id: string) {
+    setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+
+  async function save() {
+    setSaving(true);
+    const ok = await patch({ post_filter: [...selected], post_filter_enabled: targeted });
+    setSaving(false);
+    if (ok) flash(t("تم حفظ المنشورات المستهدفة ✅", "Saved targeted posts ✅"));
+  }
+
+  async function setAll(v: boolean) {
+    // v = "reply on ALL posts" → targeting OFF
+    setTargeted(!v);
+    if (v) { await patch({ post_filter_enabled: false }); flash(t("سيردّ على كل المنشورات", "Will reply on all posts")); }
+  }
+
+  const box: React.CSSProperties = { background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: "6px 20px" };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={box}>
+        <Row label={t("الرد على كل المنشورات", "Reply on all posts")} hint={t("عند الإيقاف، تختار منشورات محدّدة فقط", "When off, pick specific posts only")}>
+          <Toggle on={!targeted} onChange={setAll} />
+        </Row>
+      </div>
+
+      {targeted && (
+        <>
+          <div style={{ fontSize: 13, color: "#94a3b8" }}>
+            {t("اختر المنشورات التي يردّ عليها البوت:", "Choose the posts the bot replies on:")}
+            {selected.size > 0 && <span style={{ color: BLUE, fontWeight: 700 }}> ({selected.size})</span>}
+          </div>
+
+          {loading ? <div style={{ textAlign: "center", padding: 30, color: "#64748b" }}><Loader2 size={24} className="spin" /></div>
+            : err ? <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 20, textAlign: "center", color: "#f87171", fontSize: 13 }}>{err}</div>
+            : posts.length === 0 ? <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>{t("لا منشورات على هذه الصفحة", "No posts on this Page")}</div>
+            : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {posts.map((p) => {
+                  const on = selected.has(p.id);
+                  return (
+                    <button key={p.id} onClick={() => toggleSel(p.id)}
+                      style={{ textAlign: "start", background: on ? `${BLUE}14` : CARD, border: `1px solid ${on ? `${BLUE}66` : BORDER}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", color: "#fff" }}>
+                      {p.picture ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.picture} alt="" style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
+                      ) : (
+                        <div style={{ width: 48, height: 48, borderRadius: 10, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Newspaper size={20} color="#64748b" /></div>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.message || t("(منشور بدون نص)", "(post with no text)")}</div>
+                        <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>{new Date(p.createdTime).toLocaleDateString(t("ar-LY", "en-GB"))}</div>
+                      </div>
+                      <div style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${on ? BLUE : BORDER}`, background: on ? BLUE : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        {on && <CheckCircle2 size={16} color="#fff" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+          <button onClick={save} disabled={saving}
+            style={{ background: `linear-gradient(135deg, ${GREEN}, #16a34a)`, border: "none", borderRadius: 11, padding: "12px 0", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            {saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />} {t("حفظ", "Save")}
+          </button>
+        </>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
 
 const MATCH_TYPES = ["any_contains", "all_contains", "exact", "regex", "catch_all"];
-const EDITABLE = ["name", "keywords", "match_type", "public_reply", "private_reply", "attachments", "enabled", "priority"] as const;
+const EDITABLE = ["name", "keywords", "match_type", "public_reply", "public_replies", "private_reply", "attachments", "enabled", "priority"] as const;
 
 // Confirms the config belongs to the user; returns it or null.
 async function ownedConfig(configId: string, userId: string) {
@@ -43,8 +43,9 @@ export async function POST(req: NextRequest) {
     name:          body.name ?? null,
     keywords:      Array.isArray(body.keywords) ? body.keywords : [],
     match_type,
-    public_reply:  body.public_reply ?? null,
-    private_reply: body.private_reply ?? null,
+    public_reply:   body.public_reply ?? null,
+    public_replies: Array.isArray(body.public_replies) ? body.public_replies : [],
+    private_reply:  body.private_reply ?? null,
     attachments:   Array.isArray(body.attachments) ? body.attachments : [],
     priority:      Number.isFinite(body.priority) ? body.priority : 0,
   }).select().single();

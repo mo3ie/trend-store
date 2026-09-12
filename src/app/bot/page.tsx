@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bot, MessageSquare, ArrowLeft, ArrowRight, Loader2, Plus, Settings2,
-  CheckCircle, Zap, ShieldCheck, Sparkles,
+  CheckCircle, Zap, ShieldCheck, Sparkles, Search,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import LangToggle from "@/components/LangToggle";
@@ -36,6 +36,7 @@ export default function BotDashboard() {
   const [loading, setLoading] = useState(true);
   const [price, setPrice]   = useState(50);
   const [busy, setBusy]     = useState<string>("");
+  const [q, setQ]           = useState("");
 
   useEffect(() => { load(); }, []);
 
@@ -119,11 +120,26 @@ export default function BotDashboard() {
           </div>
         ) : (
           <>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: "#cbd5e1", margin: "0 0 14px" }}>
-              {t("صفحاتك", "Your Pages")} ({pages.length})
-            </h3>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 14px", flexWrap: "wrap" }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#cbd5e1", margin: 0 }}>
+                {t("صفحاتك", "Your Pages")} ({pages.length})
+              </h3>
+              <button onClick={() => router.push("/ads/connect")}
+                style={{ marginInlineStart: "auto", background: `${BLUE}1f`, border: `1px solid ${BLUE}55`, borderRadius: 10, padding: "8px 14px", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7 }}>
+                <Plus size={15} /> {t("ربط صفحة", "Connect a Page")}
+              </button>
+            </div>
+
+            {/* Search */}
+            <div style={{ position: "relative", marginBottom: 14 }}>
+              <Search size={16} style={{ position: "absolute", insetInlineStart: 14, top: "50%", transform: "translateY(-50%)", color: "#64748b" }} />
+              <input value={q} onChange={(e) => setQ(e.target.value)}
+                placeholder={t("ابحث عن صفحة…", "Search for a Page…")}
+                style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, paddingBlock: 11, paddingInlineStart: 40, paddingInlineEnd: 14, color: "#fff", fontSize: 14 }} />
+            </div>
+
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {pages.map((p) => {
+              {pages.filter((p) => (p.page_name || "").toLowerCase().includes(q.trim().toLowerCase())).map((p) => {
                 const active = subActive(p.subscription);
                 const on = p.config?.enabled && active;
                 return (

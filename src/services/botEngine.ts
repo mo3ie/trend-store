@@ -7,19 +7,31 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
   replyToComment,
   sendPrivateReply,
+  likeComment,
   type BotAttachment,
 } from "@/services/meta";
 import { generateAiReply, aiAvailable } from "@/services/botAi";
 
 export interface BotRule {
-  id:            string;
-  keywords:      string[];
-  match_type:    string;
-  public_reply:  string | null;
-  private_reply: string | null;
-  attachments:   BotAttachment[];
-  enabled:       boolean;
-  priority:      number;
+  id:             string;
+  keywords:       string[];
+  match_type:     string;
+  public_reply:   string | null;
+  public_replies: string[] | null;
+  private_reply:  string | null;
+  attachments:    BotAttachment[];
+  enabled:        boolean;
+  priority:       number;
+}
+
+// Picks a random non-empty entry from a pool of reply variants, falling back to a
+// single legacy value. This is how the bot varies its wording so repeated replies
+// don't look copy-pasted (and read less like spam to Facebook).
+function pickVariant(pool: string[] | null | undefined, fallback: string | null): string | null {
+  const variants = (pool || []).map((s) => (s || "").trim()).filter(Boolean);
+  if (variants.length) return variants[Math.floor(Math.random() * variants.length)];
+  const f = (fallback || "").trim();
+  return f || null;
 }
 
 export interface CommentEvent {
@@ -96,7 +108,7 @@ export function matchRule(message: string, rules: BotRule[]): BotRule | null {
 // account temporarily blocked. We cap replies per page per minute using the
 // bot_reply_log as the counter (durable across serverless instances) and add a
 // small human-like jitter before each reply.
-async function throttleGate(configId: string, perMin: number): Promise<boolean> {
+async function throttleGate(configId: string, perMin: number, minDelaySec: number, maxDelaySec: number): Promise<boolean> {
   const since = new Date(Date.now() - 60_000).toISOString();
   // Count by sent_at (when we actually hit the Graph API), NOT created_at (when the
   // comment arrived) — otherwise drained rows carry an old created_at, never count
@@ -109,16 +121,22 @@ async function throttleGate(configId: string, perMin: number): Promise<boolean> 
 
   if ((count ?? 0) >= perMin) return false; // over budget → defer this comment
 
-  // Human-like pacing: 400–1600 ms before we touch the Graph API.
-  await new Promise((r) => setTimeout(r, 400 + Math.random() * 1200));
+  // Human-like pacing: wait a configurable min–max before we touch the Graph API.
+  const lo = Math.max(0, Math.min(minDelaySec, maxDelaySec));
+  const hi = Math.max(lo, maxDelaySec);
+  const waitMs = (lo + Math.random() * (hi - lo)) * 1000;
+  await new Promise((r) => setTimeout(r, waitMs));
   return true;
 }
 
 interface PoolToken { id: string; access_token: string; }
 
-// Picks the least-recently-used ACTIVE token for a config, reactivating any whose
-// cooldown has elapsed. Returns null if every token is dead/cooling-down.
-async function pickToken(configId: string): Promise<PoolToken | null> {
+// Picks a token for a config. If `preferId` is given (the account the owner chose to
+// reply from) and it's currently active, use it; otherwise fall back to the
+// least-recently-used ACTIVE token. Reactivates any whose cooldown has elapsed.
+// Returns null if every token is dead/cooling-down — so a rate-limited "active"
+// account still fails over to the rest of the pool on the next rotation attempt.
+async function pickToken(configId: string, preferId?: string | null): Promise<PoolToken | null> {
   const nowIso = new Date().toISOString();
 
   // Reactivate cooled-down tokens.
@@ -128,6 +146,21 @@ async function pickToken(configId: string): Promise<PoolToken | null> {
     .eq("config_id", configId)
     .eq("status", "cooldown")
     .lt("cooldown_until", nowIso);
+
+  // Owner-chosen account first (if still active).
+  if (preferId) {
+    const { data: pref } = await supabaseAdmin
+      .from("bot_page_tokens")
+      .select("id, access_token")
+      .eq("config_id", configId)
+      .eq("id", preferId)
+      .eq("status", "active")
+      .maybeSingle();
+    if (pref) {
+      await supabaseAdmin.from("bot_page_tokens").update({ last_used_at: nowIso }).eq("id", pref.id);
+      return { id: pref.id, access_token: pref.access_token };
+    }
+  }
 
   const { data } = await supabaseAdmin
     .from("bot_page_tokens")
@@ -169,11 +202,14 @@ async function coolDown(tokenId: string, minutes = 30): Promise<void> {
 async function withRotation<T>(
   configId: string,
   fn: (token: string) => Promise<T>,
+  preferId?: string | null,
   maxTries = 3
 ): Promise<{ ok: true; value: T; tokenId: string } | { ok: false; error: string }> {
   let lastErr = "no active token";
   for (let i = 0; i < maxTries; i++) {
-    const tok = await pickToken(configId);
+    // Only honour the chosen account on the first try; after a rate-limit block we
+    // let the pool fail over to whatever is still active.
+    const tok = await pickToken(configId, i === 0 ? preferId : null);
     if (!tok) return { ok: false, error: lastErr };
     try {
       const value = await fn(tok.access_token);
@@ -199,12 +235,23 @@ export async function processComment(ev: CommentEvent): Promise<string> {
   // Load an active config for this page.
   const { data: config } = await supabaseAdmin
     .from("bot_configs")
-    .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, ai_enabled, ai_persona, page_name, throttle_per_min")
+    .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, public_replies, default_private_reply, like_comments, min_delay_sec, max_delay_sec, active_token_id, post_filter, post_filter_enabled, ai_enabled, ai_persona, page_name, throttle_per_min")
     .eq("page_id", ev.pageId)
     .eq("platform", "meta")
     .eq("enabled", true)
     .maybeSingle();
   if (!config) return "no_active_config";
+
+  // Post targeting: if the owner restricted the bot to specific posts, ignore
+  // comments on any other post. Match the full "{pageId}_{postId}" id or the numeric
+  // suffix, since the webhook and the stored ids can differ in shape.
+  if (config.post_filter_enabled && (config.post_filter?.length ?? 0) > 0) {
+    const pid = ev.postId || "";
+    const suffix = (s: string) => (s.includes("_") ? s.split("_")[1] : s);
+    const want = suffix(pid);
+    const targeted = (config.post_filter as string[]).some((f) => f === pid || suffix(f) === want);
+    if (!targeted) return "post_not_targeted";
+  }
 
   // Subscription gate — only run for pages with an active bot subscription.
   const { data: sub } = await supabaseAdmin
@@ -235,15 +282,23 @@ export async function processComment(ev: CommentEvent): Promise<string> {
 }
 
 export interface BotConfig {
-  id:                   string;
-  user_id:              string;
-  reply_public:         boolean;
-  reply_private:        boolean;
-  default_public_reply: string | null;
-  ai_enabled:           boolean;
-  ai_persona:           string | null;
-  page_name:            string | null;
-  throttle_per_min:     number;
+  id:                    string;
+  user_id:               string;
+  reply_public:          boolean;
+  reply_private:         boolean;
+  default_public_reply:  string | null;
+  public_replies:        string[] | null;
+  default_private_reply: string | null;
+  like_comments:         boolean;
+  min_delay_sec:         number;
+  max_delay_sec:         number;
+  active_token_id:       string | null;
+  post_filter:           string[] | null;
+  post_filter_enabled:   boolean;
+  ai_enabled:            boolean;
+  ai_persona:            string | null;
+  page_name:             string | null;
+  throttle_per_min:      number;
 }
 
 // Matches rules (or asks the AI), then sends the replies for an ALREADY-CLAIMED
@@ -252,7 +307,9 @@ export interface BotConfig {
 export async function deliverComment(config: BotConfig, ev: CommentEvent): Promise<string> {
   // Throttle: over the per-minute budget → park it for the drain job.
   const perMin = config.throttle_per_min || 20;
-  if (!(await throttleGate(config.id, perMin))) {
+  const minD = config.min_delay_sec ?? 2;
+  const maxD = config.max_delay_sec ?? 6;
+  if (!(await throttleGate(config.id, perMin, minD, maxD))) {
     await supabaseAdmin.from("bot_reply_log")
       .update({ public_status: "deferred", private_status: "deferred", error: "throttled", sent_at: null })
       .eq("comment_id", ev.commentId);
@@ -262,7 +319,7 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
   // Match a rule.
   const { data: rules } = await supabaseAdmin
     .from("bot_rules")
-    .select("id, keywords, match_type, public_reply, private_reply, attachments, enabled, priority")
+    .select("id, keywords, match_type, public_reply, public_replies, private_reply, attachments, enabled, priority")
     .eq("config_id", config.id);
   const rule = matchRule(ev.message, (rules || []) as BotRule[]);
 
@@ -297,12 +354,18 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
 
   const errors: string[] = [];
 
-  // 1) Public reply.
+  const preferId = config.active_token_id;
+
+  // 1) Public reply — a random variant of the rule's (or the page-default) wording.
   if (config.reply_public) {
-    const text = rule?.public_reply || config.default_public_reply;
-    if (text) {
+    const text = rule
+      ? pickVariant(rule.public_replies, rule.public_reply)
+      : pickVariant(config.public_replies, config.default_public_reply);
+    // A matched rule with no public text of its own still falls back to the page default.
+    const finalText = text ?? (rule ? pickVariant(config.public_replies, config.default_public_reply) : null);
+    if (finalText) {
       const res = await withRotation(config.id, (tok) =>
-        replyToComment(ev.commentId, text, tok)
+        replyToComment(ev.commentId, finalText, tok), preferId
       );
       if (res.ok) { update.public_status = "sent"; update.used_token_id = res.tokenId; }
       else { update.public_status = "failed"; errors.push(`public: ${res.error}`); }
@@ -311,19 +374,26 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
     }
   }
 
-  // 2) Private reply (DM) with attachments. Body comes from the matched rule, or from
-  // the AI when no rule matched. Attachments only ever come from a rule.
-  const privateBody = rule ? (rule.private_reply || "") : (aiPrivate || "");
+  // 2) Private reply (DM) with attachments. Body comes from the matched rule (or the
+  // page-default DM), or from the AI when no rule matched. Attachments only from a rule.
+  const privateBody = rule
+    ? (rule.private_reply || config.default_private_reply || "")
+    : (aiPrivate || "");
   const privateAtts = rule?.attachments || [];
 
   if (config.reply_private && (privateBody || privateAtts.length)) {
     const res = await withRotation(config.id, (tok) =>
-      sendPrivateReply(ev.pageId, ev.commentId, privateBody, tok, privateAtts)
+      sendPrivateReply(ev.pageId, ev.commentId, privateBody, tok, privateAtts), preferId
     );
     if (res.ok) { update.private_status = "sent"; update.used_token_id = res.tokenId; }
     else { update.private_status = "failed"; errors.push(`private: ${res.error}`); }
   } else {
     update.private_status = "skipped";
+  }
+
+  // 3) Like the comment (best-effort — never fails the delivery).
+  if (config.like_comments) {
+    await withRotation(config.id, (tok) => likeComment(ev.commentId, tok), preferId);
   }
 
   if (errors.length) update.error = errors.join(" | ");
@@ -352,7 +422,7 @@ export async function drainDeferred(limit = 50): Promise<{ processed: number; se
     if (!configs.has(row.config_id)) {
       const { data } = await supabaseAdmin
         .from("bot_configs")
-        .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, ai_enabled, ai_persona, page_name, throttle_per_min")
+        .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, public_replies, default_private_reply, like_comments, min_delay_sec, max_delay_sec, active_token_id, post_filter, post_filter_enabled, ai_enabled, ai_persona, page_name, throttle_per_min")
         .eq("id", row.config_id)
         .eq("enabled", true)
         .maybeSingle();

@@ -175,6 +175,12 @@ export async function replyToComment(
   return data.id;
 }
 
+// Likes a comment as the Page (a light touch that shows the commenter they were
+// seen). Requires pages_manage_engagement. Best-effort — callers ignore failures.
+export async function likeComment(commentId: string, pageToken: string): Promise<void> {
+  await graph(`${commentId}/likes`, "POST", {}, pageToken);
+}
+
 // Sends a PRIVATE reply (DM) to whoever wrote a comment, via the Send API using
 // `recipient: { comment_id }`. This form supports attachments (images/files) and
 // works outside the 24h window because commenting opens the messaging window.

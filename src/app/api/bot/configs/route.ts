@@ -7,6 +7,9 @@ import { subscribePageToWebhook } from "@/services/meta";
 const EDITABLE = [
   "enabled", "reply_public", "reply_private", "ai_enabled", "ai_persona",
   "default_public_reply", "throttle_per_min",
+  // feature additions (2026-09)
+  "like_comments", "min_delay_sec", "max_delay_sec", "default_private_reply",
+  "public_replies", "post_filter", "post_filter_enabled", "active_token_id",
 ] as const;
 
 // GET — the user's Meta Pages, each merged with its bot config + subscription state.
@@ -78,14 +81,22 @@ export async function POST(req: NextRequest) {
   const { data: existingTok } = await supabaseAdmin
     .from("bot_page_tokens")
     .select("id").eq("config_id", config.id).eq("access_token", page.page_access_token).maybeSingle();
+  let seededTokenId = existingTok?.id ?? null;
   if (!existingTok) {
-    await supabaseAdmin.from("bot_page_tokens").insert({
+    const { data: newTok } = await supabaseAdmin.from("bot_page_tokens").insert({
       config_id:    config.id,
       user_id:      user.id,
       page_id:      page.page_id,
       label:        page.page_name || "الحساب الأساسي",
       access_token: page.page_access_token,
-    });
+    }).select("id").single();
+    seededTokenId = newTok?.id ?? null;
+  }
+
+  // Default the "active" account to the first token so the bot has one to reply from.
+  if (seededTokenId && !config.active_token_id) {
+    await supabaseAdmin.from("bot_configs").update({ active_token_id: seededTokenId }).eq("id", config.id);
+    config.active_token_id = seededTokenId;
   }
 
   return NextResponse.json({ config });
