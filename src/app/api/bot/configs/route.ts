@@ -133,13 +133,41 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (!config.webhook_subscribed) {
-      const { data: tok } = await supabaseAdmin
-        .from("bot_page_tokens").select("access_token")
-        .eq("config_id", config.id).eq("status", "active").limit(1).maybeSingle();
-      if (tok?.access_token) {
+      // Prefer the FRESHEST Page token — the one the OAuth connect flow just stored in
+      // connected_pages — over whatever is in the rotation pool (which may hold a stale
+      // token seeded when the config was first created, causing "session invalidated").
+      const { data: cp } = await supabaseAdmin
+        .from("connected_pages").select("page_access_token, page_name")
+        .eq("user_id", user.id).eq("page_id", config.page_id).eq("platform", "meta").maybeSingle();
+      let subToken = cp?.page_access_token || null;
+      if (!subToken) {
+        const { data: tok } = await supabaseAdmin
+          .from("bot_page_tokens").select("access_token")
+          .eq("config_id", config.id).eq("status", "active").limit(1).maybeSingle();
+        subToken = tok?.access_token || null;
+      }
+      if (subToken) {
         try {
-          await subscribePageToWebhook(config.page_id, tok.access_token);
+          await subscribePageToWebhook(config.page_id, subToken);
           patch.webhook_subscribed = true;
+          // Sync the pool + active account to this fresh token so replies use it too.
+          if (cp?.page_access_token) {
+            const { data: existing } = await supabaseAdmin
+              .from("bot_page_tokens").select("id")
+              .eq("config_id", config.id).eq("access_token", cp.page_access_token).maybeSingle();
+            let tokenId = existing?.id ?? null;
+            if (existing) {
+              await supabaseAdmin.from("bot_page_tokens")
+                .update({ status: "active", cooldown_until: null, fail_count: 0 }).eq("id", existing.id);
+            } else {
+              const { data: inserted } = await supabaseAdmin.from("bot_page_tokens").insert({
+                config_id: config.id, user_id: user.id, page_id: config.page_id,
+                label: cp.page_name || "الحساب الأساسي", access_token: cp.page_access_token,
+              }).select("id").single();
+              tokenId = inserted?.id ?? null;
+            }
+            if (tokenId) patch.active_token_id = tokenId;
+          }
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "webhook subscribe failed";
           return NextResponse.json({ error: msg }, { status: 500 });
