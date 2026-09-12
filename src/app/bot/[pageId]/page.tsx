@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Loader2, Bot, MessageSquare, Users, Activity,
   Settings2, Plus, Trash2, Save, AlertTriangle, Upload, X,
-  Sparkles, CreditCard, Power, Clock, Newspaper, Star, CheckCircle2, RefreshCw,
+  Sparkles, CreditCard, Power, Clock, Newspaper, Star, CheckCircle2, RefreshCw, Pencil,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import LangToggle from "@/components/LangToggle";
@@ -14,6 +14,7 @@ const GRADIENT = "linear-gradient(135deg, #0f0f1a 0%, #0d1b2a 100%)";
 const BLUE = "#1877f2", GREEN = "#22c55e", CARD = "rgba(255,255,255,0.04)", BORDER = "rgba(255,255,255,0.08)";
 
 interface Attachment { type: "image" | "file"; url: string; }
+interface PostOverride { public_replies: string[]; private_reply: string; attachments: Attachment[]; }
 interface Rule {
   id: string; name: string | null; keywords: string[]; match_type: string;
   public_reply: string | null; public_replies: string[]; private_reply: string | null; attachments: Attachment[];
@@ -26,6 +27,7 @@ interface Config {
   like_comments: boolean; min_delay_sec: number; max_delay_sec: number;
   default_private_reply: string | null; public_replies: string[];
   post_filter: string[]; post_filter_enabled: boolean; active_token_id: string | null;
+  post_overrides: Record<string, PostOverride>;
 }
 interface Sub { status: string; expires_at: string | null; }
 interface Token { id: string; label: string | null; status: string; cooldown_until: string | null; fail_count: number; last_used_at: string | null; }
@@ -533,6 +535,12 @@ function AccountsTab({ config, patch, flash, t }: { config: Config; patch: (p: P
         <Plus size={17} /> {t("ربط حساب فيسبوك إضافي", "Link another Facebook account")}
       </button>
 
+      {!loading && tokens.length <= 1 && tokens.length > 0 && (
+        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14, textAlign: "center", lineHeight: 1.7 }}>
+          {t("لديك حساب واحد (وهو النشط ⭐). اربط حساباً آخر بالزرّ أعلاه، وعندها يظهر زرّ «اجعله النشط» للتبديل بينهما.", "You have one account (it's active ⭐). Link another with the button above, then a “Set active” button appears to switch between them.")}
+        </div>
+      )}
+
       {loading ? <div style={{ textAlign: "center", padding: 30, color: "#64748b" }}><Loader2 size={24} className="spin" /></div>
         : tokens.length === 0 ? (
           <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
@@ -573,13 +581,19 @@ function AccountsTab({ config, patch, flash, t }: { config: Config; patch: (p: P
   );
 }
 
-// ── Posts targeting tab ──────────────────────────────────────────────────────
+// ── Posts targeting + per-post replies tab ───────────────────────────────────
+function hasOverride(o?: PostOverride): boolean {
+  return !!o && ((o.public_replies || []).some((s) => (s || "").trim()) || !!(o.private_reply || "").trim() || (o.attachments || []).length > 0);
+}
+
 function PostsTab({ config, pageId, patch, flash, t }: { config: Config; pageId: string; patch: (p: Partial<Config>) => Promise<boolean>; flash: (m: string) => void; t: TF }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [targeted, setTargeted] = useState(config.post_filter_enabled);
   const [selected, setSelected] = useState<Set<string>>(new Set(config.post_filter || []));
+  const [overrides, setOverrides] = useState<Record<string, PostOverride>>(config.post_overrides || {});
+  const [editing, setEditing] = useState<Post | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -594,7 +608,7 @@ function PostsTab({ config, pageId, patch, flash, t }: { config: Config; pageId:
     setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   }
 
-  async function save() {
+  async function saveSelection() {
     setSaving(true);
     const ok = await patch({ post_filter: [...selected], post_filter_enabled: targeted });
     setSaving(false);
@@ -607,7 +621,25 @@ function PostsTab({ config, pageId, patch, flash, t }: { config: Config; pageId:
     if (v) { await patch({ post_filter_enabled: false }); flash(t("سيردّ على كل المنشورات", "Will reply on all posts")); }
   }
 
+  // Persist a post's custom reply. Saving one also targets that post so it's honoured
+  // even in "specific posts" mode.
+  async function saveOverride(post: Post, ov: PostOverride) {
+    const next = { ...overrides };
+    if (hasOverride(ov)) next[post.id] = ov; else delete next[post.id];
+    const nextSel = new Set(selected); if (hasOverride(ov)) nextSel.add(post.id);
+    const ok = await patch({ post_overrides: next, post_filter: [...nextSel] });
+    if (ok) {
+      setOverrides(next); setSelected(nextSel); setEditing(null);
+      flash(hasOverride(ov) ? t("تم حفظ ردّ المنشور ✅", "Saved post reply ✅") : t("تم حذف ردّ المنشور", "Post reply removed"));
+    }
+  }
+
   const box: React.CSSProperties = { background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: "6px 20px" };
+
+  if (editing) {
+    return <PostReplyEditor post={editing} initial={overrides[editing.id]} t={t}
+      onClose={() => setEditing(null)} onSave={(ov) => saveOverride(editing, ov)} />;
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -617,48 +649,142 @@ function PostsTab({ config, pageId, patch, flash, t }: { config: Config; pageId:
         </Row>
       </div>
 
-      {targeted && (
-        <>
-          <div style={{ fontSize: 13, color: "#94a3b8" }}>
-            {t("اختر المنشورات التي يردّ عليها البوت:", "Choose the posts the bot replies on:")}
-            {selected.size > 0 && <span style={{ color: BLUE, fontWeight: 700 }}> ({selected.size})</span>}
+      <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.7 }}>
+        {targeted
+          ? t("اختر المنشورات (المربّع) التي يردّ عليها البوت، واضغط على أي منشور لتخصيص ردّ خاص به.", "Tick the posts the bot replies on, and tap any post to set a custom reply for it.")
+          : t("اضغط على أي منشور لتخصيص ردّ خاص به (اختياري).", "Tap any post to give it its own custom reply (optional).")}
+        {targeted && selected.size > 0 && <span style={{ color: BLUE, fontWeight: 700 }}> · {selected.size}</span>}
+      </div>
+
+      {loading ? <div style={{ textAlign: "center", padding: 30, color: "#64748b" }}><Loader2 size={24} className="spin" /></div>
+        : err ? <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 20, textAlign: "center", color: "#f87171", fontSize: 13 }}>{err}</div>
+        : posts.length === 0 ? <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>{t("لا منشورات على هذه الصفحة", "No posts on this Page")}</div>
+        : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {posts.map((p) => {
+              const on = selected.has(p.id);
+              const custom = hasOverride(overrides[p.id]);
+              return (
+                <div key={p.id} onClick={() => setEditing(p)}
+                  style={{ background: custom ? `${GREEN}10` : CARD, border: `1px solid ${custom ? `${GREEN}44` : (on ? `${BLUE}55` : BORDER)}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", color: "#fff" }}>
+                  {p.picture ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.picture} alt="" style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
+                  ) : (
+                    <div style={{ width: 48, height: 48, borderRadius: 10, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Newspaper size={20} color="#64748b" /></div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.message || t("(منشور بدون نص)", "(post with no text)")}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                      <span style={{ fontSize: 11, color: "#64748b" }}>{new Date(p.createdTime).toLocaleDateString(t("ar-LY", "en-GB"))}</span>
+                      {custom && <span style={{ fontSize: 11, color: GREEN, display: "inline-flex", alignItems: "center", gap: 3 }}><MessageSquare size={11} /> {t("ردّ مخصّص", "Custom reply")}</span>}
+                    </div>
+                  </div>
+                  <button onClick={(e) => { e.stopPropagation(); setEditing(p); }} title={t("تعديل الرد", "Edit reply")}
+                    style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "7px 9px", color: "#cbd5e1", cursor: "pointer", flexShrink: 0 }}>
+                    <Pencil size={14} />
+                  </button>
+                  {targeted && (
+                    <div onClick={(e) => { e.stopPropagation(); toggleSel(p.id); }}
+                      style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${on ? BLUE : BORDER}`, background: on ? BLUE : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}>
+                      {on && <CheckCircle2 size={16} color="#fff" />}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
+        )}
 
-          {loading ? <div style={{ textAlign: "center", padding: 30, color: "#64748b" }}><Loader2 size={24} className="spin" /></div>
-            : err ? <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 20, textAlign: "center", color: "#f87171", fontSize: 13 }}>{err}</div>
-            : posts.length === 0 ? <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>{t("لا منشورات على هذه الصفحة", "No posts on this Page")}</div>
-            : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {posts.map((p) => {
-                  const on = selected.has(p.id);
-                  return (
-                    <button key={p.id} onClick={() => toggleSel(p.id)}
-                      style={{ textAlign: "start", background: on ? `${BLUE}14` : CARD, border: `1px solid ${on ? `${BLUE}66` : BORDER}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", color: "#fff" }}>
-                      {p.picture ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.picture} alt="" style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
-                      ) : (
-                        <div style={{ width: 48, height: 48, borderRadius: 10, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Newspaper size={20} color="#64748b" /></div>
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.message || t("(منشور بدون نص)", "(post with no text)")}</div>
-                        <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>{new Date(p.createdTime).toLocaleDateString(t("ar-LY", "en-GB"))}</div>
-                      </div>
-                      <div style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${on ? BLUE : BORDER}`, background: on ? BLUE : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        {on && <CheckCircle2 size={16} color="#fff" />}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-          <button onClick={save} disabled={saving}
-            style={{ background: `linear-gradient(135deg, ${GREEN}, #16a34a)`, border: "none", borderRadius: 11, padding: "12px 0", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-            {saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />} {t("حفظ", "Save")}
-          </button>
-        </>
+      {targeted && (
+        <button onClick={saveSelection} disabled={saving}
+          style={{ background: `linear-gradient(135deg, ${GREEN}, #16a34a)`, border: "none", borderRadius: 11, padding: "12px 0", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          {saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />} {t("حفظ المنشورات المختارة", "Save selected posts")}
+        </button>
       )}
+    </div>
+  );
+}
+
+// Editor for a single post's custom public/private reply + attachments.
+function PostReplyEditor({ post, initial, t, onClose, onSave }: { post: Post; initial?: PostOverride; t: TF; onClose: () => void; onSave: (ov: PostOverride) => void }) {
+  const [pubVariants, setPubVariants] = useState((initial?.public_replies || []).join("\n"));
+  const [priv, setPriv] = useState(initial?.private_reply || "");
+  const [atts, setAtts] = useState<Attachment[]>(initial?.attachments || []);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function upload(file: File) {
+    setUploading(true);
+    const fd = new FormData(); fd.append("file", file);
+    const res = await fetch("/api/bot/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    setUploading(false);
+    if (data.url) setAtts((a) => [...a, { type: data.type, url: data.url }]);
+  }
+
+  async function save() {
+    setSaving(true);
+    await onSave({
+      public_replies: pubVariants.split("\n").map((s) => s.trim()).filter(Boolean),
+      private_reply: priv.trim(),
+      attachments: atts,
+    });
+    setSaving(false);
+  }
+
+  const inp: React.CSSProperties = { width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 9, padding: "11px 14px", color: "#fff", boxSizing: "border-box" };
+  const lbl: React.CSSProperties = { fontSize: 13, fontWeight: 600, display: "block", marginBottom: 7, marginTop: 16 };
+
+  return (
+    <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: 22 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{t("ردّ خاص بهذا المنشور", "Custom reply for this post")}</h3>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}><X size={20} /></button>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,0.04)", borderRadius: 12, padding: 10, marginTop: 8 }}>
+        {post.picture ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={post.picture} alt="" style={{ width: 44, height: 44, borderRadius: 9, objectFit: "cover" }} />
+        ) : <div style={{ width: 44, height: 44, borderRadius: 9, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}><Newspaper size={18} color="#64748b" /></div>}
+        <div style={{ fontSize: 12, color: "#cbd5e1", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{post.message || t("(منشور بدون نص)", "(post with no text)")}</div>
+      </div>
+
+      <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 12, lineHeight: 1.7 }}>
+        {t("يُستخدم هذا الردّ لكل تعليق على هذا المنشور تحديداً — ويتقدّم على القواعد العامة.", "This reply is used for every comment on this specific post — and takes priority over the general rules.")}
+      </div>
+
+      <label style={lbl}>{t("الرد العلني — سطر لكل نص للتنويع", "Public reply — one text per line for variety")}</label>
+      <textarea value={pubVariants} onChange={(e) => setPubVariants(e.target.value)} rows={3} style={{ ...inp, resize: "vertical" }} placeholder={t("تمّت مراسلتك في الخاص ✅\nراسلناك على الخاص 📩", "We've DMed you ✅\nCheck your inbox 📩")} />
+
+      <label style={lbl}>{t("الرسالة الخاصة (السعر/التفاصيل)", "Private message (price/details)")}</label>
+      <textarea value={priv} onChange={(e) => setPriv(e.target.value)} rows={4} style={{ ...inp, resize: "vertical" }} placeholder={t("سعر هذا المنتج 250 د.ل، متوفر 📦", "This product is 250 LYD, in stock 📦")} />
+
+      <label style={lbl}>{t("مرفقات (صور المنتج)", "Attachments (product images)")}</label>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+        {atts.map((a, i) => (
+          <div key={i} style={{ position: "relative" }}>
+            {a.type === "image" ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={a.url} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: "cover", border: `1px solid ${BORDER}` }} />
+            ) : (
+              <div style={{ width: 60, height: 60, borderRadius: 10, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#94a3b8" }}>PDF</div>
+            )}
+            <button onClick={() => setAtts((x) => x.filter((_, j) => j !== i))}
+              style={{ position: "absolute", top: -6, insetInlineEnd: -6, background: "#ef4444", border: "none", borderRadius: "50%", width: 20, height: 20, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={12} /></button>
+          </div>
+        ))}
+        <label style={{ width: 60, height: 60, borderRadius: 10, border: `1px dashed ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#94a3b8" }}>
+          {uploading ? <Loader2 size={18} className="spin" /> : <Upload size={18} />}
+          <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
+        </label>
+      </div>
+
+      <button onClick={save} disabled={saving}
+        style={{ width: "100%", marginTop: 20, background: `linear-gradient(135deg, ${GREEN}, #16a34a)`, border: "none", borderRadius: 11, padding: "13px 0", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />} {t("حفظ ردّ المنشور", "Save post reply")}
+      </button>
     </div>
   );
 }

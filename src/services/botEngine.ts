@@ -34,6 +34,25 @@ function pickVariant(pool: string[] | null | undefined, fallback: string | null)
   return f || null;
 }
 
+// A per-post custom reply, keyed by numeric post id in bot_configs.post_overrides.
+export interface PostOverride {
+  public_replies?: string[];
+  private_reply?:  string;
+  attachments?:    BotAttachment[];
+}
+
+// Finds the override for a post. Webhook post ids are "{pageId}_{postId}" while the
+// map is keyed by the numeric post id, so match either shape.
+function getOverride(overrides: Record<string, PostOverride> | null | undefined, postId: string): PostOverride | null {
+  if (!overrides || !postId) return null;
+  const suffix = postId.includes("_") ? postId.split("_")[1] : postId;
+  return overrides[postId] || overrides[suffix] || null;
+}
+
+function overrideHasContent(o: PostOverride | null): boolean {
+  return !!o && ((o.public_replies?.some((s) => (s || "").trim()) ?? false) || !!(o.private_reply || "").trim() || (o.attachments?.length ?? 0) > 0);
+}
+
 export interface CommentEvent {
   pageId:     string;
   commentId:  string;
@@ -235,7 +254,7 @@ export async function processComment(ev: CommentEvent): Promise<string> {
   // Load an active config for this page.
   const { data: config } = await supabaseAdmin
     .from("bot_configs")
-    .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, public_replies, default_private_reply, like_comments, min_delay_sec, max_delay_sec, active_token_id, post_filter, post_filter_enabled, ai_enabled, ai_persona, page_name, throttle_per_min")
+    .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, public_replies, default_private_reply, like_comments, min_delay_sec, max_delay_sec, active_token_id, post_filter, post_filter_enabled, post_overrides, ai_enabled, ai_persona, page_name, throttle_per_min")
     .eq("page_id", ev.pageId)
     .eq("platform", "meta")
     .eq("enabled", true)
@@ -244,13 +263,15 @@ export async function processComment(ev: CommentEvent): Promise<string> {
 
   // Post targeting: if the owner restricted the bot to specific posts, ignore
   // comments on any other post. Match the full "{pageId}_{postId}" id or the numeric
-  // suffix, since the webhook and the stored ids can differ in shape.
+  // suffix, since the webhook and the stored ids can differ in shape. A post with its
+  // own custom reply is always targeted, even in "specific posts" mode.
   if (config.post_filter_enabled && (config.post_filter?.length ?? 0) > 0) {
     const pid = ev.postId || "";
     const suffix = (s: string) => (s.includes("_") ? s.split("_")[1] : s);
     const want = suffix(pid);
     const targeted = (config.post_filter as string[]).some((f) => f === pid || suffix(f) === want);
-    if (!targeted) return "post_not_targeted";
+    const hasOverride = overrideHasContent(getOverride(config.post_overrides, pid));
+    if (!targeted && !hasOverride) return "post_not_targeted";
   }
 
   // Subscription gate — only run for pages with an active bot subscription.
@@ -295,6 +316,7 @@ export interface BotConfig {
   active_token_id:       string | null;
   post_filter:           string[] | null;
   post_filter_enabled:   boolean;
+  post_overrides:        Record<string, PostOverride> | null;
   ai_enabled:            boolean;
   ai_persona:            string | null;
   page_name:             string | null;
@@ -316,12 +338,16 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
     return "deferred";
   }
 
-  // Match a rule.
+  // A post-specific custom reply wins over keyword rules for comments on that post.
+  const override = getOverride(config.post_overrides, ev.postId);
+  const useOverride = overrideHasContent(override);
+
+  // Match a rule (unless a post override is answering this comment).
   const { data: rules } = await supabaseAdmin
     .from("bot_rules")
     .select("id, keywords, match_type, public_reply, public_replies, private_reply, attachments, enabled, priority")
     .eq("config_id", config.id);
-  const rule = matchRule(ev.message, (rules || []) as BotRule[]);
+  const rule = useOverride ? null : matchRule(ev.message, (rules || []) as BotRule[]);
 
   // Seed both statuses to 'skipped' and stamp sent_at NOW: this row has consumed a
   // throttle slot, and — critically — it must not stay 'deferred' when a reply type is
@@ -338,7 +364,7 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
   // configured). The AI text becomes the private reply; the public reply falls back to
   // the page default. Without AI we stay silent rather than guess.
   let aiPrivate: string | null = null;
-  if (!rule) {
+  if (!rule && !useOverride) {
     if (config.ai_enabled && aiAvailable()) {
       aiPrivate = await generateAiReply(ev.message, config.ai_persona, config.page_name);
     }
@@ -351,18 +377,21 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
     }
     update.error = "ai_reply";
   }
+  if (useOverride) update.error = "post_override";
 
   const errors: string[] = [];
 
   const preferId = config.active_token_id;
 
-  // 1) Public reply — a random variant of the rule's (or the page-default) wording.
+  // 1) Public reply — a random variant of the post-override's, rule's, or page-default wording.
   if (config.reply_public) {
-    const text = rule
-      ? pickVariant(rule.public_replies, rule.public_reply)
-      : pickVariant(config.public_replies, config.default_public_reply);
-    // A matched rule with no public text of its own still falls back to the page default.
-    const finalText = text ?? (rule ? pickVariant(config.public_replies, config.default_public_reply) : null);
+    const text = useOverride
+      ? pickVariant(override!.public_replies, null)
+      : rule
+        ? pickVariant(rule.public_replies, rule.public_reply)
+        : pickVariant(config.public_replies, config.default_public_reply);
+    // Fall back to the page default when the chosen source has no public text of its own.
+    const finalText = text ?? pickVariant(config.public_replies, config.default_public_reply);
     if (finalText) {
       const res = await withRotation(config.id, (tok) =>
         replyToComment(ev.commentId, finalText, tok), preferId
@@ -376,10 +405,12 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
 
   // 2) Private reply (DM) with attachments. Body comes from the matched rule (or the
   // page-default DM), or from the AI when no rule matched. Attachments only from a rule.
-  const privateBody = rule
-    ? (rule.private_reply || config.default_private_reply || "")
-    : (aiPrivate || "");
-  const privateAtts = rule?.attachments || [];
+  const privateBody = useOverride
+    ? (override!.private_reply || config.default_private_reply || "")
+    : rule
+      ? (rule.private_reply || config.default_private_reply || "")
+      : (aiPrivate || "");
+  const privateAtts = useOverride ? (override!.attachments || []) : (rule?.attachments || []);
 
   if (config.reply_private && (privateBody || privateAtts.length)) {
     const res = await withRotation(config.id, (tok) =>
@@ -422,7 +453,7 @@ export async function drainDeferred(limit = 50): Promise<{ processed: number; se
     if (!configs.has(row.config_id)) {
       const { data } = await supabaseAdmin
         .from("bot_configs")
-        .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, public_replies, default_private_reply, like_comments, min_delay_sec, max_delay_sec, active_token_id, post_filter, post_filter_enabled, ai_enabled, ai_persona, page_name, throttle_per_min")
+        .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, public_replies, default_private_reply, like_comments, min_delay_sec, max_delay_sec, active_token_id, post_filter, post_filter_enabled, post_overrides, ai_enabled, ai_persona, page_name, throttle_per_min")
         .eq("id", row.config_id)
         .eq("enabled", true)
         .maybeSingle();

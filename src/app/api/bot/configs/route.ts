@@ -10,6 +10,7 @@ const EDITABLE = [
   // feature additions (2026-09)
   "like_comments", "min_delay_sec", "max_delay_sec", "default_private_reply",
   "public_replies", "post_filter", "post_filter_enabled", "active_token_id",
+  "post_overrides",
 ] as const;
 
 // GET — the user's Meta Pages, each merged with its bot config + subscription state.
