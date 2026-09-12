@@ -8,6 +8,7 @@ import {
   replyToComment,
   sendPrivateReply,
   likeComment,
+  getSystemPageToken,
   type BotAttachment,
 } from "@/services/meta";
 import { generateAiReply, aiAvailable } from "@/services/botAi";
@@ -218,28 +219,42 @@ async function coolDown(tokenId: string, minutes = 30): Promise<void> {
 
 // Runs a Graph call with token rotation: on a rate-limit error the current token is
 // cooled down and the next active token is tried, up to `maxTries` distinct tokens.
+function isDeadToken(msg: string): boolean {
+  const m = msg.toLowerCase();
+  return m.includes("session has been invalidated") || m.includes("(#190)") ||
+    m.includes("code 190") || m.includes("access token") && m.includes("invalid");
+}
+
 async function withRotation<T>(
   configId: string,
   fn: (token: string) => Promise<T>,
   preferId?: string | null,
+  pageId?: string,
   maxTries = 3
-): Promise<{ ok: true; value: T; tokenId: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; value: T; tokenId: string | null } | { ok: false; error: string }> {
   let lastErr = "no active token";
   for (let i = 0; i < maxTries; i++) {
     // Only honour the chosen account on the first try; after a rate-limit block we
     // let the pool fail over to whatever is still active.
     const tok = await pickToken(configId, i === 0 ? preferId : null);
-    if (!tok) return { ok: false, error: lastErr };
+    if (!tok) break;
     try {
       const value = await fn(tok.access_token);
       return { ok: true, value, tokenId: tok.id };
     } catch (err: unknown) {
       lastErr = err instanceof Error ? err.message : "error";
-      if (isRateLimit(lastErr)) {
-        await coolDown(tok.id);
-        continue; // fail over to the next token
-      }
-      return { ok: false, error: lastErr }; // non-rate-limit error → stop
+      if (isRateLimit(lastErr)) { await coolDown(tok.id); continue; }
+      if (isDeadToken(lastErr)) { await coolDown(tok.id, 24 * 60); continue; } // OAuth token died → try another
+      return { ok: false, error: lastErr }; // other error → stop
+    }
+  }
+  // Final fallback: a STABLE system-user Page token (never dies from an OAuth session
+  // reset). Works for pages the store's system user manages in the Business.
+  if (pageId) {
+    const sys = await getSystemPageToken(pageId);
+    if (sys) {
+      try { return { ok: true, value: await fn(sys), tokenId: null }; }
+      catch (err: unknown) { lastErr = err instanceof Error ? err.message : lastErr; }
     }
   }
   return { ok: false, error: lastErr };
@@ -394,7 +409,7 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
     const finalText = text ?? pickVariant(config.public_replies, config.default_public_reply);
     if (finalText) {
       const res = await withRotation(config.id, (tok) =>
-        replyToComment(ev.commentId, finalText, tok), preferId
+        replyToComment(ev.commentId, finalText, tok), preferId, ev.pageId
       );
       if (res.ok) { update.public_status = "sent"; update.used_token_id = res.tokenId; }
       else { update.public_status = "failed"; errors.push(`public: ${res.error}`); }
@@ -414,7 +429,7 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
 
   if (config.reply_private && (privateBody || privateAtts.length)) {
     const res = await withRotation(config.id, (tok) =>
-      sendPrivateReply(ev.pageId, ev.commentId, privateBody, tok, privateAtts), preferId
+      sendPrivateReply(ev.pageId, ev.commentId, privateBody, tok, privateAtts), preferId, ev.pageId
     );
     if (res.ok) { update.private_status = "sent"; update.used_token_id = res.tokenId; }
     else { update.private_status = "failed"; errors.push(`private: ${res.error}`); }
@@ -424,7 +439,7 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
 
   // 3) Like the comment (best-effort — never fails the delivery).
   if (config.like_comments) {
-    await withRotation(config.id, (tok) => likeComment(ev.commentId, tok), preferId);
+    await withRotation(config.id, (tok) => likeComment(ev.commentId, tok), preferId, ev.pageId);
   }
 
   if (errors.length) update.error = errors.join(" | ");

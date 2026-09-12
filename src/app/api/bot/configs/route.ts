@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
-import { subscribePageToWebhook } from "@/services/meta";
+import { subscribePageToWebhook, getSystemPageToken } from "@/services/meta";
 
 // Fields a user is allowed to change on their bot config.
 const EDITABLE = [
@@ -133,13 +133,19 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (!config.webhook_subscribed) {
-      // Prefer the FRESHEST Page token — the one the OAuth connect flow just stored in
-      // connected_pages — over whatever is in the rotation pool (which may hold a stale
-      // token seeded when the config was first created, causing "session invalidated").
+      // Token priority for going live:
+      // 1) a STABLE system-user Page token (survives the OAuth "session invalidated"
+      //    death — the store's system user manages the page in the Business);
+      // 2) the freshest OAuth token from connected_pages;
+      // 3) whatever is already in the rotation pool.
+      const sysToken = await getSystemPageToken(config.page_id);
       const { data: cp } = await supabaseAdmin
         .from("connected_pages").select("page_access_token, page_name")
         .eq("user_id", user.id).eq("page_id", config.page_id).eq("platform", "meta").maybeSingle();
-      let subToken = cp?.page_access_token || null;
+
+      let subToken = sysToken || cp?.page_access_token || null;
+      const freshToken = sysToken || cp?.page_access_token || null;
+      const freshLabel = sysToken ? "مستخدم النظام" : (cp?.page_name || "الحساب الأساسي");
       if (!subToken) {
         const { data: tok } = await supabaseAdmin
           .from("bot_page_tokens").select("access_token")
@@ -150,11 +156,11 @@ export async function PATCH(req: NextRequest) {
         try {
           await subscribePageToWebhook(config.page_id, subToken);
           patch.webhook_subscribed = true;
-          // Sync the pool + active account to this fresh token so replies use it too.
-          if (cp?.page_access_token) {
+          // Sync the pool + active account to the fresh token so replies use it too.
+          if (freshToken) {
             const { data: existing } = await supabaseAdmin
               .from("bot_page_tokens").select("id")
-              .eq("config_id", config.id).eq("access_token", cp.page_access_token).maybeSingle();
+              .eq("config_id", config.id).eq("access_token", freshToken).maybeSingle();
             let tokenId = existing?.id ?? null;
             if (existing) {
               await supabaseAdmin.from("bot_page_tokens")
@@ -162,7 +168,7 @@ export async function PATCH(req: NextRequest) {
             } else {
               const { data: inserted } = await supabaseAdmin.from("bot_page_tokens").insert({
                 config_id: config.id, user_id: user.id, page_id: config.page_id,
-                label: cp.page_name || "الحساب الأساسي", access_token: cp.page_access_token,
+                label: freshLabel, access_token: freshToken,
               }).select("id").single();
               tokenId = inserted?.id ?? null;
             }
