@@ -40,6 +40,20 @@ export default function PrivacyPage() {
             ],
           },
           {
+            title: ["بوت الرد الآلي (فيسبوك وتيك توك)", "Auto-reply bot (Facebook & TikTok)"],
+            body: [
+              "عند اشتراكك في خدمة بوت الرد الآلي، تمنحنا صلاحية قراءة التعليقات المنشورة على صفحاتك أو فيديوهاتك أنت فقط، والرد عليها نيابةً عنك — علنياً أو برسالة خاصة (فيسبوك فقط). لا نقرأ رسائلك الخاصة ولا تعليقات حسابات لا تملكها. نحفظ نص التعليق ومعرّفه لغرض واحد: منع تكرار الرد وعرض سجل النشاط لك. يمكنك إيقاف البوت أو إلغاء الصلاحيات في أي وقت.",
+              "When you subscribe to the auto-reply bot, you grant us permission to read comments posted on your own Pages or videos only, and to reply to them on your behalf — publicly or by private message (Facebook only). We do not read your private messages, nor comments on accounts you do not own. We store the comment text and its ID for one purpose: preventing duplicate replies and showing you an activity log. You can turn the bot off or revoke permissions at any time.",
+            ],
+          },
+          {
+            title: ["تيك توك", "TikTok"],
+            body: [
+              "عند ربط حساب تيك توك التجاري الخاص بك، نستخدم صلاحيات تيك توك الرسمية لقراءة فيديوهاتك وتعليقاتها والرد عليها علنياً فقط، وذلك حصراً على الحساب الذي ربطته بنفسك. لا نستخدم بياناتك لأي غرض آخر، ولا نشاركها مع أي طرف ثالث.",
+              "When you connect your TikTok Business account, we use TikTok's official permissions to read your videos and their comments and to reply publicly — exclusively on the account you connected yourself. We do not use your data for any other purpose, and we do not share it with any third party.",
+            ],
+          },
+          {
             title: ["حفظ البيانات وحمايتها", "Data storage & protection"],
             body: [
               "نحفظ بياناتك بشكل آمن على خوادم Supabase. رموز الوصول الخاصة بصفحاتك مشفرة ولا يمكن الوصول إليها إلا من خلال النظام المصرّح.",

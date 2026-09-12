@@ -279,6 +279,7 @@ export default function Home() {
                 <a href="/orders">{t("تتبّع طلبك", "Track order")}</a>
                 <a onClick={() => setModal("maint")}>{t("منظومة الصيانة", "Maintenance")}</a>
                 <a href="/privacy">{t("سياسة الخصوصية", "Privacy")}</a>
+                <a href="/terms">{t("الشروط والأحكام", "Terms")}</a>
               </div>
             </div>
             <div className="copy">© 2026 {t("محل ترند للإلكترونيات — جميع الحقوق محفوظة", "Trend Store — all rights reserved")}</div>
