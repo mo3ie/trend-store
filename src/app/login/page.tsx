@@ -9,9 +9,6 @@ import { useCart } from "@/hooks/useCart";
 import { useLang } from "@/hooks/useLang";
 import LangToggle from "@/components/LangToggle";
 
-// Vivid gradient of the "حيوي جريء" direction.
-const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
-
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24">
@@ -124,15 +121,15 @@ export default function LoginPage() {
           )}
         </div>
       </a>
-      <div className="fixed top-[-100px] left-[-100px] w-[400px] h-[400px] bg-fuchsia-600/25 rounded-full blur-[120px] pointer-events-none" />
-      <div className="fixed bottom-[-100px] right-[-100px] w-[400px] h-[400px] bg-orange-500/20 rounded-full blur-[120px] pointer-events-none" />
+      <div className="fixed top-[-100px] left-[-100px] w-[400px] h-[400px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none" />
+      <div className="fixed bottom-[-100px] right-[-100px] w-[400px] h-[400px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="w-full max-w-md relative">
         <div className="bg-[var(--surface)] border border-purple-500/30 rounded-3xl p-8 shadow-[0_0_60px_rgba(168,85,247,0.1)]">
 
           {/* Logo */}
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-black tracking-widest bg-clip-text text-transparent" style={{ backgroundImage: G_HERO }}>
+            <h1 className="text-4xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
               TREND
             </h1>
             <p className="text-[var(--muted-2)] text-sm mt-1">{t("ترند للإلكترونيات", "Trend Electronics")}</p>
@@ -250,8 +247,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              style={{ background: G_HERO }}
-              className="w-full py-3 rounded-xl font-bold text-white hover:opacity-90 hover:shadow-[0_0_24px_rgba(214,64,159,0.5)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+              className="w-full py-3 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-500 hover:to-blue-400 hover:shadow-[0_0_24px_rgba(168,85,247,0.5)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
             >
               {loading ? (
                 <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
