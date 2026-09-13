@@ -10,8 +10,23 @@ export async function getAdsPricing(): Promise<AdsPricing> {
   return mergeAdsPricing(stored);
 }
 
+// VIP is granted two ways: an admin-set permanent tier='vip', OR an active paid
+// monthly subscription (profiles.vip_until in the future).
 export async function getUserTier(userId: string): Promise<Tier> {
   const { data } = await supabaseAdmin
-    .from("profiles").select("tier").eq("id", userId).maybeSingle();
-  return (data as { tier?: string } | null)?.tier === "vip" ? "vip" : "regular";
+    .from("profiles").select("tier, vip_until").eq("id", userId).maybeSingle();
+  const row = data as { tier?: string; vip_until?: string | null } | null;
+  if (row?.tier === "vip") return "vip";
+  if (row?.vip_until && new Date(row.vip_until).getTime() > Date.now()) return "vip";
+  return "regular";
+}
+
+// Returns VIP status + expiry for display.
+export async function getVipStatus(userId: string): Promise<{ vip: boolean; until: string | null; permanent: boolean }> {
+  const { data } = await supabaseAdmin
+    .from("profiles").select("tier, vip_until").eq("id", userId).maybeSingle();
+  const row = data as { tier?: string; vip_until?: string | null } | null;
+  const permanent = row?.tier === "vip";
+  const active = !!row?.vip_until && new Date(row.vip_until!).getTime() > Date.now();
+  return { vip: permanent || active, until: row?.vip_until ?? null, permanent };
 }

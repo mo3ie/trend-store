@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { getAdsPricing, getUserTier } from "@/lib/adsPricing";
+import { getAdsPricing, getUserTier, getVipStatus } from "@/lib/adsPricing";
 
 async function getUser() {
   const store = await cookies();
@@ -19,7 +19,7 @@ async function getUser() {
 export async function GET() {
   const user = await getUser();
   const pricing = await getAdsPricing();
-  if (!user) return NextResponse.json({ tier: "regular", pricing });
-  const tier = await getUserTier(user.id);
-  return NextResponse.json({ tier, pricing });
+  if (!user) return NextResponse.json({ tier: "regular", pricing, vip: { vip: false, until: null, permanent: false } });
+  const [tier, vip] = await Promise.all([getUserTier(user.id), getVipStatus(user.id)]);
+  return NextResponse.json({ tier, pricing, vip });
 }

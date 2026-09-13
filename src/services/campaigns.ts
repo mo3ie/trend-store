@@ -27,6 +27,64 @@ export const DEFAULT_PACKAGES: AdPackage[] = [
   { id: "premium", name: "بريميوم", nameEn: "Premium", usd: 50, days: 14, reach: "٧٠–١٢٠ ألف",  reachEn: "70–120k" },
 ];
 
+// ── Fixed LYD packages (the "باقات الإعلانات الممولة" poster) ──────────────────
+// Regular accounts pick ONE of these — priced in LYD, no USD ever shown. Each
+// option carries an INTERNAL usd budget (what we actually spend on Meta); the
+// customer only ever sees priceLyd + the views range. VIP accounts bypass all
+// of this and set a free USD budget/duration (see priceFor).
+export interface AdTierOption {
+  days:     number;
+  priceLyd: number;
+  viewsMin: number;
+  viewsMax: number;
+  budgetUsd: number; // internal Meta spend (≈ priceLyd / 13)
+}
+export interface AdTierPackage {
+  id:     "first" | "second" | "third";
+  name:   string;   // Arabic
+  nameEn: string;
+  level:  1 | 2 | 3;
+  options: AdTierOption[];
+}
+
+export const AD_TIER_PACKAGES: AdTierPackage[] = [
+  { id: "first", name: "الأولى", nameEn: "First", level: 1, options: [
+    { days: 3,  priceLyd: 65,  viewsMin: 1000,  viewsMax: 3500,  budgetUsd: 5  },
+    { days: 5,  priceLyd: 95,  viewsMin: 7000,  viewsMax: 17000, budgetUsd: 7  },
+    { days: 7,  priceLyd: 115, viewsMin: 8500,  viewsMax: 25000, budgetUsd: 9  },
+    { days: 10, priceLyd: 145, viewsMin: 12000, viewsMax: 35000, budgetUsd: 11 },
+    { days: 15, priceLyd: 195, viewsMin: 18000, viewsMax: 50000, budgetUsd: 15 },
+    { days: 20, priceLyd: 290, viewsMin: 25000, viewsMax: 70000, budgetUsd: 22 },
+  ]},
+  { id: "second", name: "الثانية", nameEn: "Second", level: 2, options: [
+    { days: 3,  priceLyd: 100, viewsMin: 3000,  viewsMax: 7000,   budgetUsd: 8  },
+    { days: 5,  priceLyd: 145, viewsMin: 15000, viewsMax: 35000,  budgetUsd: 11 },
+    { days: 7,  priceLyd: 190, viewsMin: 20000, viewsMax: 50000,  budgetUsd: 15 },
+    { days: 10, priceLyd: 290, viewsMin: 25000, viewsMax: 70000,  budgetUsd: 22 },
+    { days: 15, priceLyd: 450, viewsMin: 40000, viewsMax: 100000, budgetUsd: 35 },
+    { days: 20, priceLyd: 590, viewsMin: 50000, viewsMax: 150000, budgetUsd: 45 },
+  ]},
+  { id: "third", name: "الثالثة", nameEn: "Third", level: 3, options: [
+    { days: 3,  priceLyd: 195,  viewsMin: 15000,  viewsMax: 20000,  budgetUsd: 15 },
+    { days: 5,  priceLyd: 350,  viewsMin: 35000,  viewsMax: 100000, budgetUsd: 27 },
+    { days: 7,  priceLyd: 490,  viewsMin: 45000,  viewsMax: 125000, budgetUsd: 38 },
+    { days: 10, priceLyd: 750,  viewsMin: 50000,  viewsMax: 175000, budgetUsd: 58 },
+    { days: 15, priceLyd: 990,  viewsMin: 80000,  viewsMax: 150000, budgetUsd: 76 },
+    { days: 20, priceLyd: 1200, viewsMin: 120000, viewsMax: 350000, budgetUsd: 92 },
+  ]},
+];
+
+// Server-trusted lookup: resolve a (packageId, days) selection to its fixed option.
+export function findTierOption(packageId: string, days: number): { pkg: AdTierPackage; option: AdTierOption } | null {
+  const pkg = AD_TIER_PACKAGES.find((p) => p.id === packageId);
+  if (!pkg) return null;
+  const option = pkg.options.find((o) => o.days === Number(days));
+  return option ? { pkg, option } : null;
+}
+
+// Monthly VIP subscription price (LYD). VIP unlocks free USD budgets, no packages.
+export const VIP_MONTHLY_LYD = 50;
+
 export interface AdsPricing {
   vipRate:           number; // LYD per 1 USD (VIP / merchants)
   regularRate:       number; // LYD per 1 USD (regular — higher)

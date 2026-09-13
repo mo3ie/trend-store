@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Megaphone, Zap, BarChart3, Users, Check, ArrowLeft, ArrowRight, Globe,
+  Crown, Headphones, Sparkles, Infinity as InfinityIcon, Eye,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
-import { priceFor, mergeAdsPricing, DEFAULT_ADS_PRICING, type AdsPricing, type Tier } from "@/services/campaigns";
+import { AD_TIER_PACKAGES, VIP_MONTHLY_LYD, type Tier } from "@/services/campaigns";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
@@ -28,7 +29,6 @@ export default function AdsLandingPage() {
   const [user, setUser] = useState<{ id: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [tier, setTier]       = useState<Tier>("regular");
-  const [pricing, setPricing] = useState<AdsPricing>(DEFAULT_ADS_PRICING);
 
   const Fwd = rtl ? ArrowLeft : ArrowRight;
 
@@ -64,7 +64,7 @@ export default function AdsLandingPage() {
     supabase.auth.getUser().then(({ data }) => { setUser(data.user); setLoading(false); });
     fetch("/api/promo/me")
       .then((r) => r.json())
-      .then((d) => { setTier(d.tier === "vip" ? "vip" : "regular"); setPricing(mergeAdsPricing(d.pricing)); })
+      .then((d) => { setTier(d.tier === "vip" ? "vip" : "regular"); })
       .catch(() => {});
   }, []);
 
@@ -169,44 +169,94 @@ export default function AdsLandingPage() {
         </div>
       </section>
 
-      {/* Packages */}
+      {/* Packages — fixed LYD tiers */}
       <section style={{ maxWidth: 1000, margin: "0 auto", padding: "28px 18px 8px" }}>
-        <h2 style={{ fontWeight: 900, fontSize: 24, margin: "0 0 4px" }}>{t("الباقات والأسعار", "Packages & pricing")}</h2>
-        <p style={{ color: c.muted, fontSize: 13.5, margin: "0 0 16px" }}>{t("أو حدّد ميزانية مخصّصة عند إنشاء الحملة", "Or set a custom budget when creating the campaign")}</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: 14 }}>
-          {pricing.packages.map((pkg) => {
-            const totalLyd = priceFor(pkg.usd, tier, pricing).totalLyd;
+        <h2 style={{ fontWeight: 900, fontSize: 24, margin: "0 0 4px" }}>{t("باقات الإعلانات الممولة", "Sponsored ad packages")}</h2>
+        <p style={{ color: c.muted, fontSize: 13.5, margin: "0 0 18px" }}>{t("إعلانات فيسبوك — نتائج حقيقية لإعلاناتك.", "Facebook ads — real results for your posts.")}</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16 }}>
+          {AD_TIER_PACKAGES.map((pkg) => {
+            const medal = pkg.level === 1 ? "#f0b429" : pkg.level === 2 ? "#9aa4b2" : "#c07b45";
             return (
-              <div key={pkg.id} style={{ ...card, padding: 22, position: "relative", ...(pkg.highlight ? { borderColor: "transparent", backgroundImage: `linear-gradient(${c.surface},${c.surface}), ${G_HERO}`, backgroundOrigin: "border-box", backgroundClip: "padding-box, border-box" } : {}) }}>
-                {pkg.highlight && (
-                  <div style={{ position: "absolute", top: -12, insetInlineEnd: 18, background: G_HERO, borderRadius: 100, padding: "3px 12px", fontSize: 11, fontWeight: 800, color: "#fff" }}>
-                    {t("الأكثر طلبًا", "Most popular")}
-                  </div>
-                )}
-                <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 4 }}>{t(pkg.name, pkg.nameEn)}</div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 4 }}>
-                  <span style={{ fontSize: 38, fontWeight: 900, background: G_HERO, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{totalLyd}</span>
-                  <span style={{ color: c.muted, fontSize: 13 }}>{t("د.ل", "LYD")}</span>
+              <div key={pkg.id} style={{ ...card, padding: 0, overflow: "hidden", borderColor: `${medal}55` }}>
+                <div style={{ textAlign: "center", padding: "18px 16px 14px", borderBottom: `1px solid ${c.border}` }}>
+                  <div style={{ width: 44, height: 44, margin: "0 auto 8px", borderRadius: "50%", background: `${medal}22`, border: `2px solid ${medal}`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 18, color: medal }}>{pkg.level}</div>
+                  <div style={{ fontSize: 11, color: c.dim, letterSpacing: 3, fontWeight: 700 }}>{t("باقة", "PACKAGE")}</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: medal }}>{t(pkg.name, pkg.nameEn)}</div>
                 </div>
-                <div style={{ color: c.dim, fontSize: 12, marginBottom: 16 }}>${pkg.usd} {t("ميزانية إعلان", "ad budget")}</div>
-                <div style={{ borderTop: `1px solid ${c.border}`, paddingTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-                  {[
-                    t(`مدة: ${pkg.days} أيام`, `Duration: ${pkg.days} days`),
-                    t(`وصول تقديري: ~${pkg.reach}`, `Est. reach: ~${pkg.reachEn}`),
-                    t("استهداف ليبيا كاملة", "Targets all of Libya"),
-                  ].map((item) => (
-                    <div key={item} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: c.muted }}>
-                      <Check size={15} color="#ec4899" /> {item}
+                <div style={{ padding: "6px 14px 14px" }}>
+                  <div style={{ display: "flex", padding: "8px 6px", color: c.dim, fontSize: 11, fontWeight: 700, borderBottom: `1px solid ${c.border}` }}>
+                    <span style={{ flex: 1 }}>{t("المدة", "Duration")}</span>
+                    <span style={{ flex: 1, textAlign: "center" }}>{t("السعر", "Price")}</span>
+                    <span style={{ flex: 1.3, textAlign: "center" }}>{t("المشاهدات", "Views")}</span>
+                  </div>
+                  {pkg.options.map((o) => (
+                    <div key={o.days} style={{ display: "flex", alignItems: "center", padding: "9px 6px", fontSize: 12.5, borderBottom: `1px solid ${c.border}` }}>
+                      <span style={{ flex: 1, color: c.muted }}>{t(`${o.days} أيام`, `${o.days} days`)}</span>
+                      <span style={{ flex: 1, textAlign: "center", fontWeight: 900, color: medal }}>{o.priceLyd} <span style={{ fontSize: 10, color: c.dim }}>{t("د.ل", "LYD")}</span></span>
+                      <span style={{ flex: 1.3, textAlign: "center", color: c.muted, fontSize: 11 }}>{o.viewsMin.toLocaleString("en")}–{o.viewsMax.toLocaleString("en")}</span>
                     </div>
                   ))}
+                  <button onClick={handleStart}
+                    style={{ marginTop: 14, width: "100%", background: `linear-gradient(135deg,${medal},${medal}cc)`, border: "none", borderRadius: 12, padding: "12px 0", color: "#1a1330", fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+                    {t("اختر هذه الباقة", "Choose this package")}
+                  </button>
                 </div>
-                <button onClick={handleStart}
-                  style={{ marginTop: 20, width: "100%", background: pkg.highlight ? G_HERO : c.surface, border: pkg.highlight ? "none" : `2px solid ${c.border}`, borderRadius: 12, padding: "12px 0", color: pkg.highlight ? "#fff" : c.text, fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
-                  {t("اختيار هذه الباقة", "Choose this package")}
-                </button>
               </div>
             );
           })}
+        </div>
+
+        {/* trust strip */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 16 }}>
+          {[
+            { icon: Eye,       label: t("ضمان وصول المشاهدات", "Guaranteed views delivery") },
+            { icon: BarChart3, label: t("تقارير دورية للأداء", "Regular performance reports") },
+            { icon: Check,     label: t("إدارة احترافية", "Professional management") },
+          ].map((x) => (
+            <div key={x.label} style={{ flex: "1 1 200px", display: "flex", alignItems: "center", gap: 9, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: "12px 14px" }}>
+              <x.icon size={17} color="#ec4899" />
+              <span style={{ fontSize: 12.5, color: c.muted, fontWeight: 600 }}>{x.label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* VIP card */}
+      <section style={{ maxWidth: 1000, margin: "0 auto", padding: "20px 18px 8px" }}>
+        <div style={{ borderRadius: 22, padding: "clamp(24px,5vw,34px)", background: "linear-gradient(135deg,#171226,#241a3a)", border: "1px solid #f0b42955", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: -30, insetInlineEnd: -20, width: 160, height: 160, borderRadius: "50%", background: "radial-gradient(circle,#f0b42933,transparent 70%)" }} />
+          <div style={{ position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: "linear-gradient(135deg,#f0b429,#ff9d2f)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Crown size={22} color="#1a1330" />
+              </div>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 20, color: "#fff" }}>{t("عضوية VIP", "VIP membership")}</div>
+                <div style={{ fontSize: 12.5, color: "#c9b98a" }}>{t("حرية كاملة في الميزانية والمدة", "Full freedom over budget & duration")}</div>
+              </div>
+              <div style={{ marginInlineStart: "auto", textAlign: "center" }}>
+                <div style={{ fontSize: 26, fontWeight: 900, color: "#f0b429" }}>{VIP_MONTHLY_LYD}</div>
+                <div style={{ fontSize: 11, color: "#c9b98a" }}>{t("د.ل / شهرياً", "LYD / month")}</div>
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 10, margin: "16px 0 18px" }}>
+              {[
+                { icon: InfinityIcon, label: t("ميزانية وأيام بلا حدود (بالدولار)", "Unlimited budget & days (USD)") },
+                { icon: Headphones,   label: t("دعم متواصل 24/7", "24/7 dedicated support") },
+                { icon: Sparkles,     label: t("مساعد ذكاء اصطناعي لبناء الحملة", "AI assistant to build campaigns") },
+                { icon: Check,        label: t("بدون عمولة + أولوية تشغيل", "Zero commission + priority") },
+              ].map((b) => (
+                <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 9, color: "#e9e2d0", fontSize: 13 }}>
+                  <div style={{ width: 26, height: 26, borderRadius: 8, background: "#f0b42922", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><b.icon size={15} color="#f0b429" /></div>
+                  {b.label}
+                </div>
+              ))}
+            </div>
+            <button onClick={() => router.push(user ? "/ads/vip" : "/login?next=/ads/vip")}
+              style={{ width: "100%", background: "linear-gradient(135deg,#f0b429,#ff9d2f)", border: "none", borderRadius: 13, padding: "14px 0", color: "#1a1330", fontWeight: 900, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>
+              {tier === "vip" ? t("أنت عضو VIP ⭐ — أنشئ حملة حرة", "You're VIP ⭐ — create a free campaign") : t(`اشترك في VIP — ${VIP_MONTHLY_LYD} د.ل/شهر`, `Join VIP — ${VIP_MONTHLY_LYD} LYD/mo`)}
+            </button>
+          </div>
         </div>
       </section>
 

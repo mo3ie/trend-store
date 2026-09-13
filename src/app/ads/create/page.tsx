@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Link2, DollarSign, Calendar, Globe,
-  Loader2, CheckCircle, AlertCircle, ChevronDown, Search, X, MapPin, Users2, Target,
+  Loader2, CheckCircle, AlertCircle, ChevronDown, Search, X, MapPin, Users2, Target, Crown, Eye,
 } from "lucide-react";
 import { Suspense } from "react";
-import { priceFor, mergeAdsPricing, DEFAULT_ADS_PRICING, type AdsPricing, type Tier } from "@/services/campaigns";
+import { priceFor, mergeAdsPricing, DEFAULT_ADS_PRICING, AD_TIER_PACKAGES, findTierOption, type AdsPricing, type Tier } from "@/services/campaigns";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
@@ -52,7 +52,13 @@ function CreateCampaignInner() {
   const [manualMode, setManualMode] = useState(false);
   const [usdInput, setUsdInput] = useState("");
   const [days, setDays]         = useState("7");
-  const [selectedPkgId, setSelectedPkgId] = useState<string | null>(pkgId);
+  // Regular = fixed LYD tier packages; VIP can switch to a free USD budget.
+  const [tierPkgId, setTierPkgId] = useState<"first" | "second" | "third">(
+    (["first", "second", "third"].includes(pkgId || "") ? pkgId : "first") as "first" | "second" | "third"
+  );
+  const [pkgDays, setPkgDays]   = useState(3);
+  const [isVip, setIsVip]       = useState(false);
+  const [vipMode, setVipMode]   = useState<"package" | "custom">("package");
   const [tier, setTier]         = useState<Tier>("regular");
   const [pricing, setPricing]   = useState<AdsPricing>(DEFAULT_ADS_PRICING);
   const [saving, setSaving]     = useState(false);
@@ -70,16 +76,23 @@ function CreateCampaignInner() {
   const [ageMax, setAgeMax] = useState(65);
   const [gender, setGender] = useState<"all" | "male" | "female">("all");
 
-  const packages   = pricing.packages;
-  const pkg        = packages.find((p) => p.id === selectedPkgId);
-  const budgetUsd  = pkg ? pkg.usd : Number(usdInput) || 0;
-  const daysVal    = pkg ? pkg.days : Number(days) || 0;
-  const price      = budgetUsd > 0 ? priceFor(budgetUsd, tier, pricing) : null;
+  const usingCustom = isVip && vipMode === "custom";
+  const tierPkg     = AD_TIER_PACKAGES.find((p) => p.id === tierPkgId)!;
+  const opt         = usingCustom ? null : (findTierOption(tierPkgId, pkgDays)?.option ?? null);
+  const budgetUsd   = usingCustom ? (Number(usdInput) || 0) : (opt?.budgetUsd ?? 0);
+  const daysVal     = usingCustom ? (Number(days) || 0)     : (opt?.days ?? 0);
+  const vipPrice    = budgetUsd > 0 ? priceFor(budgetUsd, "vip", pricing) : null;
+  const totalLyd    = usingCustom ? (vipPrice?.totalLyd ?? 0) : (opt?.priceLyd ?? 0);
 
   useEffect(() => {
     fetch("/api/promo/me")
       .then((r) => r.json())
-      .then((d) => { setTier(d.tier === "vip" ? "vip" : "regular"); setPricing(mergeAdsPricing(d.pricing)); })
+      .then((d) => {
+        const vip = d.tier === "vip" || !!d.vip?.vip;
+        setTier(vip ? "vip" : "regular");
+        setIsVip(vip);
+        setPricing(mergeAdsPricing(d.pricing));
+      })
       .catch(() => {});
   }, []);
 
@@ -153,18 +166,22 @@ function CreateCampaignInner() {
     setError("");
     if (!selectedPage) { setError(t("اختر صفحتك أولاً", "Select your Page first")); return; }
     if (!postUrl)       { setError(t("اختر منشورًا أو الصق رابطًا", "Select a post or paste a link")); return; }
-    if (!pkg && (!budgetUsd || budgetUsd < 1)) { setError(t("الحد الأدنى للميزانية 1$", "Minimum budget is $1")); return; }
-    if (!pkg && (!daysVal   || daysVal < 1))   { setError(t("المدة يجب أن تكون يوم واحد على الأقل", "Duration must be at least one day")); return; }
+    if (usingCustom) {
+      if (!budgetUsd || budgetUsd < 1) { setError(t("الحد الأدنى للميزانية 1$", "Minimum budget is $1")); return; }
+      if (!daysVal   || daysVal < 1)   { setError(t("المدة يجب أن تكون يوم واحد على الأقل", "Duration must be at least one day")); return; }
+    } else if (!opt) {
+      setError(t("اختر باقة ومدة", "Choose a package and duration")); return;
+    }
 
     setSaving(true);
     const page = pages.find((p) => p.page_id === selectedPage);
+    const body = usingCustom
+      ? { pageId: selectedPage, pageName: page?.page_name, postUrl, budgetUsd, durationDays: daysVal, targeting: buildTargeting() }
+      : { pageId: selectedPage, pageName: page?.page_name, postUrl, packageId: tierPkgId, durationDays: pkgDays, targeting: buildTargeting() };
     const res  = await fetch("/api/promo/campaigns", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        pageId: selectedPage, pageName: page?.page_name, postUrl,
-        budgetUsd, durationDays: daysVal, targeting: buildTargeting(),
-      }),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (!res.ok) { setError(data.error || t("حدث خطأ", "Something went wrong")); setSaving(false); return; }
@@ -405,87 +422,110 @@ function CreateCampaignInner() {
 
         {/* Pricing */}
         <div style={card}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
             <label style={{ fontWeight: 800, fontSize: 14 }}>
               <DollarSign size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
-              {tier === "vip" ? t("ميزانية الإعلان بالدولار", "Ad budget in USD") : t("اختر باقة أو ميزانية مخصصة", "Choose a package or a custom budget")}
+              {usingCustom ? t("ميزانية حرة بالدولار", "Free USD budget") : t("اختر الباقة والمدة", "Choose package & duration")}
             </label>
-            <span style={{ fontSize: 11, fontWeight: 800, borderRadius: 100, padding: "4px 12px",
-              background: tier === "vip" ? "rgba(245,158,11,0.15)" : PINK_BG,
-              border: tier === "vip" ? "1px solid rgba(245,158,11,0.4)" : `1px solid ${PINK}55`,
-              color: tier === "vip" ? "#f59e0b" : PINK }}>
-              {tier === "vip" ? t("⭐ عميل مميّز (VIP)", "⭐ VIP") : t("عميل", "Customer")}
-            </span>
+            {isVip
+              ? <span style={{ fontSize: 11, fontWeight: 800, borderRadius: 100, padding: "4px 12px", background: "rgba(240,180,41,0.15)", border: "1px solid rgba(240,180,41,0.5)", color: "#f0b429", display: "inline-flex", alignItems: "center", gap: 5 }}><Crown size={12} /> VIP</span>
+              : <span style={{ fontSize: 11, fontWeight: 800, borderRadius: 100, padding: "4px 12px", background: PINK_BG, border: `1px solid ${PINK}55`, color: PINK }}>{t("عميل", "Customer")}</span>}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 16 }}>
-            {packages.map((p) => {
-              const active = selectedPkgId === p.id;
-              const tot = priceFor(p.usd, tier, pricing).totalLyd;
-              return (
-                <button key={p.id} type="button" onClick={() => { setSelectedPkgId(p.id); setUsdInput(""); }}
-                  style={{ position: "relative", textAlign: "center", padding: "16px 10px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit",
-                    border: active ? `2px solid ${PINK}` : `1px solid ${c.border}`,
-                    background: active ? PINK_BG : c.inputBg }}>
-                  {p.highlight && (
-                    <span style={{ position: "absolute", top: -9, insetInlineEnd: 10, background: G_HERO, color: "#fff", fontSize: 9, fontWeight: 800, borderRadius: 100, padding: "2px 8px" }}>
-                      {t("الأكثر طلبًا", "Popular")}
-                    </span>
-                  )}
-                  <div style={{ fontWeight: 800, fontSize: 14, color: active ? PINK : c.text }}>{t(p.name, p.nameEn)}</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: c.text, marginTop: 4 }}>${p.usd}</div>
-                  <div style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{t(`${p.days} أيام`, `${p.days} days`)}</div>
-                  <div style={{ fontSize: 11, color: c.dim, marginTop: 2 }}>~{t(p.reach, p.reachEn)} {t("وصول", "reach")}</div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: PINK, marginTop: 8 }}>{tot} {LYD}</div>
+          {/* VIP mode toggle */}
+          {isVip && (
+            <div style={{ display: "flex", gap: 6, background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: 5, marginBottom: 16 }}>
+              {(["package", "custom"] as const).map((m) => (
+                <button key={m} type="button" onClick={() => setVipMode(m)}
+                  style={{ flex: 1, border: "none", cursor: "pointer", borderRadius: 9, padding: "9px 0", fontFamily: "inherit", fontWeight: 800, fontSize: 13,
+                    background: vipMode === m ? G_HERO : "transparent", color: vipMode === m ? "#fff" : c.muted }}>
+                  {m === "package" ? t("باقة جاهزة", "A package") : t("ميزانية حرة (دولار)", "Free budget (USD)")}
                 </button>
-              );
-            })}
-          </div>
-
-          <button type="button" onClick={() => setSelectedPkgId(null)}
-            style={{ padding: "8px 16px", borderRadius: 100, border: selectedPkgId === null ? `2px solid ${PINK}` : `1px solid ${c.border}`, background: selectedPkgId === null ? PINK_BG : "transparent", color: selectedPkgId === null ? PINK : c.muted, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
-            {t("ميزانية مخصصة (بالدولار)", "Custom budget (USD)")}
-          </button>
-
-          {selectedPkgId === null && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
-              <div>
-                <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("الميزانية (دولار)", "Budget (USD)")}</label>
-                <input type="number" min={1} value={usdInput} onChange={(e) => setUsdInput(e.target.value)} placeholder={t("مثال: 10", "e.g. 10")} style={input} />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("المدة (أيام)", "Duration (days)")}</label>
-                <input type="number" min={1} max={30} value={days} onChange={(e) => setDays(e.target.value)} placeholder="7" style={input} />
-              </div>
+              ))}
             </div>
+          )}
+
+          {usingCustom ? (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("الميزانية (دولار)", "Budget (USD)")}</label>
+                  <input type="number" min={1} value={usdInput} onChange={(e) => setUsdInput(e.target.value)} placeholder={t("مثال: 25", "e.g. 25")} style={input} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("المدة (أيام)", "Duration (days)")}</label>
+                  <input type="number" min={1} max={90} value={days} onChange={(e) => setDays(e.target.value)} placeholder="7" style={input} />
+                </div>
+              </div>
+              <p style={{ fontSize: 11.5, color: "#f0b429", marginTop: 10 }}>⭐ {t("حرية كاملة — أي ميزانية وأي مدة تريدها.", "Full freedom — any budget, any duration.")}</p>
+            </>
+          ) : (
+            <>
+              {/* Tier selector */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+                {AD_TIER_PACKAGES.map((p) => {
+                  const medal = p.level === 1 ? "#f0b429" : p.level === 2 ? "#9aa4b2" : "#c07b45";
+                  const active = tierPkgId === p.id;
+                  return (
+                    <button key={p.id} type="button" onClick={() => setTierPkgId(p.id)}
+                      style={{ textAlign: "center", padding: "12px 6px", borderRadius: 13, cursor: "pointer", fontFamily: "inherit",
+                        border: active ? `2px solid ${medal}` : `1px solid ${c.border}`, background: active ? `${medal}18` : c.inputBg }}>
+                      <div style={{ width: 30, height: 30, margin: "0 auto 6px", borderRadius: "50%", background: `${medal}22`, border: `1.5px solid ${medal}`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 14, color: medal }}>{p.level}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 800, color: active ? medal : c.text }}>{t(p.name, p.nameEn)}</div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Duration selector */}
+              <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 8 }}>{t("المدة", "Duration")}</label>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+                {tierPkg.options.map((o) => {
+                  const active = pkgDays === o.days;
+                  return (
+                    <button key={o.days} type="button" onClick={() => setPkgDays(o.days)}
+                      style={{ padding: "12px 6px", borderRadius: 12, cursor: "pointer", fontFamily: "inherit", textAlign: "center",
+                        border: active ? `2px solid ${PINK}` : `1px solid ${c.border}`, background: active ? PINK_BG : c.inputBg }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: active ? PINK : c.text }}>{t(`${o.days} أيام`, `${o.days}d`)}</div>
+                      <div style={{ fontSize: 14, fontWeight: 900, color: active ? PINK : c.text, marginTop: 2 }}>{o.priceLyd} <span style={{ fontSize: 9, color: c.dim }}>{LYD}</span></div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {!isVip && (
+                <button type="button" onClick={() => router.push("/ads/vip")}
+                  style={{ marginTop: 14, width: "100%", background: "transparent", border: "1px solid rgba(240,180,41,0.5)", borderRadius: 11, padding: "10px 0", color: "#f0b429", fontWeight: 800, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                  <Crown size={14} /> {t("ترقية إلى VIP للتحكم الحر بالميزانية", "Go VIP for a free custom budget")}
+                </button>
+              )}
+            </>
           )}
         </div>
 
         {/* Live price summary */}
-        {price && (
-          <div style={{ background: PINK_BG, border: `1px solid ${PINK}44`, borderRadius: 18, padding: 20 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", color: c.muted, fontSize: 14 }}>
-                <span>{t("ميزانية الإعلان", "Ad budget")}</span><span>${price.budgetUsd}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", color: c.muted, fontSize: 14 }}>
-                <span>{t("سعر الصرف اليوم", "Today's rate")}</span><span>{price.rate} {LYD} / $</span>
-              </div>
-              {price.commissionPct > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", color: c.muted, fontSize: 14 }}>
-                  <span>{t(`عمولة (${price.commissionPct}%)`, `Commission (${price.commissionPct}%)`)}</span><span>{price.commissionLyd} {LYD}</span>
+        <div style={{ background: PINK_BG, border: `1px solid ${PINK}44`, borderRadius: 18, padding: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {usingCustom ? (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", color: c.muted, fontSize: 14 }}><span>{t("ميزانية الإعلان", "Ad budget")}</span><span>${vipPrice?.budgetUsd ?? 0}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", color: c.muted, fontSize: 14 }}><span>{t("المدة", "Duration")}</span><span>{t(`${daysVal} أيام`, `${daysVal} days`)}</span></div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", color: c.muted, fontSize: 14 }}><span>{t("الباقة", "Package")}</span><span>{t(tierPkg.name, tierPkg.nameEn)} · {t(`${daysVal} أيام`, `${daysVal} days`)}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: c.muted, fontSize: 14 }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Eye size={14} /> {t("المشاهدات المتوقعة", "Expected views")}</span>
+                  <span>{opt ? `${opt.viewsMin.toLocaleString("en")}–${opt.viewsMax.toLocaleString("en")}` : "—"}</span>
                 </div>
-              )}
-              <div style={{ borderTop: `1px solid ${c.border}`, paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "baseline", fontWeight: 900, fontSize: 18 }}>
-                <span>{t("الإجمالي بالدينار", "Total in LYD")}</span>
-                <span style={{ fontSize: 26, background: G_HERO, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{price.totalLyd} <span style={{ fontSize: 14, WebkitTextFillColor: c.muted }}>{LYD}</span></span>
-              </div>
-              <p style={{ fontSize: 11, color: c.dim, margin: 0 }}>
-                {t("يُحتسب الإجمالي حسب سعر الدولار اليوم وقد يختلف لاحقًا.", "Total is computed at today's USD rate and may change later.")}
-              </p>
+              </>
+            )}
+            <div style={{ borderTop: `1px solid ${c.border}`, paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "baseline", fontWeight: 900, fontSize: 18 }}>
+              <span>{t("الإجمالي", "Total")}</span>
+              <span style={{ fontSize: 26, background: G_HERO, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{totalLyd} <span style={{ fontSize: 14, WebkitTextFillColor: c.muted }}>{LYD}</span></span>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Duration note */}
         <div style={{ background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 12, padding: "12px 16px", fontSize: 13, color: "#f59e0b", display: "flex", alignItems: "flex-start", gap: 10 }}>
