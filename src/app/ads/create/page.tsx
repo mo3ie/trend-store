@@ -7,31 +7,41 @@ import {
   Loader2, CheckCircle, AlertCircle, ChevronDown, Search, X, MapPin, Users2, Target,
 } from "lucide-react";
 import { Suspense } from "react";
-import { priceFor, mergeAdsPricing, DEFAULT_ADS_PRICING, type AdsPricing, type AdPackage, type Tier } from "@/services/campaigns";
+import { priceFor, mergeAdsPricing, DEFAULT_ADS_PRICING, type AdsPricing, type Tier } from "@/services/campaigns";
 import { useLang } from "@/hooks/useLang";
+import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
 
-const GRADIENT = "linear-gradient(135deg, #0f0f1a 0%, #0d1b2a 100%)";
-const BLUE     = "#1877f2";
-const CARD_BG  = "rgba(255,255,255,0.04)";
+const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
+const PINK    = "#d6409f";
+const PINK_BG = "rgba(214,64,159,0.12)";
 
 interface ConnectedPage { id: string; page_id: string; page_name: string; page_picture?: string; }
 interface PagePost { id: string; postId: string; message: string; createdTime: string; picture?: string; permalinkUrl?: string; }
 interface GeoCity { key: string; name: string; region?: string; }
-
-const INPUT_STYLE: React.CSSProperties = {
-  width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-  borderRadius: 10, padding: "12px 14px", color: "#fff", fontSize: 14, outline: "none",
-  boxSizing: "border-box",
-};
 
 function CreateCampaignInner() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const pkgId        = searchParams.get("pkg");
   const { t, rtl } = useLang();
+  const { light } = useTheme();
   const Back = rtl ? ArrowLeft : ArrowRight;
   const LYD  = t("د.ل", "LYD");
+
+  const c = light ? {
+    bg: "#fbf7ff", text: "#1e1330", muted: "#6b5b78", dim: "#8b7d97",
+    surface: "#ffffff", border: "rgba(120,60,160,0.14)", inputBg: "#f4eefb", menuBg: "#ffffff",
+  } : {
+    bg: "#100a18", text: "#f6eefb", muted: "#a394b0", dim: "#7a6d88",
+    surface: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.10)", inputBg: "rgba(255,255,255,0.06)", menuBg: "#1a1226",
+  };
+
+  const input: React.CSSProperties = {
+    width: "100%", background: c.inputBg, border: `1px solid ${c.border}`,
+    borderRadius: 11, padding: "12px 14px", color: c.text, fontSize: 14, outline: "none",
+    boxSizing: "border-box", fontFamily: "inherit",
+  };
 
   const [pages, setPages]   = useState<ConnectedPage[]>([]);
   const [selectedPage, setSelectedPage] = useState("");
@@ -49,11 +59,9 @@ function CreateCampaignInner() {
   const [error, setError]       = useState("");
   const [loadingPages, setLoadingPages] = useState(true);
 
-  // Page selector (custom searchable dropdown — replaces the unreadable native <select>)
   const [pageMenuOpen, setPageMenuOpen] = useState(false);
   const [pageSearch, setPageSearch]     = useState("");
 
-  // Targeting
   const [cities, setCities]         = useState<GeoCity[]>([]);
   const [citySearch, setCitySearch] = useState("");
   const [cityResults, setCityResults] = useState<GeoCity[]>([]);
@@ -86,7 +94,6 @@ function CreateCampaignInner() {
       });
   }, []);
 
-  // Load the selected Page's posts (reads via pages_read_engagement)
   useEffect(() => {
     if (!selectedPage) return;
     setLoadingPosts(true);
@@ -103,7 +110,6 @@ function CreateCampaignInner() {
     setPostUrl(`https://www.facebook.com/${selectedPage}/posts/${p.postId}`);
   }
 
-  // Debounced city search (Meta geo keys)
   useEffect(() => {
     const q = citySearch.trim();
     if (q.length < 2) { setCityResults([]); return; }
@@ -118,14 +124,12 @@ function CreateCampaignInner() {
     return () => clearTimeout(id);
   }, [citySearch]);
 
-  function addCity(c: GeoCity) {
-    if (!cities.some((x) => x.key === c.key)) setCities([...cities, c]);
+  function addCity(city: GeoCity) {
+    if (!cities.some((x) => x.key === city.key)) setCities([...cities, city]);
     setCitySearch("");
     setCityResults([]);
   }
-  function removeCity(key: string) {
-    setCities(cities.filter((c) => c.key !== key));
-  }
+  function removeCity(key: string) { setCities(cities.filter((city) => city.key !== key)); }
 
   function buildTargeting() {
     const targeting: Record<string, unknown> = { age_min: ageMin, age_max: ageMax };
@@ -134,7 +138,7 @@ function CreateCampaignInner() {
     if (cities.length > 0) {
       targeting.geo_locations = {
         countries: ["LY"],
-        cities: cities.map((c) => ({ key: c.key, radius: 25, distance_unit: "kilometer" })),
+        cities: cities.map((city) => ({ key: city.key, radius: 25, distance_unit: "kilometer" })),
       };
     }
     return targeting;
@@ -149,7 +153,6 @@ function CreateCampaignInner() {
     setError("");
     if (!selectedPage) { setError(t("اختر صفحتك أولاً", "Select your Page first")); return; }
     if (!postUrl)       { setError(t("اختر منشورًا أو الصق رابطًا", "Select a post or paste a link")); return; }
-
     if (!pkg && (!budgetUsd || budgetUsd < 1)) { setError(t("الحد الأدنى للميزانية 1$", "Minimum budget is $1")); return; }
     if (!pkg && (!daysVal   || daysVal < 1))   { setError(t("المدة يجب أن تكون يوم واحد على الأقل", "Duration must be at least one day")); return; }
 
@@ -159,27 +162,19 @@ function CreateCampaignInner() {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        pageId:      selectedPage,
-        pageName:    page?.page_name,
-        postUrl,
-        budgetUsd,
-        durationDays: daysVal,
-        targeting:   buildTargeting(),
+        pageId: selectedPage, pageName: page?.page_name, postUrl,
+        budgetUsd, durationDays: daysVal, targeting: buildTargeting(),
       }),
     });
     const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || t("حدث خطأ", "Something went wrong"));
-      setSaving(false);
-      return;
-    }
+    if (!res.ok) { setError(data.error || t("حدث خطأ", "Something went wrong")); setSaving(false); return; }
     router.push(`/ads/checkout?campaignId=${data.campaign.id}`);
   }
 
   if (loadingPages) {
     return (
-      <div style={{ minHeight: "100vh", background: GRADIENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Loader2 size={32} color={BLUE} className="spin" />
+      <div style={{ minHeight: "100vh", background: c.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Loader2 size={32} color={PINK} className="spin" />
         <style>{`@keyframes spin-anim{to{transform:rotate(360deg)}} .spin{animation:spin-anim 1s linear infinite}`}</style>
       </div>
     );
@@ -187,45 +182,47 @@ function CreateCampaignInner() {
 
   if (pages.length === 0) {
     return (
-      <div style={{ minHeight: "100vh", background: GRADIENT, color: "#fff", fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16, padding: 24 }}>
+      <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16, padding: 24 }}>
         <AlertCircle size={48} color="#f59e0b" />
-        <p style={{ fontSize: 16, color: "#94a3b8", textAlign: "center" }}>{t("يجب ربط صفحة فيسبوك أولاً قبل إنشاء حملة", "You must connect a Facebook Page before creating a campaign")}</p>
+        <p style={{ fontSize: 16, color: c.muted, textAlign: "center" }}>{t("يجب ربط صفحة فيسبوك أولاً قبل إنشاء حملة", "You must connect a Facebook Page before creating a campaign")}</p>
         <button onClick={() => router.push("/ads/connect")}
-          style={{ background: `linear-gradient(135deg,${BLUE},#6b46c1)`, border: "none", borderRadius: 12, padding: "12px 28px", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 15 }}>
+          style={{ background: G_HERO, border: "none", borderRadius: 14, padding: "13px 28px", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 15, fontFamily: "inherit" }}>
           {t("ربط صفحة الآن", "Connect a Page now")}
         </button>
       </div>
     );
   }
 
-  return (
-    <div style={{ minHeight: "100vh", background: GRADIENT, color: "#fff", fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80 }}>
+  const card: React.CSSProperties = { background: c.surface, border: `2px solid ${c.border}`, borderRadius: 18, padding: 22 };
 
-      <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 12 }}>
-        <button onClick={() => router.push("/ads/connect")} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+  return (
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80, transition: "background .2s,color .2s" }}>
+
+      <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", gap: 12, maxWidth: 720, margin: "0 auto" }}>
+        <button onClick={() => router.push("/ads/connect")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
           <Back size={18} /> {t("رجوع", "Back")}
         </button>
-        <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{t("إنشاء حملة إعلانية", "Create a campaign")}</h1>
+        <h1 style={{ fontSize: 18, fontWeight: 900, margin: 0 }}>{t("إنشاء حملة إعلانية", "Create a campaign")}</h1>
         <div style={{ marginInlineStart: "auto" }}><LangToggle /></div>
       </div>
 
-      <div style={{ maxWidth: 720, margin: "0 auto", padding: "36px 24px", display: "grid", gap: 24 }}>
+      <div style={{ maxWidth: 720, margin: "0 auto", padding: "22px 20px", display: "grid", gap: 18 }}>
 
         {error && (
-          <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #ef444440", borderRadius: 12, padding: "12px 16px", color: "#fca5a5", display: "flex", gap: 10, alignItems: "center" }}>
+          <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #ef444455", borderRadius: 14, padding: "12px 16px", color: "#ef4444", display: "flex", gap: 10, alignItems: "center" }}>
             <AlertCircle size={16} /> {error}
           </div>
         )}
 
         {/* Page selector */}
-        <div style={{ background: CARD_BG, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
-          <label style={{ fontWeight: 700, fontSize: 14, marginBottom: 12, display: "block" }}>
+        <div style={card}>
+          <label style={{ fontWeight: 800, fontSize: 14, marginBottom: 12, display: "block" }}>
             <Globe size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
             {t("الصفحة المراد تمويل منشورها", "The Page whose post you want to boost")}
           </label>
           <div style={{ position: "relative" }}>
             <button type="button" onClick={() => setPageMenuOpen((o) => !o)}
-              style={{ ...INPUT_STYLE, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", textAlign: rtl ? "right" : "left" }}>
+              style={{ ...input, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", textAlign: rtl ? "right" : "left" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
                 {selectedPageObj?.page_picture && (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -233,39 +230,37 @@ function CreateCampaignInner() {
                 )}
                 {selectedPageObj ? selectedPageObj.page_name : t("اختر صفحة", "Choose a Page")}
               </span>
-              <ChevronDown size={16} color="#64748b" style={{ flexShrink: 0, transform: pageMenuOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+              <ChevronDown size={16} color={c.dim} style={{ flexShrink: 0, transform: pageMenuOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
             </button>
 
             {pageMenuOpen && (
               <div style={{ position: "absolute", insetInlineStart: 0, insetInlineEnd: 0, top: "calc(100% + 6px)", zIndex: 30,
-                background: "#0d1b2a", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.5)", overflow: "hidden" }}>
-                <div style={{ position: "relative", padding: 8, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-                  <Search size={15} color="#64748b" style={{ position: "absolute", insetInlineStart: 18, top: "50%", transform: "translateY(-50%)" }} />
+                background: c.menuBg, border: `1px solid ${c.border}`, borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.28)", overflow: "hidden" }}>
+                <div style={{ position: "relative", padding: 8, borderBottom: `1px solid ${c.border}` }}>
+                  <Search size={15} color={c.dim} style={{ position: "absolute", insetInlineStart: 18, top: "50%", transform: "translateY(-50%)" }} />
                   <input autoFocus value={pageSearch} onChange={(e) => setPageSearch(e.target.value)}
                     placeholder={t("ابحث عن صفحة...", "Search a Page...")}
-                    style={{ ...INPUT_STYLE, paddingInlineStart: 36, padding: "9px 14px 9px 36px" }} />
+                    style={{ ...input, paddingInlineStart: 36, padding: "9px 14px 9px 36px" }} />
                 </div>
                 <div style={{ maxHeight: 260, overflowY: "auto" }}>
                   {filteredPages.length === 0 ? (
-                    <div style={{ padding: 16, color: "#64748b", fontSize: 13, textAlign: "center" }}>
-                      {t("لا توجد نتائج", "No matches")}
-                    </div>
+                    <div style={{ padding: 16, color: c.dim, fontSize: 13, textAlign: "center" }}>{t("لا توجد نتائج", "No matches")}</div>
                   ) : filteredPages.map((p) => {
                     const active = p.page_id === selectedPage;
                     return (
                       <button key={p.id} type="button"
                         onClick={() => { setSelectedPage(p.page_id); setPageMenuOpen(false); setPageSearch(""); }}
                         style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
-                          background: active ? `${BLUE}22` : "transparent", border: "none", cursor: "pointer",
-                          color: active ? "#93c5fd" : "#e2e8f0", textAlign: rtl ? "right" : "left", fontSize: 14 }}>
+                          background: active ? PINK_BG : "transparent", border: "none", cursor: "pointer",
+                          color: active ? PINK : c.text, textAlign: rtl ? "right" : "left", fontSize: 14, fontFamily: "inherit" }}>
                         {p.page_picture ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={p.page_picture} alt="" style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0 }} />
                         ) : (
-                          <div style={{ width: 26, height: 26, borderRadius: "50%", background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
+                          <div style={{ width: 26, height: 26, borderRadius: "50%", background: c.inputBg, flexShrink: 0 }} />
                         )}
                         <span style={{ flex: 1, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{p.page_name}</span>
-                        {active && <CheckCircle size={15} color={BLUE} style={{ flexShrink: 0 }} />}
+                        {active && <CheckCircle size={15} color={PINK} style={{ flexShrink: 0 }} />}
                       </button>
                     );
                   })}
@@ -276,40 +271,32 @@ function CreateCampaignInner() {
         </div>
 
         {/* Post selector */}
-        <div style={{ background: CARD_BG, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
+        <div style={card}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 12 }}>
-            <label style={{ fontWeight: 700, fontSize: 14 }}>
+            <label style={{ fontWeight: 800, fontSize: 14 }}>
               <Link2 size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
               {t("المنشور المراد تمويله", "The post to boost")}
             </label>
             <button type="button" onClick={() => setManualMode((m) => !m)}
-              style={{ background: "none", border: "none", color: "#93c5fd", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+              style={{ background: "none", border: "none", color: PINK, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit" }}>
               {manualMode ? t("اختيار من المنشورات", "Pick from posts") : t("أو الصق رابطًا", "Or paste a link")}
             </button>
           </div>
 
           {manualMode ? (
             <>
-              <input
-                type="url"
-                value={postUrl}
+              <input type="url" value={postUrl}
                 onChange={(e) => { setPostUrl(e.target.value); setSelectedPostId(""); }}
-                placeholder="https://www.facebook.com/PageName/posts/123456..."
-                style={INPUT_STYLE}
-              />
-              <p style={{ color: "#64748b", fontSize: 12, marginTop: 8, lineHeight: 1.6 }}>
-                {t("افتح المنشور من صفحتك، انقر على “نسخ الرابط”، والصقه هنا",
-                   "Open the post on your Page, tap “Copy link”, and paste it here")}
+                placeholder="https://www.facebook.com/PageName/posts/123456..." style={input} />
+              <p style={{ color: c.dim, fontSize: 12, marginTop: 8, lineHeight: 1.6 }}>
+                {t("افتح المنشور من صفحتك، انقر على “نسخ الرابط”، والصقه هنا", "Open the post on your Page, tap “Copy link”, and paste it here")}
               </p>
             </>
           ) : loadingPosts ? (
-            <div style={{ textAlign: "center", padding: 24, color: "#64748b" }}>
-              <Loader2 size={22} className="spin" />
-            </div>
+            <div style={{ textAlign: "center", padding: 24, color: c.dim }}><Loader2 size={22} className="spin" /></div>
           ) : posts.length === 0 ? (
-            <p style={{ color: "#94a3b8", fontSize: 13, lineHeight: 1.7 }}>
-              {t("لا توجد منشورات على هذه الصفحة، أو تعذّر تحميلها. استخدم “الصق رابطًا”.",
-                 "No posts found on this Page, or they couldn't be loaded. Use “Or paste a link”.")}
+            <p style={{ color: c.muted, fontSize: 13, lineHeight: 1.7 }}>
+              {t("لا توجد منشورات على هذه الصفحة، أو تعذّر تحميلها. استخدم “الصق رابطًا”.", "No posts found on this Page, or they couldn't be loaded. Use “Or paste a link”.")}
             </p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 340, overflowY: "auto" }}>
@@ -318,26 +305,24 @@ function CreateCampaignInner() {
                 return (
                   <button key={p.id} type="button" onClick={() => pickPost(p)}
                     style={{ display: "flex", gap: 12, alignItems: "center", textAlign: rtl ? "right" : "left",
-                      padding: 10, borderRadius: 12, cursor: "pointer",
-                      border: active ? `1px solid ${BLUE}` : "1px solid rgba(255,255,255,0.10)",
-                      background: active ? `${BLUE}18` : "rgba(255,255,255,0.02)", transition: "all 0.15s" }}>
+                      padding: 10, borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
+                      border: active ? `2px solid ${PINK}` : `1px solid ${c.border}`,
+                      background: active ? PINK_BG : c.inputBg }}>
                     {p.picture ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={p.picture} alt="" style={{ width: 52, height: 52, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
                     ) : (
-                      <div style={{ width: 52, height: 52, borderRadius: 8, background: "rgba(255,255,255,0.06)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <Globe size={20} color="#475569" />
+                      <div style={{ width: 52, height: 52, borderRadius: 8, background: c.inputBg, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Globe size={20} color={c.dim} />
                       </div>
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, color: "#e2e8f0", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                      <div style={{ fontSize: 13, color: c.text, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                         {p.message ? (p.message.length > 90 ? p.message.slice(0, 90) + "…" : p.message) : t("(منشور بدون نص)", "(post with no text)")}
                       </div>
-                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
-                        {new Date(p.createdTime).toLocaleDateString(rtl ? "ar-LY" : "en-GB")}
-                      </div>
+                      <div style={{ fontSize: 11, color: c.dim, marginTop: 3 }}>{new Date(p.createdTime).toLocaleDateString(rtl ? "ar-LY" : "en-GB")}</div>
                     </div>
-                    {active && <CheckCircle size={18} color={BLUE} style={{ flexShrink: 0 }} />}
+                    {active && <CheckCircle size={18} color={PINK} style={{ flexShrink: 0 }} />}
                   </button>
                 );
               })}
@@ -346,42 +331,41 @@ function CreateCampaignInner() {
         </div>
 
         {/* Targeting */}
-        <div style={{ background: CARD_BG, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
-          <label style={{ fontWeight: 700, fontSize: 14, marginBottom: 16, display: "block" }}>
+        <div style={card}>
+          <label style={{ fontWeight: 800, fontSize: 14, marginBottom: 16, display: "block" }}>
             <Target size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
             {t("الاستهداف", "Targeting")}
           </label>
 
-          {/* Cities */}
           <div style={{ marginBottom: 18 }}>
-            <label style={{ fontSize: 12, color: "#94a3b8", display: "block", marginBottom: 6 }}>
+            <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>
               <MapPin size={12} style={{ verticalAlign: "middle", marginInlineEnd: 4 }} />
               {t("المدن (اتركها فارغة لكل ليبيا)", "Cities (leave empty for all of Libya)")}
             </label>
             {cities.length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-                {cities.map((c) => (
-                  <span key={c.key} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${BLUE}22`, border: `1px solid ${BLUE}40`, color: "#93c5fd", borderRadius: 100, padding: "4px 10px", fontSize: 12 }}>
-                    {c.name}{c.region ? ` — ${c.region}` : ""}
-                    <X size={13} style={{ cursor: "pointer" }} onClick={() => removeCity(c.key)} />
+                {cities.map((city) => (
+                  <span key={city.key} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: PINK_BG, border: `1px solid ${PINK}55`, color: PINK, borderRadius: 100, padding: "4px 10px", fontSize: 12 }}>
+                    {city.name}{city.region ? ` — ${city.region}` : ""}
+                    <X size={13} style={{ cursor: "pointer" }} onClick={() => removeCity(city.key)} />
                   </span>
                 ))}
               </div>
             )}
             <div style={{ position: "relative" }}>
-              <Search size={15} color="#64748b" style={{ position: "absolute", insetInlineStart: 12, top: "50%", transform: "translateY(-50%)" }} />
+              <Search size={15} color={c.dim} style={{ position: "absolute", insetInlineStart: 12, top: "50%", transform: "translateY(-50%)" }} />
               <input value={citySearch} onChange={(e) => setCitySearch(e.target.value)}
                 placeholder={t("ابحث عن مدينة (مثال: طرابلس، بنغازي)", "Search a city (e.g. Tripoli, Benghazi)")}
-                style={{ ...INPUT_STYLE, paddingInlineStart: 36 }} />
+                style={{ ...input, paddingInlineStart: 36 }} />
               {(citySearching || cityResults.length > 0) && citySearch.trim().length >= 2 && (
                 <div style={{ position: "absolute", insetInlineStart: 0, insetInlineEnd: 0, top: "calc(100% + 6px)", zIndex: 20,
-                  background: "#0d1b2a", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.5)", maxHeight: 220, overflowY: "auto" }}>
+                  background: c.menuBg, border: `1px solid ${c.border}`, borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.28)", maxHeight: 220, overflowY: "auto" }}>
                   {citySearching ? (
-                    <div style={{ padding: 14, textAlign: "center", color: "#64748b" }}><Loader2 size={16} className="spin" /></div>
-                  ) : cityResults.map((c) => (
-                    <button key={c.key} type="button" onClick={() => addCity(c)}
-                      style={{ width: "100%", textAlign: rtl ? "right" : "left", padding: "10px 14px", background: "transparent", border: "none", cursor: "pointer", color: "#e2e8f0", fontSize: 13 }}>
-                      {c.name}{c.region ? <span style={{ color: "#64748b" }}> — {c.region}</span> : ""}
+                    <div style={{ padding: 14, textAlign: "center", color: c.dim }}><Loader2 size={16} className="spin" /></div>
+                  ) : cityResults.map((city) => (
+                    <button key={city.key} type="button" onClick={() => addCity(city)}
+                      style={{ width: "100%", textAlign: rtl ? "right" : "left", padding: "10px 14px", background: "transparent", border: "none", cursor: "pointer", color: c.text, fontSize: 13, fontFamily: "inherit" }}>
+                      {city.name}{city.region ? <span style={{ color: c.dim }}> — {city.region}</span> : ""}
                     </button>
                   ))}
                 </div>
@@ -389,29 +373,28 @@ function CreateCampaignInner() {
             </div>
           </div>
 
-          {/* Age + Gender */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
             <div>
-              <label style={{ fontSize: 12, color: "#94a3b8", display: "block", marginBottom: 6 }}>
+              <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>
                 <Users2 size={12} style={{ verticalAlign: "middle", marginInlineEnd: 4 }} />
                 {t("العمر من", "Age from")}
               </label>
               <input type="number" min={13} max={65} value={ageMin}
-                onChange={(e) => setAgeMin(Math.max(13, Math.min(65, Number(e.target.value) || 13)))} style={INPUT_STYLE} />
+                onChange={(e) => setAgeMin(Math.max(13, Math.min(65, Number(e.target.value) || 13)))} style={input} />
             </div>
             <div>
-              <label style={{ fontSize: 12, color: "#94a3b8", display: "block", marginBottom: 6 }}>{t("العمر إلى", "Age to")}</label>
+              <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("العمر إلى", "Age to")}</label>
               <input type="number" min={13} max={65} value={ageMax}
-                onChange={(e) => setAgeMax(Math.max(13, Math.min(65, Number(e.target.value) || 65)))} style={INPUT_STYLE} />
+                onChange={(e) => setAgeMax(Math.max(13, Math.min(65, Number(e.target.value) || 65)))} style={input} />
             </div>
             <div>
-              <label style={{ fontSize: 12, color: "#94a3b8", display: "block", marginBottom: 6 }}>{t("الجنس", "Gender")}</label>
+              <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("الجنس", "Gender")}</label>
               <div style={{ display: "flex", gap: 6 }}>
                 {([["all", t("الكل", "All")], ["male", t("ذكر", "Male")], ["female", t("أنثى", "Female")]] as const).map(([g, lbl]) => (
                   <button key={g} type="button" onClick={() => setGender(g)}
-                    style={{ flex: 1, padding: "10px 4px", borderRadius: 10, fontSize: 12, cursor: "pointer",
-                      border: gender === g ? `1px solid ${BLUE}` : "1px solid rgba(255,255,255,0.12)",
-                      background: gender === g ? `${BLUE}22` : "transparent", color: gender === g ? "#93c5fd" : "#94a3b8" }}>
+                    style={{ flex: 1, padding: "10px 4px", borderRadius: 10, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+                      border: gender === g ? `2px solid ${PINK}` : `1px solid ${c.border}`,
+                      background: gender === g ? PINK_BG : "transparent", color: gender === g ? PINK : c.muted }}>
                     {lbl}
                   </button>
                 ))}
@@ -421,62 +404,58 @@ function CreateCampaignInner() {
         </div>
 
         {/* Pricing */}
-        <div style={{ background: CARD_BG, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
+        <div style={card}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
-            <label style={{ fontWeight: 700, fontSize: 14 }}>
+            <label style={{ fontWeight: 800, fontSize: 14 }}>
               <DollarSign size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
-              {tier === "vip"
-                ? t("ميزانية الإعلان بالدولار", "Ad budget in USD")
-                : t("اختر باقة أو ميزانية مخصصة", "Choose a package or a custom budget")}
+              {tier === "vip" ? t("ميزانية الإعلان بالدولار", "Ad budget in USD") : t("اختر باقة أو ميزانية مخصصة", "Choose a package or a custom budget")}
             </label>
-            <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 100, padding: "4px 12px",
-              background: tier === "vip" ? "rgba(245,158,11,0.15)" : `${BLUE}18`,
-              border: tier === "vip" ? "1px solid rgba(245,158,11,0.4)" : `1px solid ${BLUE}40`,
-              color: tier === "vip" ? "#fbbf24" : "#93c5fd" }}>
+            <span style={{ fontSize: 11, fontWeight: 800, borderRadius: 100, padding: "4px 12px",
+              background: tier === "vip" ? "rgba(245,158,11,0.15)" : PINK_BG,
+              border: tier === "vip" ? "1px solid rgba(245,158,11,0.4)" : `1px solid ${PINK}55`,
+              color: tier === "vip" ? "#f59e0b" : PINK }}>
               {tier === "vip" ? t("⭐ عميل مميّز (VIP)", "⭐ VIP") : t("عميل", "Customer")}
             </span>
           </div>
 
-          {/* Package cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 16 }}>
             {packages.map((p) => {
               const active = selectedPkgId === p.id;
               const tot = priceFor(p.usd, tier, pricing).totalLyd;
               return (
                 <button key={p.id} type="button" onClick={() => { setSelectedPkgId(p.id); setUsdInput(""); }}
-                  style={{ position: "relative", textAlign: "center", padding: "16px 10px", borderRadius: 14, cursor: "pointer",
-                    border: active ? `1.5px solid ${BLUE}` : "1px solid rgba(255,255,255,0.12)",
-                    background: active ? `${BLUE}18` : "rgba(255,255,255,0.02)", transition: "all 0.15s" }}>
+                  style={{ position: "relative", textAlign: "center", padding: "16px 10px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit",
+                    border: active ? `2px solid ${PINK}` : `1px solid ${c.border}`,
+                    background: active ? PINK_BG : c.inputBg }}>
                   {p.highlight && (
-                    <span style={{ position: "absolute", top: -9, insetInlineEnd: 10, background: BLUE, color: "#fff", fontSize: 9, fontWeight: 700, borderRadius: 100, padding: "2px 8px" }}>
+                    <span style={{ position: "absolute", top: -9, insetInlineEnd: 10, background: G_HERO, color: "#fff", fontSize: 9, fontWeight: 800, borderRadius: 100, padding: "2px 8px" }}>
                       {t("الأكثر طلبًا", "Popular")}
                     </span>
                   )}
-                  <div style={{ fontWeight: 700, fontSize: 14, color: active ? "#93c5fd" : "#e2e8f0" }}>{t(p.name, p.nameEn)}</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: "#fff", marginTop: 4 }}>${p.usd}</div>
-                  <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>{t(`${p.days} أيام`, `${p.days} days`)}</div>
-                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>~{t(p.reach, p.reachEn)} {t("وصول", "reach")}</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#93c5fd", marginTop: 8 }}>{tot} {LYD}</div>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: active ? PINK : c.text }}>{t(p.name, p.nameEn)}</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: c.text, marginTop: 4 }}>${p.usd}</div>
+                  <div style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{t(`${p.days} أيام`, `${p.days} days`)}</div>
+                  <div style={{ fontSize: 11, color: c.dim, marginTop: 2 }}>~{t(p.reach, p.reachEn)} {t("وصول", "reach")}</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: PINK, marginTop: 8 }}>{tot} {LYD}</div>
                 </button>
               );
             })}
           </div>
 
-          {/* Custom budget toggle */}
           <button type="button" onClick={() => setSelectedPkgId(null)}
-            style={{ padding: "8px 16px", borderRadius: 100, border: selectedPkgId === null ? `1px solid ${BLUE}` : "1px solid rgba(255,255,255,0.12)", background: selectedPkgId === null ? `${BLUE}22` : "transparent", color: selectedPkgId === null ? "#93c5fd" : "#94a3b8", cursor: "pointer", fontSize: 13 }}>
+            style={{ padding: "8px 16px", borderRadius: 100, border: selectedPkgId === null ? `2px solid ${PINK}` : `1px solid ${c.border}`, background: selectedPkgId === null ? PINK_BG : "transparent", color: selectedPkgId === null ? PINK : c.muted, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
             {t("ميزانية مخصصة (بالدولار)", "Custom budget (USD)")}
           </button>
 
           {selectedPkgId === null && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
               <div>
-                <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 6 }}>{t("الميزانية (دولار)", "Budget (USD)")}</label>
-                <input type="number" min={1} value={usdInput} onChange={(e) => setUsdInput(e.target.value)} placeholder={t("مثال: 10", "e.g. 10")} style={INPUT_STYLE} />
+                <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("الميزانية (دولار)", "Budget (USD)")}</label>
+                <input type="number" min={1} value={usdInput} onChange={(e) => setUsdInput(e.target.value)} placeholder={t("مثال: 10", "e.g. 10")} style={input} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 6 }}>{t("المدة (أيام)", "Duration (days)")}</label>
-                <input type="number" min={1} max={30} value={days} onChange={(e) => setDays(e.target.value)} placeholder="7" style={INPUT_STYLE} />
+                <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("المدة (أيام)", "Duration (days)")}</label>
+                <input type="number" min={1} max={30} value={days} onChange={(e) => setDays(e.target.value)} placeholder="7" style={input} />
               </div>
             </div>
           )}
@@ -484,24 +463,24 @@ function CreateCampaignInner() {
 
         {/* Live price summary */}
         {price && (
-          <div style={{ background: "rgba(24,119,242,0.08)", border: `1px solid ${BLUE}30`, borderRadius: 16, padding: 20 }}>
+          <div style={{ background: PINK_BG, border: `1px solid ${PINK}44`, borderRadius: 18, padding: 20 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", color: "#94a3b8", fontSize: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", color: c.muted, fontSize: 14 }}>
                 <span>{t("ميزانية الإعلان", "Ad budget")}</span><span>${price.budgetUsd}</span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", color: "#94a3b8", fontSize: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", color: c.muted, fontSize: 14 }}>
                 <span>{t("سعر الصرف اليوم", "Today's rate")}</span><span>{price.rate} {LYD} / $</span>
               </div>
               {price.commissionPct > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", color: "#94a3b8", fontSize: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", color: c.muted, fontSize: 14 }}>
                   <span>{t(`عمولة (${price.commissionPct}%)`, `Commission (${price.commissionPct}%)`)}</span><span>{price.commissionLyd} {LYD}</span>
                 </div>
               )}
-              <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10, display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 18 }}>
+              <div style={{ borderTop: `1px solid ${c.border}`, paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "baseline", fontWeight: 900, fontSize: 18 }}>
                 <span>{t("الإجمالي بالدينار", "Total in LYD")}</span>
-                <span style={{ color: "#93c5fd" }}>{price.totalLyd} {LYD}</span>
+                <span style={{ fontSize: 26, background: G_HERO, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{price.totalLyd} <span style={{ fontSize: 14, WebkitTextFillColor: c.muted }}>{LYD}</span></span>
               </div>
-              <p style={{ fontSize: 11, color: "#64748b", margin: 0 }}>
+              <p style={{ fontSize: 11, color: c.dim, margin: 0 }}>
                 {t("يُحتسب الإجمالي حسب سعر الدولار اليوم وقد يختلف لاحقًا.", "Total is computed at today's USD rate and may change later.")}
               </p>
             </div>
@@ -509,14 +488,14 @@ function CreateCampaignInner() {
         )}
 
         {/* Duration note */}
-        <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: 12, padding: "12px 16px", fontSize: 13, color: "#fbbf24", display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <div style={{ background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 12, padding: "12px 16px", fontSize: 13, color: "#f59e0b", display: "flex", alignItems: "flex-start", gap: 10 }}>
           <Calendar size={16} style={{ flexShrink: 0, marginTop: 2 }} />
           <span>{t("سيبدأ إعلانك خلال دقائق من تأكيد الدفع، ويعمل على ", "Your ad starts within minutes of payment, running for ")}<strong>{t(`${daysVal} أيام`, `${daysVal} days`)}</strong>{cities.length > 0 ? t(` في ${cities.length} مدينة محددة.`, ` in ${cities.length} selected cit${cities.length === 1 ? "y" : "ies"}.`) : t(" في كل ليبيا.", " across all of Libya.")}</span>
         </div>
 
         {/* Submit */}
         <button onClick={submit} disabled={saving}
-          style={{ width: "100%", background: `linear-gradient(135deg,${BLUE},#6b46c1)`, border: "none", borderRadius: 14, padding: "16px 0", color: "#fff", fontWeight: 700, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, opacity: saving ? 0.7 : 1 }}>
+          style={{ width: "100%", background: G_HERO, border: "none", borderRadius: 15, padding: "16px 0", color: "#fff", fontWeight: 900, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, opacity: saving ? 0.7 : 1, fontFamily: "inherit" }}>
           {saving ? <Loader2 size={20} className="spin" /> : <CheckCircle size={20} />}
           {saving ? t("جارٍ الحفظ...", "Saving...") : t("التالي — الدفع", "Next — payment")}
         </button>
