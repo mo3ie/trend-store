@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Link2, DollarSign, Calendar, Globe,
   Loader2, CheckCircle, AlertCircle, ChevronDown, Search, X, MapPin, Users2, Target, Crown, Eye,
+  Sparkles, Save, Trash2, Plus, Bookmark, Map as MapIcon,
 } from "lucide-react";
 import { Suspense } from "react";
 import { priceFor, mergeAdsPricing, DEFAULT_ADS_PRICING, AD_TIER_PACKAGES, findTierOption, type AdsPricing, type Tier } from "@/services/campaigns";
@@ -19,6 +20,8 @@ const PINK_BG = "rgba(214,64,159,0.12)";
 interface ConnectedPage { id: string; page_id: string; page_name: string; page_picture?: string; }
 interface PagePost { id: string; postId: string; message: string; createdTime: string; picture?: string; permalinkUrl?: string; }
 interface GeoCity { key: string; name: string; region?: string; }
+interface AdInterest { id: string; name: string; audienceLower?: number; audienceUpper?: number; }
+interface SavedAudience { id: string; name: string; targeting: Record<string, unknown>; }
 
 function CreateCampaignInner() {
   const router       = useRouter();
@@ -75,6 +78,27 @@ function CreateCampaignInner() {
   const [ageMin, setAgeMin] = useState(18);
   const [ageMax, setAgeMax] = useState(65);
   const [gender, setGender] = useState<"all" | "male" | "female">("all");
+
+  // Advanced targeting
+  const [cityRadius, setCityRadius] = useState<Record<string, number>>({});
+  const [regions, setRegions]       = useState<GeoCity[]>([]);
+  const [regionSearch, setRegionSearch]   = useState("");
+  const [regionResults, setRegionResults] = useState<GeoCity[]>([]);
+  const [interests, setInterests]   = useState<AdInterest[]>([]);
+  const [intSearch, setIntSearch]   = useState("");
+  const [intResults, setIntResults] = useState<AdInterest[]>([]);
+  const [intSearching, setIntSearching] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  // Saved audiences
+  const [audiences, setAudiences] = useState<SavedAudience[]>([]);
+  const [audName, setAudName]     = useState("");
+  const [savingAud, setSavingAud] = useState(false);
+  // AI assistant (VIP)
+  const [aiOpen, setAiOpen]       = useState(false);
+  const [aiDesc, setAiDesc]       = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSummary, setAiSummary] = useState("");
+  const [aiErr, setAiErr]         = useState("");
 
   const usingCustom = isVip && vipMode === "custom";
   const tierPkg     = AD_TIER_PACKAGES.find((p) => p.id === tierPkgId)!;
@@ -142,18 +166,97 @@ function CreateCampaignInner() {
     setCitySearch("");
     setCityResults([]);
   }
-  function removeCity(key: string) { setCities(cities.filter((city) => city.key !== key)); }
+  function removeCity(key: string) {
+    setCities(cities.filter((city) => city.key !== key));
+    setCityRadius((r) => { const n = { ...r }; delete n[key]; return n; });
+  }
+
+  // Region search (debounced)
+  useEffect(() => {
+    const q = regionSearch.trim();
+    if (q.length < 2) { setRegionResults([]); return; }
+    const id = setTimeout(() => {
+      fetch(`/api/promo/geo?type=region&q=${encodeURIComponent(q)}`)
+        .then((r) => r.json()).then((d) => setRegionResults(d.cities || [])).catch(() => setRegionResults([]));
+    }, 350);
+    return () => clearTimeout(id);
+  }, [regionSearch]);
+  function addRegion(r: GeoCity) { if (!regions.some((x) => x.key === r.key)) setRegions([...regions, r]); setRegionSearch(""); setRegionResults([]); }
+  function removeRegion(key: string) { setRegions(regions.filter((r) => r.key !== key)); }
+
+  // Interest search (debounced)
+  useEffect(() => {
+    const q = intSearch.trim();
+    if (q.length < 2) { setIntResults([]); return; }
+    setIntSearching(true);
+    const id = setTimeout(() => {
+      fetch(`/api/promo/interests?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json()).then((d) => setIntResults(d.interests || [])).catch(() => setIntResults([]))
+        .finally(() => setIntSearching(false));
+    }, 350);
+    return () => clearTimeout(id);
+  }, [intSearch]);
+  function addInterest(i: AdInterest) { if (!interests.some((x) => x.id === i.id)) setInterests([...interests, i]); setIntSearch(""); setIntResults([]); }
+  function removeInterest(id: string) { setInterests(interests.filter((i) => i.id !== id)); }
+
+  // Saved audiences
+  useEffect(() => { fetch("/api/promo/audiences").then((r) => r.json()).then((d) => setAudiences(d.audiences || [])).catch(() => {}); }, []);
+
+  async function saveAudience() {
+    if (!audName.trim()) return;
+    setSavingAud(true);
+    const r = await fetch("/api/promo/audiences", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: audName.trim(), targeting: snapshotTargeting() }) });
+    const d = await r.json();
+    setSavingAud(false);
+    if (r.ok && d.audience) { setAudiences([d.audience, ...audiences]); setAudName(""); }
+  }
+  async function deleteAudience(id: string) {
+    await fetch(`/api/promo/audiences?id=${id}`, { method: "DELETE" });
+    setAudiences(audiences.filter((a) => a.id !== id));
+  }
+  function loadAudience(a: SavedAudience) {
+    const tg = a.targeting || {};
+    if (typeof tg.age_min === "number") setAgeMin(tg.age_min as number);
+    if (typeof tg.age_max === "number") setAgeMax(tg.age_max as number);
+    const g = tg.genders as number[] | undefined;
+    setGender(g?.[0] === 1 ? "male" : g?.[0] === 2 ? "female" : "all");
+    setCities((tg._cities as GeoCity[]) || []);
+    setCityRadius((tg._cityRadius as Record<string, number>) || {});
+    setRegions((tg._regions as GeoCity[]) || []);
+    setInterests((tg._interests as AdInterest[]) || []);
+    setShowAdvanced(true);
+  }
+
+  async function runAi() {
+    setAiErr(""); setAiSummary(""); setAiLoading(true);
+    const r = await fetch("/api/promo/ai-targeting", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ description: aiDesc }) });
+    const d = await r.json();
+    setAiLoading(false);
+    if (!r.ok) { setAiErr(d.message || d.error || t("تعذّر المساعد", "Assistant failed")); return; }
+    if (typeof d.ageMin === "number") setAgeMin(d.ageMin);
+    if (typeof d.ageMax === "number") setAgeMax(d.ageMax);
+    setGender(d.gender === "male" ? "male" : d.gender === "female" ? "female" : "all");
+    if (Array.isArray(d.cities))    setCities(d.cities);
+    if (Array.isArray(d.interests)) setInterests(d.interests);
+    setAiSummary(d.summary || "");
+    setShowAdvanced(true);
+  }
+
+  // Snapshot the current targeting for saving (keeps display metadata under _ keys).
+  function snapshotTargeting(): Record<string, unknown> {
+    return { ...buildTargeting(), _cities: cities, _cityRadius: cityRadius, _regions: regions, _interests: interests };
+  }
 
   function buildTargeting() {
     const targeting: Record<string, unknown> = { age_min: ageMin, age_max: ageMax };
     if (gender === "male")   targeting.genders = [1];
     if (gender === "female") targeting.genders = [2];
-    if (cities.length > 0) {
-      targeting.geo_locations = {
-        countries: ["LY"],
-        cities: cities.map((city) => ({ key: city.key, radius: 25, distance_unit: "kilometer" })),
-      };
-    }
+    const geo: Record<string, unknown> = {};
+    if (cities.length > 0)  geo.cities  = cities.map((city) => ({ key: city.key, radius: cityRadius[city.key] || 25, distance_unit: "kilometer" }));
+    if (regions.length > 0) geo.regions = regions.map((r) => ({ key: r.key }));
+    if (cities.length === 0 && regions.length === 0) geo.countries = ["LY"];
+    targeting.geo_locations = geo;
+    if (interests.length > 0) targeting.flexible_spec = [{ interests: interests.map((i) => ({ id: i.id, name: i.name })) }];
     return targeting;
   }
 
@@ -349,60 +452,79 @@ function CreateCampaignInner() {
 
         {/* Targeting */}
         <div style={card}>
-          <label style={{ fontWeight: 800, fontSize: 14, marginBottom: 16, display: "block" }}>
-            <Target size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
-            {t("الاستهداف", "Targeting")}
-          </label>
-
-          <div style={{ marginBottom: 18 }}>
-            <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>
-              <MapPin size={12} style={{ verticalAlign: "middle", marginInlineEnd: 4 }} />
-              {t("المدن (اتركها فارغة لكل ليبيا)", "Cities (leave empty for all of Libya)")}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+            <label style={{ fontWeight: 800, fontSize: 14 }}>
+              <Target size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
+              {t("الاستهداف", "Targeting")}
             </label>
-            {cities.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-                {cities.map((city) => (
-                  <span key={city.key} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: PINK_BG, border: `1px solid ${PINK}55`, color: PINK, borderRadius: 100, padding: "4px 10px", fontSize: 12 }}>
-                    {city.name}{city.region ? ` — ${city.region}` : ""}
-                    <X size={13} style={{ cursor: "pointer" }} onClick={() => removeCity(city.key)} />
-                  </span>
-                ))}
-              </div>
+            {isVip && (
+              <button type="button" onClick={() => setAiOpen((o) => !o)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "linear-gradient(135deg,#f0b429,#ff9d2f)", border: "none", borderRadius: 10, padding: "8px 14px", color: "#1a1330", fontWeight: 800, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>
+                <Sparkles size={14} /> {t("مساعد ذكي", "AI assistant")}
+              </button>
             )}
-            <div style={{ position: "relative" }}>
-              <Search size={15} color={c.dim} style={{ position: "absolute", insetInlineStart: 12, top: "50%", transform: "translateY(-50%)" }} />
-              <input value={citySearch} onChange={(e) => setCitySearch(e.target.value)}
-                placeholder={t("ابحث عن مدينة (مثال: طرابلس، بنغازي)", "Search a city (e.g. Tripoli, Benghazi)")}
-                style={{ ...input, paddingInlineStart: 36 }} />
-              {(citySearching || cityResults.length > 0) && citySearch.trim().length >= 2 && (
-                <div style={{ position: "absolute", insetInlineStart: 0, insetInlineEnd: 0, top: "calc(100% + 6px)", zIndex: 20,
-                  background: c.menuBg, border: `1px solid ${c.border}`, borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.28)", maxHeight: 220, overflowY: "auto" }}>
-                  {citySearching ? (
-                    <div style={{ padding: 14, textAlign: "center", color: c.dim }}><Loader2 size={16} className="spin" /></div>
-                  ) : cityResults.map((city) => (
+          </div>
+
+          {/* AI assistant (VIP) */}
+          {isVip && aiOpen && (
+            <div style={{ background: "rgba(240,180,41,0.08)", border: "1px solid rgba(240,180,41,0.4)", borderRadius: 14, padding: 16, marginBottom: 18 }}>
+              <label style={{ fontSize: 12.5, color: "#f0b429", fontWeight: 700, display: "block", marginBottom: 8 }}>{t("صف منتجك وجمهورك، ويقترح المساعد أفضل استهداف:", "Describe your product & audience; the assistant suggests the best targeting:")}</label>
+              <textarea value={aiDesc} onChange={(e) => setAiDesc(e.target.value)} rows={2}
+                placeholder={t("مثال: متجر عطور نسائية فاخرة، أستهدف النساء في طرابلس وبنغازي", "e.g. Luxury women's perfume shop targeting women in Tripoli & Benghazi")}
+                style={{ ...input, resize: "vertical" }} />
+              {aiErr && <div style={{ color: "#ef4444", fontSize: 12, marginTop: 8 }}>{aiErr}</div>}
+              {aiSummary && <div style={{ color: "#f0b429", fontSize: 12.5, marginTop: 8, lineHeight: 1.6 }}>✨ {aiSummary}</div>}
+              <button type="button" onClick={runAi} disabled={aiLoading || !aiDesc.trim()}
+                style={{ marginTop: 10, background: "linear-gradient(135deg,#f0b429,#ff9d2f)", border: "none", borderRadius: 11, padding: "10px 18px", color: "#1a1330", fontWeight: 800, fontSize: 13, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 8, opacity: aiLoading ? 0.7 : 1 }}>
+                {aiLoading ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />} {t("اقترح استهدافاً", "Suggest targeting")}
+              </button>
+            </div>
+          )}
+
+          {/* Basic: cities */}
+          <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>
+            <MapPin size={12} style={{ verticalAlign: "middle", marginInlineEnd: 4 }} />
+            {t("المدن (اتركها فارغة لكل ليبيا)", "Cities (leave empty for all of Libya)")}
+          </label>
+          {cities.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+              {cities.map((city) => (
+                <span key={city.key} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: PINK_BG, border: `1px solid ${PINK}55`, color: PINK, borderRadius: 100, padding: "4px 10px", fontSize: 12 }}>
+                  {city.name}{city.region ? ` — ${city.region}` : ""}
+                  <X size={13} style={{ cursor: "pointer" }} onClick={() => removeCity(city.key)} />
+                </span>
+              ))}
+            </div>
+          )}
+          <div style={{ position: "relative", marginBottom: 18 }}>
+            <Search size={15} color={c.dim} style={{ position: "absolute", insetInlineStart: 12, top: "50%", transform: "translateY(-50%)" }} />
+            <input value={citySearch} onChange={(e) => setCitySearch(e.target.value)}
+              placeholder={t("ابحث عن مدينة (مثال: طرابلس، بنغازي)", "Search a city (e.g. Tripoli, Benghazi)")}
+              style={{ ...input, paddingInlineStart: 36 }} />
+            {(citySearching || cityResults.length > 0) && citySearch.trim().length >= 2 && (
+              <div style={{ position: "absolute", insetInlineStart: 0, insetInlineEnd: 0, top: "calc(100% + 6px)", zIndex: 20, background: c.menuBg, border: `1px solid ${c.border}`, borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.28)", maxHeight: 220, overflowY: "auto" }}>
+                {citySearching ? <div style={{ padding: 14, textAlign: "center", color: c.dim }}><Loader2 size={16} className="spin" /></div>
+                  : cityResults.map((city) => (
                     <button key={city.key} type="button" onClick={() => addCity(city)}
                       style={{ width: "100%", textAlign: rtl ? "right" : "left", padding: "10px 14px", background: "transparent", border: "none", cursor: "pointer", color: c.text, fontSize: 13, fontFamily: "inherit" }}>
                       {city.name}{city.region ? <span style={{ color: c.dim }}> — {city.region}</span> : ""}
                     </button>
                   ))}
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
+          {/* Basic: age + gender */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
             <div>
               <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>
-                <Users2 size={12} style={{ verticalAlign: "middle", marginInlineEnd: 4 }} />
-                {t("العمر من", "Age from")}
+                <Users2 size={12} style={{ verticalAlign: "middle", marginInlineEnd: 4 }} /> {t("العمر من", "Age from")}
               </label>
-              <input type="number" min={13} max={65} value={ageMin}
-                onChange={(e) => setAgeMin(Math.max(13, Math.min(65, Number(e.target.value) || 13)))} style={input} />
+              <input type="number" min={13} max={65} value={ageMin} onChange={(e) => setAgeMin(Math.max(13, Math.min(65, Number(e.target.value) || 13)))} style={input} />
             </div>
             <div>
               <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("العمر إلى", "Age to")}</label>
-              <input type="number" min={13} max={65} value={ageMax}
-                onChange={(e) => setAgeMax(Math.max(13, Math.min(65, Number(e.target.value) || 65)))} style={input} />
+              <input type="number" min={13} max={65} value={ageMax} onChange={(e) => setAgeMax(Math.max(13, Math.min(65, Number(e.target.value) || 65)))} style={input} />
             </div>
             <div>
               <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("الجنس", "Gender")}</label>
@@ -418,6 +540,113 @@ function CreateCampaignInner() {
               </div>
             </div>
           </div>
+
+          {/* Advanced toggle */}
+          <button type="button" onClick={() => setShowAdvanced((s) => !s)}
+            style={{ marginTop: 18, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: "11px 0", color: c.muted, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+            {t("خيارات متقدمة", "Advanced options")}
+            <ChevronDown size={16} style={{ transform: showAdvanced ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+          </button>
+
+          {showAdvanced && (
+            <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 18 }}>
+
+              {/* Regions */}
+              <div>
+                <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}><MapIcon size={12} style={{ verticalAlign: "middle", marginInlineEnd: 4 }} /> {t("المناطق / المحافظات", "Regions")}</label>
+                {regions.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                    {regions.map((r) => (
+                      <span key={r.key} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: PINK_BG, border: `1px solid ${PINK}55`, color: PINK, borderRadius: 100, padding: "4px 10px", fontSize: 12 }}>
+                        {r.name}<X size={13} style={{ cursor: "pointer" }} onClick={() => removeRegion(r.key)} />
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ position: "relative" }}>
+                  <Search size={15} color={c.dim} style={{ position: "absolute", insetInlineStart: 12, top: "50%", transform: "translateY(-50%)" }} />
+                  <input value={regionSearch} onChange={(e) => setRegionSearch(e.target.value)} placeholder={t("ابحث عن منطقة", "Search a region")} style={{ ...input, paddingInlineStart: 36 }} />
+                  {regionResults.length > 0 && regionSearch.trim().length >= 2 && (
+                    <div style={{ position: "absolute", insetInlineStart: 0, insetInlineEnd: 0, top: "calc(100% + 6px)", zIndex: 20, background: c.menuBg, border: `1px solid ${c.border}`, borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.28)", maxHeight: 200, overflowY: "auto" }}>
+                      {regionResults.map((r) => (
+                        <button key={r.key} type="button" onClick={() => addRegion(r)} style={{ width: "100%", textAlign: rtl ? "right" : "left", padding: "10px 14px", background: "transparent", border: "none", cursor: "pointer", color: c.text, fontSize: 13, fontFamily: "inherit" }}>{r.name}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Per-city radius */}
+              {cities.length > 0 && (
+                <div>
+                  <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 8 }}>{t("نطاق حول كل مدينة (كم)", "Radius around each city (km)")}</label>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {cities.map((city) => (
+                      <div key={city.key} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ fontSize: 12.5, color: c.text, minWidth: 90, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{city.name}</span>
+                        <input type="range" min={1} max={80} value={cityRadius[city.key] || 25}
+                          onChange={(e) => setCityRadius((r) => ({ ...r, [city.key]: Number(e.target.value) }))}
+                          style={{ flex: 1, accentColor: PINK }} />
+                        <span style={{ fontSize: 12.5, fontWeight: 800, color: PINK, minWidth: 42, textAlign: "center" }}>{cityRadius[city.key] || 25} {t("كم", "km")}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Interests / detailed targeting */}
+              <div>
+                <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}><Sparkles size={12} style={{ verticalAlign: "middle", marginInlineEnd: 4 }} /> {t("الاهتمامات والاستهداف التفصيلي", "Interests & detailed targeting")}</label>
+                {interests.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                    {interests.map((i) => (
+                      <span key={i.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(109,40,217,0.14)", border: "1px solid rgba(109,40,217,0.4)", color: light ? "#6d28d9" : "#c4b5fd", borderRadius: 100, padding: "4px 10px", fontSize: 12 }}>
+                        {i.name}<X size={13} style={{ cursor: "pointer" }} onClick={() => removeInterest(i.id)} />
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ position: "relative" }}>
+                  <Search size={15} color={c.dim} style={{ position: "absolute", insetInlineStart: 12, top: "50%", transform: "translateY(-50%)" }} />
+                  <input value={intSearch} onChange={(e) => setIntSearch(e.target.value)} placeholder={t("ابحث عن اهتمام (مثال: تسوق، عطور، سيارات)", "Search an interest (e.g. shopping, perfume)")} style={{ ...input, paddingInlineStart: 36 }} />
+                  {(intSearching || intResults.length > 0) && intSearch.trim().length >= 2 && (
+                    <div style={{ position: "absolute", insetInlineStart: 0, insetInlineEnd: 0, top: "calc(100% + 6px)", zIndex: 20, background: c.menuBg, border: `1px solid ${c.border}`, borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.28)", maxHeight: 240, overflowY: "auto" }}>
+                      {intSearching ? <div style={{ padding: 14, textAlign: "center", color: c.dim }}><Loader2 size={16} className="spin" /></div>
+                        : intResults.map((i) => (
+                          <button key={i.id} type="button" onClick={() => addInterest(i)} style={{ width: "100%", textAlign: rtl ? "right" : "left", padding: "10px 14px", background: "transparent", border: "none", cursor: "pointer", color: c.text, fontSize: 13, fontFamily: "inherit", display: "flex", justifyContent: "space-between", gap: 8 }}>
+                            <span>{i.name}</span>
+                            {i.audienceUpper ? <span style={{ color: c.dim, fontSize: 11 }}>~{i.audienceUpper.toLocaleString("en")}</span> : null}
+                          </button>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Saved audiences */}
+              <div style={{ borderTop: `1px solid ${c.border}`, paddingTop: 16 }}>
+                <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 8 }}><Bookmark size={12} style={{ verticalAlign: "middle", marginInlineEnd: 4 }} /> {t("الجمهور المحفوظ", "Saved audiences")}</label>
+                {audiences.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
+                    {audiences.map((a) => (
+                      <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: "8px 12px" }}>
+                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{a.name}</span>
+                        <button type="button" onClick={() => loadAudience(a)} style={{ background: PINK_BG, border: `1px solid ${PINK}55`, borderRadius: 8, padding: "5px 12px", color: PINK, fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>{t("تحميل", "Load")}</button>
+                        <button type="button" onClick={() => deleteAudience(a.id)} style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, padding: "5px 8px", color: "#ef4444", cursor: "pointer" }}><Trash2 size={13} /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input value={audName} onChange={(e) => setAudName(e.target.value)} placeholder={t("اسم الجمهور لحفظه", "Name this audience to save")} style={{ ...input, flex: 1 }} />
+                  <button type="button" onClick={saveAudience} disabled={savingAud || !audName.trim()}
+                    style={{ background: `${PINK}22`, border: `1px solid ${PINK}55`, borderRadius: 11, padding: "0 16px", color: PINK, fontWeight: 800, fontSize: 13, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 7 }}>
+                    {savingAud ? <Loader2 size={15} className="spin" /> : <Save size={15} />} {t("حفظ", "Save")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Pricing */}

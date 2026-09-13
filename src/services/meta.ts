@@ -276,6 +276,42 @@ export async function searchCities(q: string): Promise<GeoCity[]> {
     .map((c) => ({ key: c.key, name: c.name, region: c.region }));
 }
 
+// Searches Libyan regions (محافظات/مناطق) via Meta's targeting search.
+export async function searchRegions(q: string): Promise<GeoCity[]> {
+  const data = await graph<{ data: Array<{ key: string; name: string; country_code?: string }> }>(
+    `search?type=adgeolocation&location_types=${encodeURIComponent('["region"]')}&country_code=LY&q=${encodeURIComponent(q)}&limit=20`,
+    "GET"
+  );
+  return (data.data || [])
+    .filter((c) => !c.country_code || c.country_code === "LY")
+    .map((c) => ({ key: c.key, name: c.name }));
+}
+
+// ── Detailed targeting (interests) ────────────────────────────────────────────
+
+export interface AdInterest {
+  id:            string;
+  name:          string;
+  audienceLower?: number;
+  audienceUpper?: number;
+  path?:         string[];
+}
+
+// Searches Meta's detailed-targeting interests (adinterest). Uses SYS_TOKEN.
+export async function searchInterests(q: string): Promise<AdInterest[]> {
+  const data = await graph<{ data: Array<{
+    id: string; name: string; audience_size_lower_bound?: number; audience_size_upper_bound?: number; path?: string[];
+  }> }>(
+    `search?type=adinterest&q=${encodeURIComponent(q)}&limit=25`,
+    "GET"
+  );
+  return (data.data || []).map((i) => ({
+    id: i.id, name: i.name,
+    audienceLower: i.audience_size_lower_bound, audienceUpper: i.audience_size_upper_bound,
+    path: i.path,
+  }));
+}
+
 // ── Post ID extraction ────────────────────────────────────────────────────────
 
 export function extractPostId(postUrl: string): string | null {
