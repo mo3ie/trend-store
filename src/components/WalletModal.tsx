@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import { Wallet, X, ArrowDownCircle, ArrowUpCircle, Phone, Hash, CreditCard } from "lucide-react";
 
+// Vivid gradient of the "حيوي جريء" direction.
+const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
+
 type Transaction = {
   id: string;
   amount: number;
@@ -266,16 +269,19 @@ export default function WalletModal({ onClose }: Props) {
         </div>
 
         {/* Balance card */}
-        <div className="mx-5 mt-4 p-5 rounded-2xl bg-gradient-to-br from-purple-900/60 to-blue-900/40 border border-purple-500/30 shrink-0">
-          <p className="text-[var(--muted)] text-xs mb-1">الرصيد الحالي</p>
-          {loading ? (
-            <div className="h-9 w-24 bg-white/10 rounded-xl animate-pulse" />
-          ) : (
-            <p className="text-3xl font-black bg-gradient-to-r from-purple-300 to-blue-300 bg-clip-text text-transparent">
-              {balance.toFixed(2)} <span className="text-lg">د</span>
-            </p>
-          )}
-          <p className="text-[var(--muted-2)] text-xs mt-2">دينار ليبي</p>
+        <div className="mx-5 mt-4 p-5 rounded-2xl shrink-0 relative overflow-hidden" style={{ background: G_HERO, boxShadow: "0 14px 34px rgba(214,64,159,0.35)" }}>
+          <div className="absolute -top-8 -left-6 w-36 h-36 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
+          <div className="relative">
+            <p className="text-white/80 text-xs mb-1">الرصيد الحالي</p>
+            {loading ? (
+              <div className="h-9 w-24 bg-white/20 rounded-xl animate-pulse" />
+            ) : (
+              <p className="text-4xl font-black text-white tracking-tight">
+                {balance.toFixed(2)} <span className="text-lg font-bold text-white/85">د</span>
+              </p>
+            )}
+            <p className="text-white/75 text-xs mt-2">دينار ليبي</p>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -452,7 +458,8 @@ export default function WalletModal({ onClose }: Props) {
               <button
                 onClick={handleRecharge}
                 disabled={recharging}
-                className="w-full py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ background: G_HERO }}
+                className="w-full py-3 rounded-2xl font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {recharging ? (
                   <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> جاري...</>
@@ -513,7 +520,8 @@ export default function WalletModal({ onClose }: Props) {
               <button
                 onClick={confirmOtp}
                 disabled={confirming || otpCode.length < 4}
-                className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ background: G_HERO }}
+                className="w-full py-3.5 rounded-2xl font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {confirming
                   ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> جاري التأكيد...</>
