@@ -312,6 +312,64 @@ export async function searchInterests(q: string): Promise<AdInterest[]> {
   }));
 }
 
+// ── Live status + insights (for "My campaigns" reports) ───────────────────────
+
+export interface AdInsights {
+  reach:       number;
+  impressions: number;
+  clicks:      number;
+  spendUsd:    number;
+  cpm:         number;
+  ctr:         number;
+}
+
+// Maps Meta's ad effective_status to our internal campaign status. An ad is only
+// "active" once Meta has actually approved AND started delivering it.
+export function mapEffectiveStatus(s: string): string {
+  switch (s) {
+    case "ACTIVE":               return "active";
+    case "PENDING_REVIEW":
+    case "PREAPPROVED":
+    case "IN_PROCESS":
+    case "PENDING_BILLING_INFO": return "in_review";
+    case "DISAPPROVED":          return "rejected";
+    case "WITH_ISSUES":          return "issues";
+    case "PAUSED":
+    case "ADSET_PAUSED":
+    case "CAMPAIGN_PAUSED":      return "paused";
+    case "ARCHIVED":
+    case "DELETED":
+    case "COMPLETED":            return "completed";
+    default:                     return "in_review";
+  }
+}
+
+// Reads an ad's live effective_status. Uses SYS_TOKEN.
+export async function getAdEffectiveStatus(adId: string): Promise<string | null> {
+  try {
+    const d = await graph<{ effective_status?: string }>(`${adId}?fields=effective_status`);
+    return d.effective_status ?? null;
+  } catch { return null; }
+}
+
+// Reads a campaign's aggregate insights (lifetime). Returns zeros if nothing has
+// been delivered yet. Uses SYS_TOKEN.
+export async function getCampaignInsights(externalCampaignId: string): Promise<AdInsights> {
+  const empty: AdInsights = { reach: 0, impressions: 0, clicks: 0, spendUsd: 0, cpm: 0, ctr: 0 };
+  try {
+    const d = await graph<{ data?: Array<Record<string, string>> }>(
+      `${externalCampaignId}/insights?fields=reach,impressions,clicks,spend,cpm,ctr&date_preset=maximum`
+    );
+    const r = d.data?.[0];
+    if (!r) return empty;
+    const n = (v?: string) => Math.round(Number(v || 0) * 100) / 100;
+    return {
+      reach: Number(r.reach || 0), impressions: Number(r.impressions || 0), clicks: Number(r.clicks || 0),
+      spendUsd: n(r.spend), cpm: n(r.cpm), ctr: n(r.ctr),
+    };
+  } catch { return empty; }
+}
+
 // ── Post ID extraction ────────────────────────────────────────────────────────
 
 export function extractPostId(postUrl: string): string | null {

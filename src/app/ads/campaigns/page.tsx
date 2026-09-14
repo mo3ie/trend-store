@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Plus, Megaphone, CheckCircle, Clock,
   TrendingUp, ExternalLink, Loader2, RefreshCw, AlertCircle,
+  Eye, MousePointerClick, BarChart3, Receipt, Wallet,
 } from "lucide-react";
 import { CAMPAIGN_STATUS_LABELS, CAMPAIGN_STATUS_LABELS_EN, CAMPAIGN_STATUS_COLORS } from "@/services/campaigns";
 import { useLang } from "@/hooks/useLang";
@@ -25,13 +26,18 @@ interface Campaign {
   external_campaign_id?: string;
   error_message?:      string;
   created_at:          string;
+  reach?:              number;
+  impressions?:        number;
+  clicks?:             number;
+  spend_usd?:          number;
 }
 
 function statusIcon(status: string) {
   switch (status) {
     case "active":    return <TrendingUp size={14} />;
     case "completed": return <CheckCircle size={14} />;
-    case "failed":    return <AlertCircle size={14} />;
+    case "failed":
+    case "rejected":  return <AlertCircle size={14} />;
     case "creating":  return <Loader2 size={14} className="spin" />;
     default:          return <Clock size={14} />;
   }
@@ -57,16 +63,23 @@ function CampaignsInner() {
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [syncing, setSyncing]     = useState(false);
   const [showSuccess, setShowSuccess] = useState(paid === "1");
 
   useEffect(() => {
-    loadCampaigns();
+    loadCampaigns(true);
     if (paid === "1") setTimeout(() => setShowSuccess(false), 5000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function loadCampaigns() {
+  async function loadCampaigns(sync = false) {
     setLoading(true);
+    // Pull the latest status + insights from Meta before showing the list.
+    if (sync) {
+      setSyncing(true);
+      try { await fetch("/api/promo/campaigns/sync", { method: "POST" }); } catch { /* best-effort */ }
+      setSyncing(false);
+    }
     const res  = await fetch("/api/promo/campaigns");
     const data = await res.json();
     setCampaigns(data.campaigns || []);
@@ -84,8 +97,13 @@ function CampaignsInner() {
           <h1 style={{ fontSize: 18, fontWeight: 900, margin: 0 }}>{t("حملاتي الإعلانية", "My campaigns")}</h1>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button onClick={loadCampaigns} style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "8px 12px", color: c.muted, cursor: "pointer" }}>
-            <RefreshCw size={15} />
+          <button onClick={() => router.push("/ads/payments")} title={t("نشاطات الدفع", "Payment activity")}
+            style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "8px 12px", color: c.muted, cursor: "pointer" }}>
+            <Wallet size={15} />
+          </button>
+          <button onClick={() => loadCampaigns(true)} disabled={syncing} title={t("تحديث", "Refresh")}
+            style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "8px 12px", color: c.muted, cursor: "pointer" }}>
+            <RefreshCw size={15} className={syncing ? "spin" : ""} />
           </button>
           <button onClick={() => router.push("/ads/create")}
             style={{ background: G_HERO, border: "none", borderRadius: 11, padding: "9px 16px", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
@@ -162,6 +180,57 @@ function CampaignsInner() {
                   </div>
                 </div>
 
+                {/* Performance report */}
+                {camp.external_campaign_id && (camp.status === "active" || camp.status === "completed" || camp.status === "paused" || (camp.impressions ?? 0) > 0) && (
+                  <div style={{ marginTop: 14, background: light ? "#faf5ff" : "rgba(255,255,255,0.03)", border: `1px solid ${c.border}`, borderRadius: 14, padding: "14px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12, fontSize: 12.5, fontWeight: 800, color: c.muted }}>
+                      <BarChart3 size={14} color={PINK} /> {t("أداء الإعلان", "Ad performance")}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+                      {[
+                        { icon: Eye,                 val: (camp.reach ?? 0).toLocaleString("en"),       label: t("الوصول", "Reach") },
+                        { icon: TrendingUp,          val: (camp.impressions ?? 0).toLocaleString("en"), label: t("الظهور", "Impr.") },
+                        { icon: MousePointerClick,   val: (camp.clicks ?? 0).toLocaleString("en"),      label: t("النقرات", "Clicks") },
+                        { icon: TrendingUp,          val: `$${camp.spend_usd ?? 0}`,                     label: t("الإنفاق", "Spent") },
+                      ].map((m, i) => (
+                        <div key={i} style={{ textAlign: "center" }}>
+                          <m.icon size={15} color={PINK} style={{ marginBottom: 3 }} />
+                          <div style={{ fontSize: 15, fontWeight: 900 }}>{m.val}</div>
+                          <div style={{ fontSize: 10, color: c.dim, marginTop: 1 }}>{m.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {/* delivery bar: reach vs impressions */}
+                    {(camp.impressions ?? 0) > 0 && (
+                      <div style={{ marginTop: 12 }}>
+                        <div style={{ height: 8, borderRadius: 100, background: c.border, overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${Math.min(100, Math.round((camp.reach ?? 0) / (camp.impressions || 1) * 100))}%`, background: G_HERO }} />
+                        </div>
+                        <div style={{ fontSize: 10.5, color: c.dim, marginTop: 5 }}>
+                          {t("معدل تكرار الظهور لكل شخص", "Frequency (impressions per person)")}: {((camp.impressions ?? 0) / (camp.reach || 1)).toFixed(1)}×
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Status hints */}
+                {camp.status === "in_review" && (
+                  <div style={{ marginTop: 10, background: "rgba(59,130,246,0.1)", borderRadius: 10, padding: "8px 12px", fontSize: 12, color: "#3b82f6", display: "flex", gap: 8, alignItems: "center" }}>
+                    <Clock size={14} /> {t("إعلانك قيد المراجعة من فيسبوك — يبدأ فور الموافقة.", "Your ad is under Facebook review — it starts once approved.")}
+                  </div>
+                )}
+                {camp.status === "rejected" && (
+                  <div style={{ marginTop: 10, background: "rgba(239,68,68,0.1)", borderRadius: 10, padding: "8px 12px", fontSize: 12, color: "#ef4444", display: "flex", gap: 8, alignItems: "center" }}>
+                    <AlertCircle size={14} /> {t("تم رفض الإعلان من فيسبوك (مخالفة سياسات). تواصل معنا للمساعدة.", "The ad was rejected by Facebook (policy). Contact us for help.")}
+                  </div>
+                )}
+                {camp.status === "paused" && (
+                  <div style={{ marginTop: 10, background: "rgba(154,164,178,0.15)", borderRadius: 10, padding: "8px 12px", fontSize: 12, color: c.muted, display: "flex", gap: 8, alignItems: "center" }}>
+                    <Clock size={14} /> {t("الإعلان متوقف حالياً.", "The ad is currently paused.")}
+                  </div>
+                )}
+
                 {camp.status === "pending_payment" && (
                   <button onClick={() => router.push(`/ads/checkout?campaignId=${camp.id}`)}
                     style={{ marginTop: 14, width: "100%", background: "rgba(214,64,159,0.14)", border: `1px solid ${PINK}55`, borderRadius: 12, padding: "11px 0", color: PINK, fontWeight: 800, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
@@ -173,6 +242,14 @@ function CampaignsInner() {
                   <div style={{ marginTop: 10, background: "rgba(239,68,68,0.1)", borderRadius: 10, padding: "8px 12px", fontSize: 12, color: "#ef4444" }}>
                     {camp.error_message}
                   </div>
+                )}
+
+                {/* Invoice (paid campaigns) */}
+                {camp.status !== "pending_payment" && camp.status !== "failed" && (
+                  <a href={`/ads/invoice/${camp.id}`} target="_blank" rel="noopener noreferrer"
+                    style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 7, color: c.muted, fontSize: 12.5, fontWeight: 700, textDecoration: "none" }}>
+                    <Receipt size={14} color={PINK} /> {t("عرض الفاتورة", "View invoice")}
+                  </a>
                 )}
 
                 {camp.external_campaign_id && (

@@ -66,7 +66,9 @@ export async function POST(req: NextRequest) {
     await supabaseAdmin
       .from("ad_campaigns")
       .update({
-        status:               "active",
+        // Not "active" yet — Meta reviews the ad first. A sync flips it to
+        // active / rejected / paused based on the real effective_status.
+        status:               "in_review",
         external_campaign_id: result.campaignId,
         external_adset_id:    result.adsetId,
         external_ad_id:       result.adId,
