@@ -7,7 +7,7 @@ import {
   Loader2, CheckCircle, AlertCircle, ChevronDown, Search, X, MapPin, Users2, Target, Crown, Eye,
   Sparkles, Save, Trash2, Plus, Bookmark, Map as MapIcon,
   MessageCircle, Phone, Megaphone, PlayCircle, ThumbsUp, Layers, Wand2, ShieldAlert,
-  Copy, SplitSquareHorizontal, PenLine,
+  Copy, SplitSquareHorizontal, PenLine, Infinity as InfinityIcon,
 } from "lucide-react";
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
@@ -70,6 +70,7 @@ function CreateCampaignInner() {
   const [pkgDays, setPkgDays]   = useState(3);
   const [isVip, setIsVip]       = useState(false);
   const [vipMode, setVipMode]   = useState<"package" | "custom">("package");
+  const [continuous, setContinuous] = useState(false); // open-ended daily-debit (VIP custom)
   const [tier, setTier]         = useState<Tier>("regular");
   const [pricing, setPricing]   = useState<AdsPricing>(DEFAULT_ADS_PRICING);
   const [saving, setSaving]     = useState(false);
@@ -334,7 +335,7 @@ function CreateCampaignInner() {
     if (!isPageLikes && !postUrl) { setError(t("اختر منشورًا أو الصق رابطًا", "Select a post or paste a link")); return; }
     if (usingCustom) {
       if (!budgetUsd || budgetUsd < 1) { setError(t("الحد الأدنى للميزانية 1$", "Minimum budget is $1")); return; }
-      if (!daysVal   || daysVal < 1)   { setError(t("المدة يجب أن تكون يوم واحد على الأقل", "Duration must be at least one day")); return; }
+      if (!continuous && (!daysVal || daysVal < 1)) { setError(t("المدة يجب أن تكون يوم واحد على الأقل", "Duration must be at least one day")); return; }
     } else if (!opt) {
       setError(t("اختر باقة ومدة", "Choose a package and duration")); return;
     }
@@ -350,10 +351,11 @@ function CreateCampaignInner() {
       specialAdCategory: specialCategory || null,
       targetingB: audienceB ? cleanTargeting(audienceB.targeting) : null,
       adText: isPageLikes ? adText : undefined,
+      continuous: usingCustom && continuous ? true : undefined,
     };
     const postUrlOut = isPageLikes ? undefined : postUrl;
     const body = usingCustom
-      ? { pageId: selectedPage, pageName: page?.page_name, postUrl: postUrlOut, budgetUsd, durationDays: daysVal, targeting: buildTargeting(), ...adOptions }
+      ? { pageId: selectedPage, pageName: page?.page_name, postUrl: postUrlOut, budgetUsd, durationDays: continuous ? undefined : daysVal, targeting: buildTargeting(), ...adOptions }
       : { pageId: selectedPage, pageName: page?.page_name, postUrl: postUrlOut, packageId: tierPkgId, durationDays: pkgDays, targeting: buildTargeting(), ...adOptions };
     const res  = await fetch("/api/promo/campaigns", {
       method:  "POST",
@@ -1010,29 +1012,48 @@ function CreateCampaignInner() {
 
           {usingCustom ? (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div>
-                  <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("الميزانية (دولار)", "Budget (USD)")}</label>
-                  <input type="number" min={1} value={usdInput} onChange={(e) => setUsdInput(e.target.value)} placeholder={t("مثال: 25", "e.g. 25")} style={input} />
+              {/* Continuous (open-ended) toggle */}
+              <button type="button" onClick={() => setContinuous((v) => !v)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: continuous ? "rgba(240,180,41,0.1)" : c.inputBg, border: `1px solid ${continuous ? "rgba(240,180,41,0.5)" : c.border}`, borderRadius: 13, padding: "13px 14px", cursor: "pointer", fontFamily: "inherit", textAlign: rtl ? "right" : "left", marginBottom: 14 }}>
+                <div style={{ width: 34, height: 34, borderRadius: 10, background: continuous ? "linear-gradient(135deg,#f0b429,#ff9d2f)" : c.surface, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <InfinityIcon size={17} color={continuous ? "#1a1330" : c.muted} />
                 </div>
-                <div>
-                  <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("المدة (أيام)", "Duration (days)")}</label>
-                  <input type="number" min={1} max={90} value={days} onChange={(e) => { setDays(e.target.value); setEndDate(""); }} placeholder="7" style={input} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: continuous ? "#f0b429" : c.text }}>{t("تعمل حتى الإيقاف (خصم يومي)", "Runs until you stop it (daily)")}</div>
+                  <div style={{ fontSize: 11.5, color: c.dim, marginTop: 2, lineHeight: 1.5 }}>{t("ميزانية يومية تُخصم من محفظتك كل يوم، وتتوقف تلقائياً عند نفاد الرصيد.", "A daily budget is debited from your wallet each day; it auto-pauses when the balance runs out.")}</div>
                 </div>
+                <div style={{ width: 42, height: 24, borderRadius: 100, background: continuous ? "#f0b429" : c.border, position: "relative", flexShrink: 0, transition: "background .15s" }}>
+                  <div style={{ position: "absolute", top: 3, insetInlineStart: continuous ? 21 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "inset-inline-start .15s" }} />
+                </div>
+              </button>
+
+              <div style={{ display: "grid", gridTemplateColumns: continuous ? "1fr" : "1fr 1fr", gap: 14 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{continuous ? t("الميزانية اليومية (دولار)", "Daily budget (USD)") : t("الميزانية (دولار)", "Budget (USD)")}</label>
+                  <input type="number" min={1} value={usdInput} onChange={(e) => setUsdInput(e.target.value)} placeholder={t("مثال: 5", "e.g. 5")} style={input} />
+                </div>
+                {!continuous && (
+                  <div>
+                    <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("المدة (أيام)", "Duration (days)")}</label>
+                    <input type="number" min={1} max={90} value={days} onChange={(e) => { setDays(e.target.value); setEndDate(""); }} placeholder="7" style={input} />
+                  </div>
+                )}
               </div>
-              {/* Calendar — pick an end date, days auto-computed */}
-              <div style={{ marginTop: 12 }}>
-                <label style={{ fontSize: 12, color: c.muted, display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                  <Calendar size={13} /> {t("أو اختر تاريخ انتهاء الإعلان من التقويم", "Or pick an end date from the calendar")}
-                </label>
-                <input type="date" value={endDate}
-                  min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)}
-                  max={new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10)}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  style={{ ...input, colorScheme: light ? "light" : "dark" }} />
-                {endDate && <p style={{ fontSize: 11.5, color: PINK, marginTop: 6 }}>{t(`= ${daysVal} يوم`, `= ${daysVal} days`)}</p>}
-              </div>
-              <p style={{ fontSize: 11.5, color: "#f0b429", marginTop: 10 }}>⭐ {t("حرية كاملة — أي ميزانية وأي مدة تريدها.", "Full freedom — any budget, any duration.")}</p>
+              {/* Calendar — pick an end date, days auto-computed (fixed duration only) */}
+              {!continuous && (
+                <div style={{ marginTop: 12 }}>
+                  <label style={{ fontSize: 12, color: c.muted, display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                    <Calendar size={13} /> {t("أو اختر تاريخ انتهاء الإعلان من التقويم", "Or pick an end date from the calendar")}
+                  </label>
+                  <input type="date" value={endDate}
+                    min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)}
+                    max={new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10)}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    style={{ ...input, colorScheme: light ? "light" : "dark" }} />
+                  {endDate && <p style={{ fontSize: 11.5, color: PINK, marginTop: 6 }}>{t(`= ${daysVal} يوم`, `= ${daysVal} days`)}</p>}
+                </div>
+              )}
+              <p style={{ fontSize: 11.5, color: "#f0b429", marginTop: 10 }}>⭐ {continuous ? t("تعمل بلا نهاية حتى توقفها بنفسك من «حملاتي».", "Runs indefinitely until you stop it from “My campaigns”.") : t("حرية كاملة — أي ميزانية وأي مدة تريدها.", "Full freedom — any budget, any duration.")}</p>
             </>
           ) : (
             <>
@@ -1083,8 +1104,8 @@ function CreateCampaignInner() {
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {usingCustom ? (
               <>
-                <div style={{ display: "flex", justifyContent: "space-between", color: c.muted, fontSize: 14 }}><span>{t("ميزانية الإعلان", "Ad budget")}</span><span>${vipPrice?.budgetUsd ?? 0}</span></div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: c.muted, fontSize: 14 }}><span>{t("المدة", "Duration")}</span><span>{t(`${daysVal} أيام`, `${daysVal} days`)}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", color: c.muted, fontSize: 14 }}><span>{continuous ? t("الميزانية اليومية", "Daily budget") : t("ميزانية الإعلان", "Ad budget")}</span><span>${vipPrice?.budgetUsd ?? 0}{continuous ? t(" /يوم", "/day") : ""}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", color: c.muted, fontSize: 14 }}><span>{t("المدة", "Duration")}</span><span>{continuous ? t("حتى الإيقاف ∞", "Until stopped ∞") : t(`${daysVal} أيام`, `${daysVal} days`)}</span></div>
               </>
             ) : (
               <>
@@ -1096,16 +1117,19 @@ function CreateCampaignInner() {
               </>
             )}
             <div style={{ borderTop: `1px solid ${c.border}`, paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "baseline", fontWeight: 900, fontSize: 18 }}>
-              <span>{t("الإجمالي", "Total")}</span>
+              <span>{usingCustom && continuous ? t("يُدفع الآن (اليوم الأول)", "Pay now (day 1)") : t("الإجمالي", "Total")}</span>
               <span style={{ fontSize: 26, background: G_HERO, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{totalLyd} <span style={{ fontSize: 14, WebkitTextFillColor: c.muted }}>{LYD}</span></span>
             </div>
+            {usingCustom && continuous && (
+              <p style={{ fontSize: 11.5, color: "#f0b429", margin: 0 }}>♾️ {t(`ثم ${totalLyd} د.ل يومياً تُخصم من محفظتك حتى توقف الحملة.`, `then ${totalLyd} LYD/day from your wallet until you stop the campaign.`)}</p>
+            )}
           </div>
         </div>
 
         {/* Duration note */}
         <div style={{ background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 12, padding: "12px 16px", fontSize: 13, color: "#f59e0b", display: "flex", alignItems: "flex-start", gap: 10 }}>
           <Calendar size={16} style={{ flexShrink: 0, marginTop: 2 }} />
-          <span>{t("سيبدأ إعلانك خلال دقائق من تأكيد الدفع، ويعمل على ", "Your ad starts within minutes of payment, running for ")}<strong>{t(`${daysVal} أيام`, `${daysVal} days`)}</strong>{mapPin ? t(` حول نقطة محددة بنطاق ${mapPin.radius} كم${cities.length > 0 ? ` و${cities.length} مدينة` : ""}.`, ` around a pinned point (${mapPin.radius} km)${cities.length > 0 ? ` and ${cities.length} cit${cities.length === 1 ? "y" : "ies"}` : ""}.`) : cities.length > 0 ? t(` في ${cities.length} مدينة محددة.`, ` in ${cities.length} selected cit${cities.length === 1 ? "y" : "ies"}.`) : t(" في كل ليبيا.", " across all of Libya.")}</span>
+          <span>{t("سيبدأ إعلانك خلال دقائق من تأكيد الدفع، ويعمل على ", "Your ad starts within minutes of payment, running for ")}<strong>{usingCustom && continuous ? t("حتى الإيقاف", "until stopped") : t(`${daysVal} أيام`, `${daysVal} days`)}</strong>{mapPin ? t(` حول نقطة محددة بنطاق ${mapPin.radius} كم${cities.length > 0 ? ` و${cities.length} مدينة` : ""}.`, ` around a pinned point (${mapPin.radius} km)${cities.length > 0 ? ` and ${cities.length} cit${cities.length === 1 ? "y" : "ies"}` : ""}.`) : cities.length > 0 ? t(` في ${cities.length} مدينة محددة.`, ` in ${cities.length} selected cit${cities.length === 1 ? "y" : "ies"}.`) : t(" في كل ليبيا.", " across all of Libya.")}</span>
         </div>
 
         {/* Submit */}

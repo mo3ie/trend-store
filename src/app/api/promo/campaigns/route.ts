@@ -38,7 +38,7 @@ export async function POST(req: Request) {
 
   const {
     pageId, pageName, postUrl, budgetUsd, durationDays, targeting, packageId,
-    objective, placements, advantageAudience, specialAdCategory, targetingB, adText,
+    objective, placements, advantageAudience, specialAdCategory, targetingB, adText, continuous,
   } = await req.json();
 
   const VALID_OBJECTIVES = ["engagement", "messages", "traffic", "calls", "video_views", "awareness", "page_likes"];
@@ -72,8 +72,23 @@ export async function POST(req: Request) {
 
   // Pricing — server-trusted, never the client's numbers.
   let budgetUsdFinal: number, baseLyd: number, serviceFee: number, totalLyd: number, days: number;
+  const isContinuous = continuous === true;
 
-  if (packageId) {
+  if (isContinuous) {
+    // Open-ended: a DAILY budget, wallet debited each day, no fixed duration.
+    if (tier !== "vip") {
+      return NextResponse.json({ error: "الحملات المفتوحة متاحة لعملاء VIP فقط", code: "vip_only" }, { status: 403 });
+    }
+    const usd = Number(budgetUsd);
+    if (!usd || usd < 1) return NextResponse.json({ error: "الحد الأدنى للميزانية اليومية 1$" }, { status: 400 });
+    const pricing = await getAdsPricing();
+    const price = priceFor(usd, tier, pricing);
+    budgetUsdFinal = price.budgetUsd;   // per-day USD budget
+    baseLyd        = price.baseLyd;     // per-day LYD
+    serviceFee     = price.commissionLyd;
+    totalLyd       = price.totalLyd;    // charged for the FIRST day now; the rest daily
+    days           = 0;                 // open-ended
+  } else if (packageId) {
     // Fixed LYD package (regular + VIP): price comes straight from the poster table.
     const found = findTierOption(String(packageId), Number(durationDays));
     if (!found) return NextResponse.json({ error: "الباقة غير صحيحة" }, { status: 400 });
@@ -109,11 +124,14 @@ export async function POST(req: Request) {
       ad_text:       isPageLikes ? (adText || null) : null,
       budget_usd:    budgetUsdFinal,
       budget:        baseLyd,        // LYD figure shown to the user
-      duration_days: days,
+      duration_days: isContinuous ? null : days,
       service_fee:   serviceFee,
-      total_price:   totalLyd,       // what the customer pays
+      total_price:   totalLyd,       // what the customer pays now (first day if continuous)
       tier,
       status:        "pending_payment",
+      continuous:        isContinuous,
+      daily_budget_usd:  isContinuous ? budgetUsdFinal : null,
+      daily_price_lyd:   isContinuous ? totalLyd : null,
       targeting:     targeting || { countries: ["LY"] },
       objective:          objectiveFinal,
       placements:         placementsFinal,

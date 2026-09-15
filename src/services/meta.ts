@@ -470,6 +470,7 @@ interface BoostParams {
   targetingB?:       Record<string, unknown>; // A/B split test — second audience
   adText?:           string;        // page_likes: the promo caption on the Page ad
   pagePicture?:      string;        // page_likes: image URL for the Page ad creative
+  continuous?:       boolean;       // open-ended: daily budget, no end time (wallet debited daily)
 }
 
 interface BoostResult {
@@ -481,10 +482,12 @@ interface BoostResult {
 
 export async function boostPost(params: BoostParams): Promise<BoostResult> {
   const budgetUsd = params.budgetUsd ?? (params.budgetLyd ?? 0) / LYD_TO_USD;
-  // Meta expects lifetime_budget in cents
-  const lifetimeBudget = Math.round(budgetUsd * 100);
+  // Meta expects budgets in cents. Continuous campaigns carry a DAILY budget and
+  // no end time (they run until paused, wallet debited daily); fixed campaigns
+  // carry a lifetime budget spread over the chosen days.
+  const budgetCents = Math.round(budgetUsd * 100);
   const startTime = Math.floor(Date.now() / 1000) + 60; // 1 min from now
-  const endTime   = startTime + params.durationDays * 86400;
+  const endTime   = params.continuous ? undefined : startTime + params.durationDays * 86400;
 
   const obj = OBJECTIVE_CONFIG[params.objective ?? "engagement"] ?? OBJECTIVE_CONFIG.engagement;
 
@@ -551,9 +554,7 @@ export async function boostPost(params: BoostParams): Promise<BoostResult> {
     const body: Record<string, unknown> = {
       name:              `AdSet-${params.pageId}-${label}`,
       campaign_id:       campaign.id,
-      lifetime_budget:   budget,
       start_time:        startTime,
-      end_time:          endTime,
       billing_event:     "IMPRESSIONS",
       optimization_goal: obj.optimizationGoal,
       bid_strategy:      "LOWEST_COST_WITHOUT_CAP",
@@ -561,6 +562,12 @@ export async function boostPost(params: BoostParams): Promise<BoostResult> {
       status:            "ACTIVE",
       pacing_type:       ["standard"],
     };
+    if (params.continuous) {
+      body.daily_budget = budget;           // runs until paused
+    } else {
+      body.lifetime_budget = budget;
+      body.end_time        = endTime;
+    }
     if (obj.destinationType)   body.destination_type = obj.destinationType;
     if (obj.needsPromotedPage) body.promoted_object   = { page_id: params.pageId };
     const as = await graph<{ id: string }>(`${AD_ACCOUNT}/adsets`, "POST", body);
@@ -578,15 +585,15 @@ export async function boostPost(params: BoostParams): Promise<BoostResult> {
   // split evenly. Meta delivers to whichever audience performs better.
   const hasB = params.targetingB && Object.keys(params.targetingB).length > 0;
   if (hasB) {
-    const half = Math.round(lifetimeBudget / 2);
+    const half = Math.round(budgetCents / 2);
     const adsetA = await makeAdSet(t, half, "A");
-    const adsetB = await makeAdSet(params.targetingB as Record<string, unknown>, lifetimeBudget - half, "B");
+    const adsetB = await makeAdSet(params.targetingB as Record<string, unknown>, budgetCents - half, "B");
     const adA = await makeAd(adsetA, "A");
     const adB = await makeAd(adsetB, "B");
     return { campaignId: campaign.id, adsetId: adsetA, adId: adA, variantB: { adsetId: adsetB, adId: adB } };
   }
 
-  const adsetId = await makeAdSet(t, lifetimeBudget, "A");
+  const adsetId = await makeAdSet(t, budgetCents, "A");
   const adId    = await makeAd(adsetId, "A");
   return { campaignId: campaign.id, adsetId, adId };
 }

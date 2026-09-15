@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
   }
 
   const isPageLikes = campaign.objective === "page_likes";
+  const isContinuous = campaign.continuous === true;
 
   // Extract post ID from URL (not needed for Page-likes ads, which promote the Page).
   let postId = "";
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
       targetingB:        campaign.ab_test && campaign.targeting_b ? campaign.targeting_b : undefined,
       adText:            isPageLikes ? (campaign.ad_text || undefined) : undefined,
       pagePicture,
+      continuous:        campaign.continuous ?? undefined,
     });
 
     await supabaseAdmin
@@ -89,6 +91,8 @@ export async function POST(req: NextRequest) {
         external_adset_id:    result.adsetId,
         external_ad_id:       result.adId,
         external_variant_b:   result.variantB ?? null,
+        // Continuous campaigns paid day 1 at checkout — next wallet debit tomorrow.
+        next_charge_at:       isContinuous ? new Date(Date.now() + 86400000).toISOString() : null,
         updated_at:           new Date().toISOString(),
       })
       .eq("id", campaignId);

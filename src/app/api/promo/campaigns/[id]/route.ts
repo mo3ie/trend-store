@@ -42,10 +42,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (action !== "pause" && action !== "resume") return NextResponse.json({ error: "action غير صحيح" }, { status: 400 });
 
   const { data: camp } = await supabaseAdmin
-    .from("ad_campaigns").select("id, external_campaign_id, status")
+    .from("ad_campaigns").select("id, external_campaign_id, status, continuous, daily_price_lyd")
     .eq("id", id).eq("user_id", user.id).single();
   if (!camp) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
   if (!camp.external_campaign_id) return NextResponse.json({ error: "الحملة لم تُنشأ على فيسبوك بعد" }, { status: 400 });
+
+  // Resuming a continuous campaign requires enough wallet balance for the next day.
+  if (action === "resume" && camp.continuous) {
+    const price = Number(camp.daily_price_lyd) || 0;
+    const { data: wallet } = await supabaseAdmin.from("wallets").select("balance").eq("user_id", user.id).maybeSingle();
+    if (Number(wallet?.balance ?? 0) < price) {
+      return NextResponse.json({ error: "insufficient_balance", message: `رصيد المحفظة غير كافٍ لاستئناف الحملة (${price} د.ل/يوم)` }, { status: 402 });
+    }
+  }
 
   try {
     await setCampaignStatus(camp.external_campaign_id, action === "pause" ? "PAUSED" : "ACTIVE");
@@ -55,8 +64,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Optimistic local status; the next sync reconciles with Meta's effective_status.
   const newStatus = action === "pause" ? "paused" : "active";
+  const update: Record<string, unknown> = { status: newStatus, updated_at: new Date().toISOString() };
+  // On resume of a continuous campaign, restart the daily-charge clock (the debit
+  // cron will charge the wallet from tomorrow) and clear the pause message.
+  if (action === "resume" && camp.continuous) { update.next_charge_at = new Date(Date.now() + 86400000).toISOString(); update.error_message = null; }
   const { data } = await supabaseAdmin
-    .from("ad_campaigns").update({ status: newStatus, updated_at: new Date().toISOString() })
+    .from("ad_campaigns").update(update)
     .eq("id", id).eq("user_id", user.id).select().single();
   return NextResponse.json({ campaign: data });
 }
