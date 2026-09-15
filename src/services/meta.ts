@@ -126,22 +126,33 @@ export interface PagePost {
 // Lists a Page's recent published posts using the stored PAGE access token.
 // This read demonstrates the `pages_read_engagement` permission end-to-end.
 export async function getPagePosts(pageToken: string, limit = 15): Promise<PagePost[]> {
-  const data = await graph<{ data: Array<{
-    id: string; message?: string; created_time: string; full_picture?: string; permalink_url?: string;
-  }> }>(
-    `me/published_posts?fields=id,message,created_time,full_picture,permalink_url&limit=${limit}`,
-    "GET",
-    undefined,
-    pageToken
-  );
-  return (data.data || []).map((p) => ({
-    id:           p.id,
-    postId:       p.id.includes("_") ? p.id.split("_")[1] : p.id,
-    message:      p.message || "",
-    createdTime:  p.created_time,
-    picture:      p.full_picture,
-    permalinkUrl: p.permalink_url,
-  }));
+  type RawPost = { id: string; message?: string; story?: string; created_time: string; full_picture?: string; permalink_url?: string };
+  async function fetchFrom(edge: string): Promise<PagePost[]> {
+    const data = await graph<{ data: RawPost[] }>(
+      `${edge}?fields=id,message,story,created_time,full_picture,permalink_url&limit=${limit}`,
+      "GET", undefined, pageToken
+    );
+    return (data.data || []).map((p) => ({
+      id:           p.id,
+      postId:       p.id.includes("_") ? p.id.split("_")[1] : p.id,
+      message:      p.message || p.story || "",
+      createdTime:  p.created_time,
+      picture:      p.full_picture,
+      permalinkUrl: p.permalink_url,
+    }));
+  }
+  // published_posts is the canonical list, but it omits some post types (shared
+  // content, certain photo/video stories) — so some Pages come back empty. When
+  // that happens, fall back to the Page feed. A permission error still THROWS
+  // here so the route can retry with a fresh system-user token.
+  const primary = await fetchFrom("me/published_posts");
+  if (primary.length > 0) return primary;
+  try {
+    const feed = await fetchFrom("me/feed");
+    return feed.length > 0 ? feed : primary;
+  } catch {
+    return primary;
+  }
 }
 
 // Fetches a fresh Page access token via the system-user token. Works for pages

@@ -1,4 +1,9 @@
 "use client";
+// Bundle Leaflet's stylesheet with the component so it is guaranteed present
+// BEFORE the map initializes. (Injecting it as a runtime <link> let the map init
+// race ahead of its CSS, which rendered the panes with broken sizing — the map
+// "took half the screen and wouldn't pan".)
+import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
 import { Search, Crosshair, Loader2 } from "lucide-react";
 
@@ -65,12 +70,6 @@ export default function AdRadiusMap({ value, onChange, light, rtl, t }: Props) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!document.getElementById("leaflet-css")) {
-      const link = document.createElement("link");
-      link.id = "leaflet-css"; link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-    }
     import("leaflet").then((L) => {
       const Lf = L.default || (L as any);
       Lref.current = Lf;
@@ -85,6 +84,10 @@ export default function AdRadiusMap({ value, onChange, light, rtl, t }: Props) {
         Lf.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
         mapObj.current = map;
         setReady(true);
+        // The map mounts inside a collapsible panel; recompute its size once the
+        // browser has settled the container so tiles and dragging are correct.
+        setTimeout(() => map.invalidateSize(), 60);
+        setTimeout(() => map.invalidateSize(), 300);
         if (value) place(value.lat, value.lng, value.radius, value.address, false);
         map.on("click", (e: any) => {
           const { lat, lng } = e.latlng;
