@@ -484,11 +484,12 @@ export async function boostPost(params: BoostParams): Promise<BoostResult> {
   const geo = (t.geo_locations ?? {}) as Record<string, unknown>;
   const hasCities  = Array.isArray(geo.cities)  && geo.cities.length  > 0;
   const hasRegions = Array.isArray(geo.regions) && geo.regions.length > 0;
-  // Meta rejects a country AND a city inside it in the same request
+  const hasCustom  = Array.isArray(geo.custom_locations) && geo.custom_locations.length > 0;
+  // Meta rejects a country AND a city/pin inside it in the same request
   // ("Some locations conflict with each other"). When the user picked specific
-  // cities/regions (already Libyan — searchCities filters to LY), target those
-  // alone; otherwise default to the whole of Libya.
-  const geoLocations = hasCities || hasRegions
+  // cities/regions/map-pins (all Libyan), target those alone; otherwise default
+  // to the whole of Libya.
+  const geoLocations = hasCities || hasRegions || hasCustom
     ? (() => { const { countries: _drop, ...rest } = geo; void _drop; return rest; })()
     : { countries: ["LY"], ...geo };
   const targeting: Record<string, unknown> = {

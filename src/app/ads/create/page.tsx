@@ -9,11 +9,16 @@ import {
   MessageCircle, Phone, Megaphone, PlayCircle, ThumbsUp, Layers, Wand2, ShieldAlert,
 } from "lucide-react";
 import { Suspense } from "react";
+import dynamic from "next/dynamic";
 import { priceFor, mergeAdsPricing, DEFAULT_ADS_PRICING, AD_TIER_PACKAGES, findTierOption, type AdsPricing, type Tier } from "@/services/campaigns";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
 import AdsBottomNav from "@/components/AdsBottomNav";
+import type { MapPin as MapPinType } from "@/components/AdRadiusMap";
+
+// Leaflet touches window — load the map only on the client.
+const AdRadiusMap = dynamic(() => import("@/components/AdRadiusMap"), { ssr: false });
 
 const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
 const PINK    = "#d6409f";
@@ -91,6 +96,8 @@ function CreateCampaignInner() {
 
   // Advanced targeting
   const [cityRadius, setCityRadius] = useState<Record<string, number>>({});
+  const [mapPin, setMapPin]         = useState<MapPinType | null>(null);
+  const [showMap, setShowMap]       = useState(false);
   const [regions, setRegions]       = useState<GeoCity[]>([]);
   const [regionSearch, setRegionSearch]   = useState("");
   const [regionResults, setRegionResults] = useState<GeoCity[]>([]);
@@ -246,6 +253,9 @@ function CreateCampaignInner() {
     setCityRadius((tg._cityRadius as Record<string, number>) || {});
     setRegions((tg._regions as GeoCity[]) || []);
     setInterests((tg._interests as AdInterest[]) || []);
+    const savedPin = (tg._mapPin as MapPinType | null) || null;
+    setMapPin(savedPin);
+    if (savedPin) setShowMap(true);
     setShowAdvanced(true);
   }
 
@@ -266,7 +276,7 @@ function CreateCampaignInner() {
 
   // Snapshot the current targeting for saving (keeps display metadata under _ keys).
   function snapshotTargeting(): Record<string, unknown> {
-    return { ...buildTargeting(), _cities: cities, _cityRadius: cityRadius, _regions: regions, _interests: interests };
+    return { ...buildTargeting(), _cities: cities, _cityRadius: cityRadius, _regions: regions, _interests: interests, _mapPin: mapPin };
   }
 
   function buildTargeting() {
@@ -276,7 +286,8 @@ function CreateCampaignInner() {
     const geo: Record<string, unknown> = {};
     if (cities.length > 0)  geo.cities  = cities.map((city) => ({ key: city.key, radius: cityRadius[city.key] || 25, distance_unit: "kilometer" }));
     if (regions.length > 0) geo.regions = regions.map((r) => ({ key: r.key }));
-    if (cities.length === 0 && regions.length === 0) geo.countries = ["LY"];
+    if (mapPin)             geo.custom_locations = [{ latitude: mapPin.lat, longitude: mapPin.lng, radius: mapPin.radius, distance_unit: "kilometer" }];
+    if (cities.length === 0 && regions.length === 0 && !mapPin) geo.countries = ["LY"];
     targeting.geo_locations = geo;
     if (interests.length > 0) targeting.flexible_spec = [{ interests: interests.map((i) => ({ id: i.id, name: i.name })) }];
     return targeting;
@@ -631,6 +642,31 @@ function CreateCampaignInner() {
           {showAdvanced && (
             <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 18 }}>
 
+              {/* Map targeting — pin + radius */}
+              <div>
+                <button type="button" onClick={() => setShowMap((s) => !s)}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: mapPin ? PINK_BG : c.inputBg, border: `1px solid ${mapPin ? PINK + "55" : c.border}`, borderRadius: 13, padding: "13px 14px", cursor: "pointer", fontFamily: "inherit", textAlign: rtl ? "right" : "left" }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 10, background: mapPin ? PINK : c.surface, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <MapPin size={17} color={mapPin ? "#fff" : c.muted} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: mapPin ? PINK : c.text }}>{t("استهداف بالخريطة (دبوس + قطر)", "Map targeting (pin + radius)")}</div>
+                    <div style={{ fontSize: 11.5, color: c.dim, marginTop: 2, lineHeight: 1.5 }}>
+                      {mapPin ? t(`نقطة محددة · نطاق ${mapPin.radius} كم`, `Pinned · ${mapPin.radius} km radius`) : t("حدّد نقطة على الخريطة ووسّع دائرة التغطية.", "Drop a pin and widen the coverage circle.")}
+                    </div>
+                  </div>
+                  <ChevronDown size={16} color={c.dim} style={{ flexShrink: 0, transform: showMap ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+                </button>
+                {showMap && (
+                  <div style={{ marginTop: 12 }}>
+                    <AdRadiusMap value={mapPin} onChange={setMapPin} light={light} rtl={rtl} t={t} />
+                    {(cities.length > 0 || regions.length > 0) && mapPin && (
+                      <p style={{ fontSize: 11.5, color: "#f59e0b", marginTop: 8, lineHeight: 1.5 }}>⚠️ {t("عند استخدام الدبوس، سيُضاف إلى المدن/المناطق المحددة كمنطقة تغطية إضافية.", "The pin is added alongside your selected cities/regions as an extra coverage area.")}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Regions */}
               <div>
                 <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}><MapIcon size={12} style={{ verticalAlign: "middle", marginInlineEnd: 4 }} /> {t("المناطق / المحافظات", "Regions")}</label>
@@ -925,7 +961,7 @@ function CreateCampaignInner() {
         {/* Duration note */}
         <div style={{ background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 12, padding: "12px 16px", fontSize: 13, color: "#f59e0b", display: "flex", alignItems: "flex-start", gap: 10 }}>
           <Calendar size={16} style={{ flexShrink: 0, marginTop: 2 }} />
-          <span>{t("سيبدأ إعلانك خلال دقائق من تأكيد الدفع، ويعمل على ", "Your ad starts within minutes of payment, running for ")}<strong>{t(`${daysVal} أيام`, `${daysVal} days`)}</strong>{cities.length > 0 ? t(` في ${cities.length} مدينة محددة.`, ` in ${cities.length} selected cit${cities.length === 1 ? "y" : "ies"}.`) : t(" في كل ليبيا.", " across all of Libya.")}</span>
+          <span>{t("سيبدأ إعلانك خلال دقائق من تأكيد الدفع، ويعمل على ", "Your ad starts within minutes of payment, running for ")}<strong>{t(`${daysVal} أيام`, `${daysVal} days`)}</strong>{mapPin ? t(` حول نقطة محددة بنطاق ${mapPin.radius} كم${cities.length > 0 ? ` و${cities.length} مدينة` : ""}.`, ` around a pinned point (${mapPin.radius} km)${cities.length > 0 ? ` and ${cities.length} cit${cities.length === 1 ? "y" : "ies"}` : ""}.`) : cities.length > 0 ? t(` في ${cities.length} مدينة محددة.`, ` in ${cities.length} selected cit${cities.length === 1 ? "y" : "ies"}.`) : t(" في كل ليبيا.", " across all of Libya.")}</span>
         </div>
 
         {/* Submit */}
