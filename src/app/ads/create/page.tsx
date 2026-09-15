@@ -6,6 +6,7 @@ import {
   ArrowLeft, ArrowRight, Link2, DollarSign, Calendar, Globe,
   Loader2, CheckCircle, AlertCircle, ChevronDown, Search, X, MapPin, Users2, Target, Crown, Eye,
   Sparkles, Save, Trash2, Plus, Bookmark, Map as MapIcon,
+  MessageCircle, Phone, Megaphone, PlayCircle, ThumbsUp, Layers, Wand2, ShieldAlert,
 } from "lucide-react";
 import { Suspense } from "react";
 import { priceFor, mergeAdsPricing, DEFAULT_ADS_PRICING, AD_TIER_PACKAGES, findTierOption, type AdsPricing, type Tier } from "@/services/campaigns";
@@ -80,6 +81,14 @@ function CreateCampaignInner() {
   const [ageMax, setAgeMax] = useState(65);
   const [gender, setGender] = useState<"all" | "male" | "female">("all");
 
+  // Ad goal / placements / Advantage+ audience / special category
+  const [objective, setObjective] = useState<"engagement" | "messages" | "traffic" | "calls" | "video_views" | "awareness">("engagement");
+  const [placementMode, setPlacementMode] = useState<"auto" | "manual">("auto");
+  const [placements, setPlacements] = useState<string[]>(["facebook", "instagram", "messenger", "audience_network"]);
+  const [advantageAudience, setAdvantageAudience] = useState(true);
+  const [specialCategory, setSpecialCategory] = useState<string>("");
+  const [endDate, setEndDate] = useState(""); // VIP calendar → computes days
+
   // Advanced targeting
   const [cityRadius, setCityRadius] = useState<Record<string, number>>({});
   const [regions, setRegions]       = useState<GeoCity[]>([]);
@@ -146,6 +155,18 @@ function CreateCampaignInner() {
   function pickPost(p: PagePost) {
     setSelectedPostId(p.id);
     setPostUrl(`https://www.facebook.com/${selectedPage}/posts/${p.postId}`);
+  }
+
+  // VIP calendar → number of days from today to the chosen end date.
+  useEffect(() => {
+    if (!endDate) return;
+    const end = new Date(endDate + "T23:59:59");
+    const diff = Math.ceil((end.getTime() - Date.now()) / 86400000);
+    if (diff >= 1 && diff <= 365) setDays(String(diff));
+  }, [endDate]);
+
+  function togglePlacement(p: string) {
+    setPlacements((cur) => cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]);
   }
 
   useEffect(() => {
@@ -279,9 +300,15 @@ function CreateCampaignInner() {
 
     setSaving(true);
     const page = pages.find((p) => p.page_id === selectedPage);
+    const adOptions = {
+      objective,
+      placements: placementMode === "manual" ? placements : [],
+      advantageAudience,
+      specialAdCategory: specialCategory || null,
+    };
     const body = usingCustom
-      ? { pageId: selectedPage, pageName: page?.page_name, postUrl, budgetUsd, durationDays: daysVal, targeting: buildTargeting() }
-      : { pageId: selectedPage, pageName: page?.page_name, postUrl, packageId: tierPkgId, durationDays: pkgDays, targeting: buildTargeting() };
+      ? { pageId: selectedPage, pageName: page?.page_name, postUrl, budgetUsd, durationDays: daysVal, targeting: buildTargeting(), ...adOptions }
+      : { pageId: selectedPage, pageName: page?.page_name, postUrl, packageId: tierPkgId, durationDays: pkgDays, targeting: buildTargeting(), ...adOptions };
     const res  = await fetch("/api/promo/campaigns", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
@@ -451,6 +478,42 @@ function CreateCampaignInner() {
           )}
         </div>
 
+        {/* Ad goal / objective */}
+        <div style={card}>
+          <label style={{ fontWeight: 800, fontSize: 14, marginBottom: 4, display: "block" }}>
+            <Target size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
+            {t("هدف الإعلان", "Ad goal")}
+          </label>
+          <p style={{ color: c.dim, fontSize: 12, margin: "0 0 14px", lineHeight: 1.6 }}>
+            {t("ماذا تريد أن يفعل الناس عندما يشاهدون إعلانك؟", "What do you want people to do when they see your ad?")}
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 10 }}>
+            {([
+              { id: "engagement",  icon: ThumbsUp,      title: t("تفاعل مع المنشور", "Post engagement"), desc: t("لايكات وتعليقات ومشاركات", "Likes, comments, shares") },
+              { id: "messages",    icon: MessageCircle, title: t("رسائل", "Messages"),                  desc: t("محادثات على ماسنجر", "Messenger conversations") },
+              { id: "traffic",     icon: Globe,         title: t("زيارات", "Traffic"),                  desc: t("نقرات إلى موقعك", "Clicks to your link") },
+              { id: "calls",       icon: Phone,         title: t("مكالمات", "Calls"),                   desc: t("اتصالات هاتفية", "Phone calls") },
+              { id: "video_views", icon: PlayCircle,    title: t("مشاهدات فيديو", "Video views"),        desc: t("لمنشورات الفيديو", "For video posts") },
+              { id: "awareness",   icon: Megaphone,     title: t("وصول وانتشار", "Awareness & reach"),   desc: t("أكبر عدد من الناس", "Reach the most people") },
+            ] as const).map((o) => {
+              const active = objective === o.id;
+              return (
+                <button key={o.id} type="button" onClick={() => setObjective(o.id)}
+                  style={{ textAlign: rtl ? "right" : "left", padding: "13px 14px", borderRadius: 13, cursor: "pointer", fontFamily: "inherit",
+                    border: active ? `2px solid ${PINK}` : `1px solid ${c.border}`, background: active ? PINK_BG : c.inputBg, display: "flex", gap: 11, alignItems: "flex-start" }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 10, background: active ? PINK : c.surface, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <o.icon size={17} color={active ? "#fff" : c.muted} />
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: active ? PINK : c.text }}>{o.title}</div>
+                    <div style={{ fontSize: 11, color: c.dim, marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Targeting */}
         <div style={card}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
@@ -542,6 +605,21 @@ function CreateCampaignInner() {
               </div>
             </div>
           </div>
+
+          {/* Advantage+ audience */}
+          <button type="button" onClick={() => setAdvantageAudience((v) => !v)}
+            style={{ marginTop: 16, width: "100%", display: "flex", alignItems: "center", gap: 12, background: advantageAudience ? "rgba(109,40,217,0.10)" : c.inputBg, border: `1px solid ${advantageAudience ? "rgba(109,40,217,0.4)" : c.border}`, borderRadius: 13, padding: "13px 14px", cursor: "pointer", fontFamily: "inherit", textAlign: rtl ? "right" : "left" }}>
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: advantageAudience ? "linear-gradient(135deg,#6d28d9,#d6409f)" : c.surface, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Wand2 size={17} color={advantageAudience ? "#fff" : c.muted} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: advantageAudience ? (light ? "#6d28d9" : "#c4b5fd") : c.text }}>{t("جمهور Advantage+ التلقائي", "Advantage+ audience")}</div>
+              <div style={{ fontSize: 11.5, color: c.dim, marginTop: 2, lineHeight: 1.5 }}>{t("يسمح لفيسبوك بالوصول لأشخاص إضافيين مشابهين لجمهورك لتحسين النتائج.", "Lets Facebook reach extra similar people to improve results.")}</div>
+            </div>
+            <div style={{ width: 42, height: 24, borderRadius: 100, background: advantageAudience ? "#6d28d9" : c.border, position: "relative", flexShrink: 0, transition: "background .15s" }}>
+              <div style={{ position: "absolute", top: 3, insetInlineStart: advantageAudience ? 21 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "inset-inline-start .15s" }} />
+            </div>
+          </button>
 
           {/* Advanced toggle */}
           <button type="button" onClick={() => setShowAdvanced((s) => !s)}
@@ -651,6 +729,80 @@ function CreateCampaignInner() {
           )}
         </div>
 
+        {/* Placements */}
+        <div style={card}>
+          <label style={{ fontWeight: 800, fontSize: 14, marginBottom: 4, display: "block" }}>
+            <Layers size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
+            {t("مواضع الإعلان", "Placements")}
+          </label>
+          <p style={{ color: c.dim, fontSize: 12, margin: "0 0 14px", lineHeight: 1.6 }}>
+            {t("أين يظهر إعلانك؟", "Where your ad appears?")}
+          </p>
+          <div style={{ display: "flex", gap: 6, background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: 5, marginBottom: placementMode === "manual" ? 14 : 0 }}>
+            {([["auto", t("تلقائي (Advantage+)", "Automatic (Advantage+)")], ["manual", t("يدوي", "Manual")]] as const).map(([m, lbl]) => (
+              <button key={m} type="button" onClick={() => setPlacementMode(m)}
+                style={{ flex: 1, border: "none", cursor: "pointer", borderRadius: 9, padding: "10px 0", fontFamily: "inherit", fontWeight: 800, fontSize: 12.5,
+                  background: placementMode === m ? G_HERO : "transparent", color: placementMode === m ? "#fff" : c.muted }}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+          {placementMode === "auto" ? (
+            <p style={{ color: c.dim, fontSize: 12, margin: "12px 0 0", lineHeight: 1.6 }}>
+              ✨ {t("يوزّع فيسبوك إعلانك تلقائياً على أفضل المواضع (فيسبوك، إنستغرام، ماسنجر) لأفضل نتيجة بأقل تكلفة.", "Facebook automatically places your ad across the best spots (Facebook, Instagram, Messenger) for the best result at the lowest cost.")}
+            </p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {([
+                ["facebook", t("فيسبوك", "Facebook")],
+                ["instagram", t("إنستغرام", "Instagram")],
+                ["messenger", t("ماسنجر", "Messenger")],
+                ["audience_network", t("شبكة الجمهور", "Audience Network")],
+              ] as const).map(([p, lbl]) => {
+                const on = placements.includes(p);
+                return (
+                  <button key={p} type="button" onClick={() => togglePlacement(p)}
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 12, cursor: "pointer", fontFamily: "inherit", textAlign: rtl ? "right" : "left",
+                      border: on ? `2px solid ${PINK}` : `1px solid ${c.border}`, background: on ? PINK_BG : c.inputBg }}>
+                    <div style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${on ? PINK : c.border}`, background: on ? PINK : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {on && <CheckCircle size={13} color="#fff" />}
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: on ? PINK : c.text }}>{lbl}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Special ad category */}
+          <div style={{ marginTop: 18, borderTop: `1px solid ${c.border}`, paddingTop: 16 }}>
+            <label style={{ fontSize: 12.5, color: c.muted, display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+              <ShieldAlert size={13} /> {t("فئة إعلان خاصة (اختياري)", "Special ad category (optional)")}
+            </label>
+            <p style={{ color: c.dim, fontSize: 11.5, margin: "0 0 10px", lineHeight: 1.6 }}>
+              {t("مطلوبة فقط إذا كان الإعلان عن: إسكان، وظائف، قروض، أو سياسة. اتركها فارغة لبقية الإعلانات.", "Only required if your ad is about: housing, jobs, credit, or politics. Leave empty for everything else.")}
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {([
+                ["", t("لا شيء", "None")],
+                ["HOUSING", t("إسكان", "Housing")],
+                ["EMPLOYMENT", t("وظائف", "Employment")],
+                ["CREDIT", t("قروض", "Credit")],
+                ["ISSUES_ELECTIONS_POLITICS", t("سياسة", "Politics")],
+              ] as const).map(([v, lbl]) => {
+                const on = specialCategory === v;
+                return (
+                  <button key={v || "none"} type="button" onClick={() => setSpecialCategory(v)}
+                    style={{ padding: "8px 14px", borderRadius: 100, fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                      border: on ? `2px solid ${PINK}` : `1px solid ${c.border}`, background: on ? PINK_BG : c.inputBg, color: on ? PINK : c.muted }}>
+                    {lbl}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         {/* Pricing */}
         <div style={card}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
@@ -685,8 +837,20 @@ function CreateCampaignInner() {
                 </div>
                 <div>
                   <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("المدة (أيام)", "Duration (days)")}</label>
-                  <input type="number" min={1} max={90} value={days} onChange={(e) => setDays(e.target.value)} placeholder="7" style={input} />
+                  <input type="number" min={1} max={90} value={days} onChange={(e) => { setDays(e.target.value); setEndDate(""); }} placeholder="7" style={input} />
                 </div>
+              </div>
+              {/* Calendar — pick an end date, days auto-computed */}
+              <div style={{ marginTop: 12 }}>
+                <label style={{ fontSize: 12, color: c.muted, display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <Calendar size={13} /> {t("أو اختر تاريخ انتهاء الإعلان من التقويم", "Or pick an end date from the calendar")}
+                </label>
+                <input type="date" value={endDate}
+                  min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)}
+                  max={new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10)}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  style={{ ...input, colorScheme: light ? "light" : "dark" }} />
+                {endDate && <p style={{ fontSize: 11.5, color: PINK, marginTop: 6 }}>{t(`= ${daysVal} يوم`, `= ${daysVal} days`)}</p>}
               </div>
               <p style={{ fontSize: 11.5, color: "#f0b429", marginTop: 10 }}>⭐ {t("حرية كاملة — أي ميزانية وأي مدة تريدها.", "Full freedom — any budget, any duration.")}</p>
             </>

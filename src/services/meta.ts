@@ -405,6 +405,30 @@ export function extractPostId(postUrl: string): string | null {
 
 // ── Campaign Creation ────────────────────────────────────────────────────────
 
+// Facebook ad objectives (ODAX). Each maps to a campaign objective + ad-set
+// optimization goal + delivery destination. `engagement` is the safe default and
+// preserves the original post-boost behaviour; the others unlock the same goals
+// the Facebook "Boost post" flow offers.
+export type AdObjective =
+  | "engagement" | "messages" | "traffic" | "calls" | "video_views" | "awareness";
+
+export const OBJECTIVE_CONFIG: Record<AdObjective, {
+  campaignObjective: string;
+  optimizationGoal:  string;
+  destinationType?:  string;
+  needsPromotedPage?: boolean;
+}> = {
+  engagement:  { campaignObjective: "OUTCOME_ENGAGEMENT", optimizationGoal: "POST_ENGAGEMENT", destinationType: "ON_POST" },
+  messages:    { campaignObjective: "OUTCOME_ENGAGEMENT", optimizationGoal: "CONVERSATIONS",  destinationType: "MESSENGER",  needsPromotedPage: true },
+  calls:       { campaignObjective: "OUTCOME_ENGAGEMENT", optimizationGoal: "QUALITY_CALL",   destinationType: "PHONE_CALL", needsPromotedPage: true },
+  traffic:     { campaignObjective: "OUTCOME_TRAFFIC",    optimizationGoal: "LINK_CLICKS" },
+  video_views: { campaignObjective: "OUTCOME_ENGAGEMENT", optimizationGoal: "THRUPLAY",       destinationType: "ON_POST" },
+  awareness:   { campaignObjective: "OUTCOME_AWARENESS",  optimizationGoal: "REACH" },
+};
+
+// Manual placements → Meta publisher_platforms values.
+export type Placement = "facebook" | "instagram" | "messenger" | "audience_network";
+
 interface BoostParams {
   pageId:       string;
   postId:       string;
@@ -414,6 +438,10 @@ interface BoostParams {
   durationDays: number;
   campaignName: string;
   targeting?:   Record<string, unknown>;
+  objective?:        AdObjective;   // default "engagement"
+  placements?:       Placement[];   // omit/empty ⇒ Advantage+ automatic placements
+  advantageAudience?: boolean;      // Advantage+ audience (targeting expansion) on/off
+  specialAdCategory?: string;       // "HOUSING" | "EMPLOYMENT" | "CREDIT" | "ISSUES_ELECTIONS_POLITICS"
 }
 
 interface BoostResult {
@@ -429,18 +457,20 @@ export async function boostPost(params: BoostParams): Promise<BoostResult> {
   const startTime = Math.floor(Date.now() / 1000) + 60; // 1 min from now
   const endTime   = startTime + params.durationDays * 86400;
 
+  const obj = OBJECTIVE_CONFIG[params.objective ?? "engagement"] ?? OBJECTIVE_CONFIG.engagement;
+
   // 1) Campaign
   const campaign = await graph<{ id: string }>(
     `${AD_ACCOUNT}/campaigns`,
     "POST",
     {
       name:                  params.campaignName,
-      // ODAX objective (Meta deprecated the legacy POST_ENGAGEMENT campaign
-      // objective; post-boost engagement now lives under OUTCOME_ENGAGEMENT
-      // with the ad set optimizing for POST_ENGAGEMENT).
-      objective:             "OUTCOME_ENGAGEMENT",
+      // ODAX objective — driven by the chosen goal (Meta deprecated the legacy
+      // POST_ENGAGEMENT campaign objective; goals now live under OUTCOME_* with
+      // the ad set carrying the matching optimization_goal).
+      objective:             obj.campaignObjective,
       status:                "ACTIVE",
-      special_ad_categories: [],
+      special_ad_categories: params.specialAdCategory ? [params.specialAdCategory] : [],
       // Budget lives on the ad set (not the campaign). Meta now *requires* this
       // flag to be explicit when campaign budget optimization is off — omitting
       // it fails campaign creation with "Must specify True or False in
@@ -461,36 +491,46 @@ export async function boostPost(params: BoostParams): Promise<BoostResult> {
   const geoLocations = hasCities || hasRegions
     ? (() => { const { countries: _drop, ...rest } = geo; void _drop; return rest; })()
     : { countries: ["LY"], ...geo };
-  const targeting = {
+  const targeting: Record<string, unknown> = {
     age_min: 18,
     age_max: 65,
     ...t,
     geo_locations: geoLocations,
   };
+  // Manual placements — otherwise Meta uses Advantage+ automatic placements.
+  if (Array.isArray(params.placements) && params.placements.length > 0) {
+    targeting.publisher_platforms = params.placements;
+  }
+  // Advantage+ audience (targeting expansion). 1 = let Meta expand beyond the
+  // detailed targeting; 0 = keep the audience exactly as defined.
+  targeting.targeting_automation = { advantage_audience: params.advantageAudience ? 1 : 0 };
+
+  const adsetBody: Record<string, unknown> = {
+    name:              `AdSet-${params.pageId}`,
+    campaign_id:       campaign.id,
+    lifetime_budget:   lifetimeBudget,
+    start_time:        startTime,
+    end_time:          endTime,
+    billing_event:     "IMPRESSIONS",
+    optimization_goal: obj.optimizationGoal,
+    // Automatic (lowest-cost) bidding — without an explicit strategy this
+    // account defaults to a bid-cap strategy and rejects the ad set with
+    // "Bid amount or bid constraints required for bid strategy".
+    bid_strategy:      "LOWEST_COST_WITHOUT_CAP",
+    targeting,
+    status:            "ACTIVE",
+    pacing_type:       ["standard"],
+  };
+  // Delivery destination varies by goal. ON_POST keeps engagement on the post
+  // (without it the ad step demands a tracking pixel); MESSENGER/PHONE_CALL route
+  // to conversations/calls and need the page as the promoted object.
+  if (obj.destinationType) adsetBody.destination_type = obj.destinationType;
+  if (obj.needsPromotedPage) adsetBody.promoted_object = { page_id: params.pageId };
 
   const adset = await graph<{ id: string }>(
     `${AD_ACCOUNT}/adsets`,
     "POST",
-    {
-      name:              `AdSet-${params.pageId}`,
-      campaign_id:       campaign.id,
-      lifetime_budget:   lifetimeBudget,
-      start_time:        startTime,
-      end_time:          endTime,
-      billing_event:     "IMPRESSIONS",
-      optimization_goal: "POST_ENGAGEMENT",
-      // Automatic (lowest-cost) bidding — without an explicit strategy this
-      // account defaults to a bid-cap strategy and rejects the ad set with
-      // "Bid amount or bid constraints required for bid strategy".
-      bid_strategy:      "LOWEST_COST_WITHOUT_CAP",
-      // The ad promotes engagement on the post itself; without ON_POST the ad
-      // creation step treats the campaign as conversions and demands a tracking
-      // pixel ("Tracking Pixel Required").
-      destination_type:  "ON_POST",
-      targeting,
-      status:            "ACTIVE",
-      pacing_type:       ["standard"],
-    }
+    adsetBody
   );
 
   // 3) Creative — reference existing page post

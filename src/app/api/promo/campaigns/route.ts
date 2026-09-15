@@ -36,7 +36,19 @@ export async function POST(req: Request) {
   const user = await getUser();
   if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
 
-  const { pageId, pageName, postUrl, budgetUsd, durationDays, targeting, packageId } = await req.json();
+  const {
+    pageId, pageName, postUrl, budgetUsd, durationDays, targeting, packageId,
+    objective, placements, advantageAudience, specialAdCategory,
+  } = await req.json();
+
+  const VALID_OBJECTIVES = ["engagement", "messages", "traffic", "calls", "video_views", "awareness"];
+  const VALID_PLACEMENTS = ["facebook", "instagram", "messenger", "audience_network"];
+  const VALID_CATEGORIES = ["HOUSING", "EMPLOYMENT", "CREDIT", "ISSUES_ELECTIONS_POLITICS"];
+  const objectiveFinal = VALID_OBJECTIVES.includes(objective) ? objective : "engagement";
+  const placementsFinal = Array.isArray(placements)
+    ? placements.filter((p: string) => VALID_PLACEMENTS.includes(p))
+    : [];
+  const categoryFinal = VALID_CATEGORIES.includes(specialAdCategory) ? specialAdCategory : null;
 
   if (!pageId || !postUrl) {
     return NextResponse.json({ error: "بيانات ناقصة" }, { status: 400 });
@@ -100,6 +112,10 @@ export async function POST(req: Request) {
       tier,
       status:        "pending_payment",
       targeting:     targeting || { countries: ["LY"] },
+      objective:          objectiveFinal,
+      placements:         placementsFinal,
+      advantage_audience: advantageAudience === true,
+      special_ad_category: categoryFinal,
     })
     .select()
     .single();

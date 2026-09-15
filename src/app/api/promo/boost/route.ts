@@ -61,6 +61,10 @@ export async function POST(req: NextRequest) {
       durationDays: campaign.duration_days,
       campaignName: `TrendStore - ${page.page_name || campaign.page_id} - ${campaignId.slice(0, 8)}`,
       targeting:    campaign.targeting,
+      objective:         campaign.objective ?? undefined,
+      placements:        Array.isArray(campaign.placements) && campaign.placements.length ? campaign.placements : undefined,
+      advantageAudience: campaign.advantage_audience ?? undefined,
+      specialAdCategory: campaign.special_ad_category ?? undefined,
     });
 
     await supabaseAdmin
