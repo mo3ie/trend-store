@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { setCampaignStatus } from "@/services/meta";
 
 async function getUser() {
   const store = await cookies();
@@ -28,6 +29,35 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     .single();
 
   if (error || !data) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
+  return NextResponse.json({ campaign: data });
+}
+
+// POST — owner pauses / resumes their own campaign on Meta. Body: { action: "pause" | "resume" }
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const user = await getUser();
+  if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
+
+  const { action } = await req.json();
+  if (action !== "pause" && action !== "resume") return NextResponse.json({ error: "action غير صحيح" }, { status: 400 });
+
+  const { data: camp } = await supabaseAdmin
+    .from("ad_campaigns").select("id, external_campaign_id, status")
+    .eq("id", id).eq("user_id", user.id).single();
+  if (!camp) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
+  if (!camp.external_campaign_id) return NextResponse.json({ error: "الحملة لم تُنشأ على فيسبوك بعد" }, { status: 400 });
+
+  try {
+    await setCampaignStatus(camp.external_campaign_id, action === "pause" ? "PAUSED" : "ACTIVE");
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Meta error" }, { status: 500 });
+  }
+
+  // Optimistic local status; the next sync reconciles with Meta's effective_status.
+  const newStatus = action === "pause" ? "paused" : "active";
+  const { data } = await supabaseAdmin
+    .from("ad_campaigns").update({ status: newStatus, updated_at: new Date().toISOString() })
+    .eq("id", id).eq("user_id", user.id).select().single();
   return NextResponse.json({ campaign: data });
 }
 

@@ -7,6 +7,7 @@ import { CAMPAIGN_STATUS_LABELS, CAMPAIGN_STATUS_LABELS_EN, CAMPAIGN_STATUS_COLO
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
+import AdsBottomNav from "@/components/AdsBottomNav";
 
 const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
 const PINK   = "#d6409f";
@@ -43,7 +44,7 @@ export default function PaymentsPage() {
   const total = rows.reduce((s, r) => s + (Number(r.total_price) || 0), 0);
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 60, transition: "background .2s,color .2s" }}>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 96, transition: "background .2s,color .2s" }}>
       <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", gap: 12, maxWidth: 700, margin: "0 auto" }}>
         <button onClick={() => router.push("/ads/campaigns")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
           <Back size={18} /> {t("رجوع", "Back")}
@@ -94,6 +95,7 @@ export default function PaymentsPage() {
           </div>
         )}
       </div>
+      <AdsBottomNav />
       <style>{`@keyframes spin-anim{to{transform:rotate(360deg)}}.spin{animation:spin-anim 1s linear infinite}`}</style>
     </div>
   );

@@ -344,6 +344,11 @@ export function mapEffectiveStatus(s: string): string {
   }
 }
 
+// Pauses or resumes a whole campaign (cascades to its ad sets + ads). Uses SYS_TOKEN.
+export async function setCampaignStatus(externalCampaignId: string, status: "PAUSED" | "ACTIVE"): Promise<void> {
+  await graph(`${externalCampaignId}`, "POST", { status });
+}
+
 // Reads an ad's live effective_status. Uses SYS_TOKEN.
 export async function getAdEffectiveStatus(adId: string): Promise<string | null> {
   try {

@@ -5,12 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Plus, Megaphone, CheckCircle, Clock,
   TrendingUp, ExternalLink, Loader2, RefreshCw, AlertCircle,
-  Eye, MousePointerClick, BarChart3, Receipt, Wallet,
+  Eye, MousePointerClick, BarChart3, Receipt, Wallet, Pause, Play,
 } from "lucide-react";
 import { CAMPAIGN_STATUS_LABELS, CAMPAIGN_STATUS_LABELS_EN, CAMPAIGN_STATUS_COLORS } from "@/services/campaigns";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
+import AdsBottomNav from "@/components/AdsBottomNav";
 
 const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
 const PINK    = "#d6409f";
@@ -84,6 +85,17 @@ function CampaignsInner() {
     const data = await res.json();
     setCampaigns(data.campaigns || []);
     setLoading(false);
+  }
+
+  const [busyId, setBusyId] = useState<string>("");
+  async function togglePause(camp: Campaign, action: "pause" | "resume") {
+    if (action === "pause" && !confirm(t("إيقاف هذه الحملة؟ يمكنك تشغيلها لاحقاً.", "Pause this campaign? You can resume it later."))) return;
+    setBusyId(camp.id);
+    const r = await fetch(`/api/promo/campaigns/${camp.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+    const d = await r.json();
+    setBusyId("");
+    if (r.ok && d.campaign) setCampaigns((cs) => cs.map((x) => (x.id === camp.id ? { ...x, status: d.campaign.status } : x)));
+    else alert(d.error || t("تعذّر تنفيذ الطلب", "Action failed"));
   }
 
   return (
@@ -244,12 +256,26 @@ function CampaignsInner() {
                   </div>
                 )}
 
-                {/* Invoice (paid campaigns) */}
+                {/* Actions: pause/resume + invoice */}
                 {camp.status !== "pending_payment" && camp.status !== "failed" && (
-                  <a href={`/ads/invoice/${camp.id}`} target="_blank" rel="noopener noreferrer"
-                    style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 7, color: c.muted, fontSize: 12.5, fontWeight: 700, textDecoration: "none" }}>
-                    <Receipt size={14} color={PINK} /> {t("عرض الفاتورة", "View invoice")}
-                  </a>
+                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                    {camp.external_campaign_id && ["active", "in_review", "issues"].includes(camp.status) && (
+                      <button onClick={() => togglePause(camp, "pause")} disabled={busyId === camp.id}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(154,164,178,0.15)", border: `1px solid ${c.border}`, borderRadius: 10, padding: "7px 14px", color: c.muted, fontWeight: 800, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>
+                        {busyId === camp.id ? <Loader2 size={13} className="spin" /> : <Pause size={13} />} {t("إيقاف", "Pause")}
+                      </button>
+                    )}
+                    {camp.external_campaign_id && camp.status === "paused" && (
+                      <button onClick={() => togglePause(camp, "resume")} disabled={busyId === camp.id}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(34,197,94,0.14)", border: "1px solid #22c55e55", borderRadius: 10, padding: "7px 14px", color: "#22c55e", fontWeight: 800, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>
+                        {busyId === camp.id ? <Loader2 size={13} className="spin" /> : <Play size={13} />} {t("تشغيل", "Resume")}
+                      </button>
+                    )}
+                    <a href={`/ads/invoice/${camp.id}`} target="_blank" rel="noopener noreferrer"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 7, color: c.muted, fontSize: 12.5, fontWeight: 700, textDecoration: "none" }}>
+                      <Receipt size={14} color={PINK} /> {t("عرض الفاتورة", "View invoice")}
+                    </a>
+                  </div>
                 )}
 
                 {camp.external_campaign_id && (
@@ -263,6 +289,7 @@ function CampaignsInner() {
         )}
       </div>
 
+      <AdsBottomNav />
       <style>{`@keyframes spin-anim{to{transform:rotate(360deg)}} .spin{animation:spin-anim 1s linear infinite}`}</style>
     </div>
   );

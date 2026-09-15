@@ -11,6 +11,7 @@ import { AD_TIER_PACKAGES, VIP_MONTHLY_LYD, type Tier } from "@/services/campaig
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
+import AdsBottomNav from "@/components/AdsBottomNav";
 
 // Vivid gradient tokens — shared across dark & light (the "حيوي جريء" direction).
 const G_HERO   = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
@@ -75,7 +76,7 @@ export default function AdsLandingPage() {
   const card: React.CSSProperties = { background: c.surface, border: `2px solid ${c.border}`, borderRadius: 18 };
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 40, transition: "background .2s,color .2s" }}>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 96, transition: "background .2s,color .2s" }}>
 
       {/* Nav */}
       <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", maxWidth: 1100, margin: "0 auto" }}>
@@ -86,10 +87,15 @@ export default function AdsLandingPage() {
           <div style={{ fontWeight: 900, fontSize: 15 }}>{t("ترند ستور", "Trend Store")}</div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          {user && (
+          {user ? (
             <button onClick={() => router.push("/ads/campaigns")}
               style={{ background: c.surface, border: `2px solid ${c.border}`, borderRadius: 11, padding: "8px 14px", color: c.text, cursor: "pointer", fontSize: 12.5, fontWeight: 800, fontFamily: "inherit" }}>
               {t("حملاتي", "My campaigns")}
+            </button>
+          ) : (
+            <button onClick={() => router.push("/login?next=/ads")}
+              style={{ background: G_HERO, border: "none", borderRadius: 11, padding: "8px 16px", color: "#fff", cursor: "pointer", fontSize: 12.5, fontWeight: 800, fontFamily: "inherit" }}>
+              {t("تسجيل الدخول", "Sign in")}
             </button>
           )}
           <button onClick={() => router.push("/")}
@@ -298,6 +304,8 @@ export default function AdsLandingPage() {
       <div style={{ textAlign: "center", padding: 24, color: c.dim, fontSize: 12 }}>
         {t("© 2025 ترند ستور — خدمات الإعلانات الرقمية", "© 2025 Trend Store — Digital advertising services")}
       </div>
+
+      <AdsBottomNav />
     </div>
   );
 }

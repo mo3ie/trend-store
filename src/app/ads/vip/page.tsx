@@ -9,6 +9,7 @@ import {
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
+import AdsBottomNav from "@/components/AdsBottomNav";
 
 const GOLD = "#f0b429";
 const G_GOLD = "linear-gradient(135deg,#f0b429,#ff9d2f)";
@@ -70,7 +71,7 @@ export default function VipPage() {
   const expiry = st.until ? new Date(st.until).toLocaleDateString(rtl ? "ar-LY" : "en-GB") : null;
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 60, transition: "background .2s,color .2s" }}>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 96, transition: "background .2s,color .2s" }}>
 
       <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", gap: 12, maxWidth: 640, margin: "0 auto" }}>
         <button onClick={() => router.push("/ads")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
@@ -162,6 +163,7 @@ export default function VipPage() {
         )}
       </div>
 
+      <AdsBottomNav />
       <style>{`@keyframes spin-anim{to{transform:rotate(360deg)}}.spin{animation:spin-anim 1s linear infinite}`}</style>
     </div>
   );

@@ -12,6 +12,7 @@ import { priceFor, mergeAdsPricing, DEFAULT_ADS_PRICING, AD_TIER_PACKAGES, findT
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
+import AdsBottomNav from "@/components/AdsBottomNav";
 
 const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
 const PINK    = "#d6409f";
@@ -515,19 +516,20 @@ function CreateCampaignInner() {
           </div>
 
           {/* Basic: age + gender */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6, fontSize: 12, color: c.muted }}>
+            <Users2 size={13} /> {t("العمر والجنس", "Age & gender")}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.4fr", gap: 12, alignItems: "end" }}>
             <div>
-              <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>
-                <Users2 size={12} style={{ verticalAlign: "middle", marginInlineEnd: 4 }} /> {t("العمر من", "Age from")}
-              </label>
+              <label style={{ fontSize: 11.5, color: c.dim, display: "block", marginBottom: 6, whiteSpace: "nowrap" }}>{t("العمر من", "Age from")}</label>
               <input type="number" min={13} max={65} value={ageMin} onChange={(e) => setAgeMin(Math.max(13, Math.min(65, Number(e.target.value) || 13)))} style={input} />
             </div>
             <div>
-              <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("العمر إلى", "Age to")}</label>
+              <label style={{ fontSize: 11.5, color: c.dim, display: "block", marginBottom: 6, whiteSpace: "nowrap" }}>{t("العمر إلى", "Age to")}</label>
               <input type="number" min={13} max={65} value={ageMax} onChange={(e) => setAgeMax(Math.max(13, Math.min(65, Number(e.target.value) || 65)))} style={input} />
             </div>
             <div>
-              <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{t("الجنس", "Gender")}</label>
+              <label style={{ fontSize: 11.5, color: c.dim, display: "block", marginBottom: 6, whiteSpace: "nowrap" }}>{t("الجنس", "Gender")}</label>
               <div style={{ display: "flex", gap: 6 }}>
                 {([["all", t("الكل", "All")], ["male", t("ذكر", "Male")], ["female", t("أنثى", "Female")]] as const).map(([g, lbl]) => (
                   <button key={g} type="button" onClick={() => setGender(g)}
@@ -770,6 +772,7 @@ function CreateCampaignInner() {
         </button>
       </div>
 
+      <AdsBottomNav />
       <style>{`@keyframes spin-anim{to{transform:rotate(360deg)}} .spin{animation:spin-anim 1s linear infinite}`}</style>
     </div>
   );

@@ -6,6 +6,7 @@ import { Globe, CheckCircle, XCircle, Trash2, Plus, ArrowLeft, ArrowRight, Loade
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
+import AdsBottomNav from "@/components/AdsBottomNav";
 
 const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
 const G_META = "linear-gradient(135deg,#3b82f6,#22d3ee)";
@@ -41,6 +42,7 @@ function ConnectPageInner() {
   const [search, setSearch]   = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     const s = searchParams.get("success");
@@ -201,7 +203,7 @@ function ConnectPageInner() {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-            {filteredPages.map((page) => {
+            {(showAll ? filteredPages : filteredPages.slice(0, 8)).map((page) => {
               const isSel = selected.has(page.id);
               return (
               <div key={page.id} onClick={() => toggleSelect(page.id)}
@@ -226,6 +228,12 @@ function ConnectPageInner() {
               </div>
               );
             })}
+            {!showAll && filteredPages.length > 8 && (
+              <button onClick={() => setShowAll(true)}
+                style={{ width: "100%", background: c.surface, border: `1px dashed ${c.border}`, borderRadius: 12, padding: "11px 0", color: PINK, fontWeight: 800, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                {t(`إظهار كل الصفحات (${filteredPages.length})`, `Show all pages (${filteredPages.length})`)}
+              </button>
+            )}
           </div>
         )}
 
@@ -237,6 +245,7 @@ function ConnectPageInner() {
         )}
       </div>
 
+      <AdsBottomNav />
       <style>{`@keyframes spin-anim { to { transform: rotate(360deg); } } .spin { animation: spin-anim 1s linear infinite; }`}</style>
     </div>
   );
