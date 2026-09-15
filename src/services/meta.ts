@@ -442,12 +442,14 @@ interface BoostParams {
   placements?:       Placement[];   // omit/empty ⇒ Advantage+ automatic placements
   advantageAudience?: boolean;      // Advantage+ audience (targeting expansion) on/off
   specialAdCategory?: string;       // "HOUSING" | "EMPLOYMENT" | "CREDIT" | "ISSUES_ELECTIONS_POLITICS"
+  targetingB?:       Record<string, unknown>; // A/B split test — second audience
 }
 
 interface BoostResult {
   campaignId: string;
   adsetId:    string;
   adId:       string;
+  variantB?:  { adsetId: string; adId: string };
 }
 
 export async function boostPost(params: BoostParams): Promise<BoostResult> {
@@ -479,86 +481,74 @@ export async function boostPost(params: BoostParams): Promise<BoostResult> {
     }
   );
 
-  // 2) AdSet
+  // 2) AdSet(s)
   const t = (params.targeting ?? {}) as Record<string, unknown>;
-  const geo = (t.geo_locations ?? {}) as Record<string, unknown>;
-  const hasCities  = Array.isArray(geo.cities)  && geo.cities.length  > 0;
-  const hasRegions = Array.isArray(geo.regions) && geo.regions.length > 0;
-  const hasCustom  = Array.isArray(geo.custom_locations) && geo.custom_locations.length > 0;
-  // Meta rejects a country AND a city/pin inside it in the same request
-  // ("Some locations conflict with each other"). When the user picked specific
-  // cities/regions/map-pins (all Libyan), target those alone; otherwise default
-  // to the whole of Libya.
-  const geoLocations = hasCities || hasRegions || hasCustom
-    ? (() => { const { countries: _drop, ...rest } = geo; void _drop; return rest; })()
-    : { countries: ["LY"], ...geo };
-  const targeting: Record<string, unknown> = {
-    age_min: 18,
-    age_max: 65,
-    ...t,
-    geo_locations: geoLocations,
-  };
-  // Manual placements — otherwise Meta uses Advantage+ automatic placements.
-  if (Array.isArray(params.placements) && params.placements.length > 0) {
-    targeting.publisher_platforms = params.placements;
+
+  // Turn a raw targeting object into a Meta-ready one: age defaults, geo
+  // normalization (Meta rejects a country AND a city/pin inside it — target the
+  // specifics alone, otherwise the whole of Libya), manual placements, and the
+  // Advantage+ audience flag. Applied to each A/B variant identically.
+  function finalizeTargeting(raw: Record<string, unknown>): Record<string, unknown> {
+    const g = (raw.geo_locations ?? {}) as Record<string, unknown>;
+    const gCities  = Array.isArray(g.cities)  && g.cities.length  > 0;
+    const gRegions = Array.isArray(g.regions) && g.regions.length > 0;
+    const gCustom  = Array.isArray(g.custom_locations) && g.custom_locations.length > 0;
+    const gLoc = gCities || gRegions || gCustom
+      ? (() => { const { countries: _drop, ...rest } = g; void _drop; return rest; })()
+      : { countries: ["LY"], ...g };
+    const out: Record<string, unknown> = { age_min: 18, age_max: 65, ...raw, geo_locations: gLoc };
+    if (Array.isArray(params.placements) && params.placements.length > 0) out.publisher_platforms = params.placements;
+    out.targeting_automation = { advantage_audience: params.advantageAudience ? 1 : 0 };
+    return out;
   }
-  // Advantage+ audience (targeting expansion). 1 = let Meta expand beyond the
-  // detailed targeting; 0 = keep the audience exactly as defined.
-  targeting.targeting_automation = { advantage_audience: params.advantageAudience ? 1 : 0 };
 
-  const adsetBody: Record<string, unknown> = {
-    name:              `AdSet-${params.pageId}`,
-    campaign_id:       campaign.id,
-    lifetime_budget:   lifetimeBudget,
-    start_time:        startTime,
-    end_time:          endTime,
-    billing_event:     "IMPRESSIONS",
-    optimization_goal: obj.optimizationGoal,
-    // Automatic (lowest-cost) bidding — without an explicit strategy this
-    // account defaults to a bid-cap strategy and rejects the ad set with
-    // "Bid amount or bid constraints required for bid strategy".
-    bid_strategy:      "LOWEST_COST_WITHOUT_CAP",
-    targeting,
-    status:            "ACTIVE",
-    pacing_type:       ["standard"],
-  };
-  // Delivery destination varies by goal. ON_POST keeps engagement on the post
-  // (without it the ad step demands a tracking pixel); MESSENGER/PHONE_CALL route
-  // to conversations/calls and need the page as the promoted object.
-  if (obj.destinationType) adsetBody.destination_type = obj.destinationType;
-  if (obj.needsPromotedPage) adsetBody.promoted_object = { page_id: params.pageId };
-
-  const adset = await graph<{ id: string }>(
-    `${AD_ACCOUNT}/adsets`,
-    "POST",
-    adsetBody
-  );
-
-  // 3) Creative — reference existing page post
+  // 3) Creative — reference the existing page post (shared by every variant).
   const creative = await graph<{ id: string }>(
     `${AD_ACCOUNT}/adcreatives`,
     "POST",
-    {
-      name:             "Creative",
-      object_story_id:  `${params.pageId}_${params.postId}`,
-    }
+    { name: "Creative", object_story_id: `${params.pageId}_${params.postId}` }
   );
 
-  // 4) Ad
-  const ad = await graph<{ id: string }>(
-    `${AD_ACCOUNT}/ads`,
-    "POST",
-    {
-      name:      "Ad",
-      adset_id:  adset.id,
-      creative:  { creative_id: creative.id },
-      status:    "ACTIVE",
-    }
-  );
+  async function makeAdSet(rawTargeting: Record<string, unknown>, budget: number, label: string): Promise<string> {
+    const body: Record<string, unknown> = {
+      name:              `AdSet-${params.pageId}-${label}`,
+      campaign_id:       campaign.id,
+      lifetime_budget:   budget,
+      start_time:        startTime,
+      end_time:          endTime,
+      billing_event:     "IMPRESSIONS",
+      optimization_goal: obj.optimizationGoal,
+      bid_strategy:      "LOWEST_COST_WITHOUT_CAP",
+      targeting:         finalizeTargeting(rawTargeting),
+      status:            "ACTIVE",
+      pacing_type:       ["standard"],
+    };
+    if (obj.destinationType)   body.destination_type = obj.destinationType;
+    if (obj.needsPromotedPage) body.promoted_object   = { page_id: params.pageId };
+    const as = await graph<{ id: string }>(`${AD_ACCOUNT}/adsets`, "POST", body);
+    return as.id;
+  }
 
-  return {
-    campaignId: campaign.id,
-    adsetId:    adset.id,
-    adId:       ad.id,
-  };
+  async function makeAd(adsetId: string, label: string): Promise<string> {
+    const a = await graph<{ id: string }>(`${AD_ACCOUNT}/ads`, "POST", {
+      name: `Ad-${label}`, adset_id: adsetId, creative: { creative_id: creative.id }, status: "ACTIVE",
+    });
+    return a.id;
+  }
+
+  // A/B split test — two ad sets (audience A vs B) under one campaign, budget
+  // split evenly. Meta delivers to whichever audience performs better.
+  const hasB = params.targetingB && Object.keys(params.targetingB).length > 0;
+  if (hasB) {
+    const half = Math.round(lifetimeBudget / 2);
+    const adsetA = await makeAdSet(t, half, "A");
+    const adsetB = await makeAdSet(params.targetingB as Record<string, unknown>, lifetimeBudget - half, "B");
+    const adA = await makeAd(adsetA, "A");
+    const adB = await makeAd(adsetB, "B");
+    return { campaignId: campaign.id, adsetId: adsetA, adId: adA, variantB: { adsetId: adsetB, adId: adB } };
+  }
+
+  const adsetId = await makeAdSet(t, lifetimeBudget, "A");
+  const adId    = await makeAd(adsetId, "A");
+  return { campaignId: campaign.id, adsetId, adId };
 }

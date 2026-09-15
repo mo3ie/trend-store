@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
       placements:        Array.isArray(campaign.placements) && campaign.placements.length ? campaign.placements : undefined,
       advantageAudience: campaign.advantage_audience ?? undefined,
       specialAdCategory: campaign.special_ad_category ?? undefined,
+      targetingB:        campaign.ab_test && campaign.targeting_b ? campaign.targeting_b : undefined,
     });
 
     await supabaseAdmin
@@ -76,6 +77,7 @@ export async function POST(req: NextRequest) {
         external_campaign_id: result.campaignId,
         external_adset_id:    result.adsetId,
         external_ad_id:       result.adId,
+        external_variant_b:   result.variantB ?? null,
         updated_at:           new Date().toISOString(),
       })
       .eq("id", campaignId);

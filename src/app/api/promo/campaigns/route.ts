@@ -38,7 +38,7 @@ export async function POST(req: Request) {
 
   const {
     pageId, pageName, postUrl, budgetUsd, durationDays, targeting, packageId,
-    objective, placements, advantageAudience, specialAdCategory,
+    objective, placements, advantageAudience, specialAdCategory, targetingB,
   } = await req.json();
 
   const VALID_OBJECTIVES = ["engagement", "messages", "traffic", "calls", "video_views", "awareness"];
@@ -116,6 +116,8 @@ export async function POST(req: Request) {
       placements:         placementsFinal,
       advantage_audience: advantageAudience === true,
       special_ad_category: categoryFinal,
+      targeting_b:        targetingB && typeof targetingB === "object" ? targetingB : null,
+      ab_test:            !!(targetingB && typeof targetingB === "object"),
     })
     .select()
     .single();

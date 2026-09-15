@@ -7,6 +7,7 @@ import {
   Loader2, CheckCircle, AlertCircle, ChevronDown, Search, X, MapPin, Users2, Target, Crown, Eye,
   Sparkles, Save, Trash2, Plus, Bookmark, Map as MapIcon,
   MessageCircle, Phone, Megaphone, PlayCircle, ThumbsUp, Layers, Wand2, ShieldAlert,
+  Copy, SplitSquareHorizontal, PenLine,
 } from "lucide-react";
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
@@ -116,6 +117,16 @@ function CreateCampaignInner() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState("");
   const [aiErr, setAiErr]         = useState("");
+  // A/B test
+  const [abOn, setAbOn]           = useState(false);
+  const [audienceBId, setAudienceBId] = useState("");
+  // AI ad-copy variations
+  const [copyOpen, setCopyOpen]     = useState(false);
+  const [copyDesc, setCopyDesc]     = useState("");
+  const [copyLoading, setCopyLoading] = useState(false);
+  const [copyErr, setCopyErr]       = useState("");
+  const [copyVars, setCopyVars]     = useState<string[]>([]);
+  const [copiedIdx, setCopiedIdx]   = useState(-1);
 
   const usingCustom = isVip && vipMode === "custom";
   const tierPkg     = AD_TIER_PACKAGES.find((p) => p.id === tierPkgId)!;
@@ -259,6 +270,23 @@ function CreateCampaignInner() {
     setShowAdvanced(true);
   }
 
+  async function runAdCopy() {
+    setCopyErr(""); setCopyVars([]); setCopyLoading(true); setCopiedIdx(-1);
+    const r = await fetch("/api/promo/ad-copy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ description: copyDesc }) });
+    const d = await r.json();
+    setCopyLoading(false);
+    if (!r.ok) { setCopyErr(d.error || t("تعذّر توليد النصوص", "Failed to generate")); return; }
+    setCopyVars(d.variations || []);
+  }
+  async function copyText(text: string, idx: number) {
+    try { await navigator.clipboard.writeText(text); setCopiedIdx(idx); setTimeout(() => setCopiedIdx(-1), 1800); } catch { /* ignore */ }
+  }
+
+  // Strip display-only (_-prefixed) keys → a clean Meta targeting object.
+  function cleanTargeting(obj: Record<string, unknown>): Record<string, unknown> {
+    return Object.fromEntries(Object.entries(obj || {}).filter(([k]) => !k.startsWith("_")));
+  }
+
   async function runAi() {
     setAiErr(""); setAiSummary(""); setAiLoading(true);
     const r = await fetch("/api/promo/ai-targeting", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ description: aiDesc }) });
@@ -308,14 +336,17 @@ function CreateCampaignInner() {
     } else if (!opt) {
       setError(t("اختر باقة ومدة", "Choose a package and duration")); return;
     }
+    if (abOn && !audienceBId) { setError(t("اختر الجمهور (ب) للمقارنة أو أوقف اختبار A/B", "Pick audience B for the test, or turn A/B off")); return; }
 
     setSaving(true);
     const page = pages.find((p) => p.page_id === selectedPage);
+    const audienceB = abOn ? audiences.find((a) => a.id === audienceBId) : undefined;
     const adOptions = {
       objective,
       placements: placementMode === "manual" ? placements : [],
       advantageAudience,
       specialAdCategory: specialCategory || null,
+      targetingB: audienceB ? cleanTargeting(audienceB.targeting) : null,
     };
     const body = usingCustom
       ? { pageId: selectedPage, pageName: page?.page_name, postUrl, budgetUsd, durationDays: daysVal, targeting: buildTargeting(), ...adOptions }
@@ -485,6 +516,49 @@ function CreateCampaignInner() {
                   </button>
                 );
               })}
+            </div>
+          )}
+        </div>
+
+        {/* AI ad-copy variations */}
+        <div style={card}>
+          <button type="button" onClick={() => setCopyOpen((o) => !o)}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: rtl ? "right" : "left", padding: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 11, background: "linear-gradient(135deg,#6d28d9,#d6409f)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <PenLine size={18} color="#fff" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 800 }}>{t("نصوص إعلانية بالذكاء الاصطناعي", "AI ad-copy variations")}</div>
+              <div style={{ fontSize: 11.5, color: c.dim, marginTop: 2 }}>{t("احصل على 3 صيغ جاهزة لمنشورك", "Get 3 ready captions for your post")}</div>
+            </div>
+            <ChevronDown size={16} color={c.dim} style={{ flexShrink: 0, transform: copyOpen ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+          </button>
+          {copyOpen && (
+            <div style={{ marginTop: 14 }}>
+              <textarea value={copyDesc} onChange={(e) => setCopyDesc(e.target.value)} rows={2}
+                placeholder={t("صف منتجك أو عرضك (مثال: خصم 20% على العطور هذا الأسبوع)", "Describe your product/offer (e.g. 20% off perfumes this week)")}
+                style={{ ...input, resize: "vertical" }} />
+              <button type="button" onClick={runAdCopy} disabled={copyLoading || !copyDesc.trim()}
+                style={{ marginTop: 10, background: G_HERO, border: "none", borderRadius: 11, padding: "10px 18px", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 8, opacity: copyLoading ? 0.7 : 1 }}>
+                {copyLoading ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />} {t("توليد النصوص", "Generate")}
+              </button>
+              {copyErr && <div style={{ color: "#ef4444", fontSize: 12, marginTop: 8 }}>{copyErr}</div>}
+              {copyVars.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 14 }}>
+                  {copyVars.map((v, i) => (
+                    <div key={i} style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 13.5, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{v}</div>
+                      <button type="button" onClick={() => copyText(v, i)}
+                        style={{ marginTop: 10, background: copiedIdx === i ? "rgba(34,197,94,0.15)" : PINK_BG, border: `1px solid ${copiedIdx === i ? "#22c55e55" : PINK + "55"}`, borderRadius: 9, padding: "6px 14px", color: copiedIdx === i ? "#22c55e" : PINK, fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        {copiedIdx === i ? <CheckCircle size={13} /> : <Copy size={13} />} {copiedIdx === i ? t("تم النسخ", "Copied") : t("نسخ", "Copy")}
+                      </button>
+                    </div>
+                  ))}
+                  <p style={{ fontSize: 11.5, color: c.dim, lineHeight: 1.6, margin: 0 }}>
+                    💡 {t("انسخ النص الذي يعجبك، وحدّث منشورك على فيسبوك قبل التمويل — فالتمويل لا يغيّر نص المنشور الأصلي.", "Copy the one you like and update your Facebook post before boosting — boosting can't change the original post's text.")}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -837,6 +911,55 @@ function CreateCampaignInner() {
               })}
             </div>
           </div>
+        </div>
+
+        {/* A/B split test */}
+        <div style={card}>
+          <button type="button" onClick={() => setAbOn((v) => !v)}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: rtl ? "right" : "left", padding: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 11, background: abOn ? "linear-gradient(135deg,#6d28d9,#d6409f)" : c.inputBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <SplitSquareHorizontal size={18} color={abOn ? "#fff" : c.muted} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 800 }}>{t("اختبار A/B (مقارنة جمهورين)", "A/B test (compare two audiences)")}</div>
+              <div style={{ fontSize: 11.5, color: c.dim, marginTop: 2, lineHeight: 1.5 }}>{t("يُقسّم الميزانية بين جمهورين، ويعرض النتائج لكل منهما.", "Splits the budget between two audiences and reports each one's results.")}</div>
+            </div>
+            <div style={{ width: 42, height: 24, borderRadius: 100, background: abOn ? "#6d28d9" : c.border, position: "relative", flexShrink: 0, transition: "background .15s" }}>
+              <div style={{ position: "absolute", top: 3, insetInlineStart: abOn ? 21 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "inset-inline-start .15s" }} />
+            </div>
+          </button>
+          {abOn && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, fontSize: 12.5, color: c.muted, lineHeight: 1.6 }}>
+                <span style={{ background: PINK_BG, color: PINK, borderRadius: 6, padding: "2px 8px", fontWeight: 800, fontSize: 11 }}>A</span>
+                {t("الجمهور الحالي الذي حددته بالأعلى", "The audience you set above")}
+              </div>
+              <label style={{ fontSize: 12.5, color: c.muted, display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ background: "rgba(109,40,217,0.14)", color: light ? "#6d28d9" : "#c4b5fd", borderRadius: 6, padding: "2px 8px", fontWeight: 800, fontSize: 11 }}>B</span>
+                {t("الجمهور المقابل — اختر من الجمهور المحفوظ", "The rival audience — pick a saved audience")}
+              </label>
+              {audiences.length === 0 ? (
+                <p style={{ fontSize: 12.5, color: c.dim, lineHeight: 1.7 }}>
+                  {t("لا يوجد جمهور محفوظ بعد. ارجع إلى الاستهداف ← خيارات متقدمة، جهّز جمهوراً ثانياً واحفظه، ثم عُد إلى هنا.", "No saved audiences yet. Go to Targeting → Advanced options, set up a second audience and save it, then come back here.")}
+                </p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {audiences.map((a) => {
+                    const on = audienceBId === a.id;
+                    return (
+                      <button key={a.id} type="button" onClick={() => setAudienceBId(on ? "" : a.id)}
+                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 11, cursor: "pointer", fontFamily: "inherit", textAlign: rtl ? "right" : "left",
+                          border: on ? `2px solid ${PINK}` : `1px solid ${c.border}`, background: on ? PINK_BG : c.inputBg }}>
+                        <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${on ? PINK : c.border}`, background: on ? PINK : "transparent", flexShrink: 0 }} />
+                        <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: on ? PINK : c.text }}>{a.name}</span>
+                        {on && <CheckCircle size={15} color={PINK} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Pricing */}
