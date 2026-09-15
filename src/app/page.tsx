@@ -5,7 +5,7 @@ import {
   Home as HomeIcon, ShoppingCart, Wrench, Laptop, Gamepad2, Globe, Smartphone,
   Megaphone, Package, Heart, Wallet, Settings, Menu, Search, Sun, Moon,
   Building2, Headphones, Phone, MapPin, ShieldCheck, Truck, RotateCcw, Lock,
-  BadgeCheck, MessageCircle, Check, X, MessagesSquare,
+  BadgeCheck, MessageCircle, Check, X, MessagesSquare, Music2,
 } from "lucide-react";
 import WalletModal from "@/components/WalletModal";
 import NotificationBell from "@/components/NotificationBell";
@@ -94,6 +94,7 @@ export default function Home() {
     { ar: "خدمات رقمية", en: "Digital", sub: "DIGITAL", icon: Globe, href: "/products" },
     { ar: "طلب من المواقع", en: "Order Online", sub: "SHOPPING", icon: ShoppingCart, href: "https://order.trendstore-ly.com" },
     { ar: "أدوات فيسبوك", en: "Facebook Tools", sub: "FACEBOOK", icon: MessagesSquare, href: "/facebook" },
+    { ar: "أدوات تيك توك", en: "TikTok Tools", sub: "TIKTOK", icon: Music2, href: "/tiktok" },
     { ar: "مواقعنا", en: "Our Sites", sub: "SITES", icon: Building2, href: "/our-sites" },
   ];
   const services = [

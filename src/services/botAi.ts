@@ -1,12 +1,13 @@
-// AI reply generation for the comment bot (Claude Messages API, via plain fetch —
-// no SDK dependency). Used only when a page has ai_enabled and no keyword rule
-// matched the comment. If ANTHROPIC_API_KEY is unset, the caller falls back to the
-// keyword rules, so AI is strictly additive.
+// AI reply generation for the comment bot. Uses the unified AI provider
+// (Groq → Gemini → Claude, see services/ai.ts) so replies run on a near-zero-cost
+// open model. Used only when a page has ai_enabled and no keyword rule matched the
+// comment. If no provider is configured, the caller falls back to the keyword
+// rules, so AI is strictly additive.
 
-const AI_MODEL = process.env.BOT_AI_MODEL || "claude-sonnet-5";
+import { aiComplete, hasAI } from "@/services/ai";
 
 export function aiAvailable(): boolean {
-  return !!(process.env.ANTHROPIC_API_KEY || "").trim();
+  return hasAI();
 }
 
 // Generates a short private-reply body for a customer comment, in the commenter's
@@ -17,8 +18,7 @@ export async function generateAiReply(
   persona: string | null,
   pageName?: string | null
 ): Promise<string | null> {
-  const key = (process.env.ANTHROPIC_API_KEY || "").trim();
-  if (!key || !comment.trim()) return null;
+  if (!hasAI() || !comment.trim()) return null;
 
   const system = [
     persona?.trim() ||
@@ -31,29 +31,7 @@ export async function generateAiReply(
   ].join(" ");
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type":      "application/json",
-        "x-api-key":         key,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model:      AI_MODEL,
-        max_tokens: 300,
-        system,
-        messages:   [{ role: "user", content: comment }],
-      }),
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-
-    const data = await res.json() as { content?: Array<{ type: string; text?: string }> };
-    const text = (data.content || [])
-      .filter((b) => b.type === "text")
-      .map((b) => b.text || "")
-      .join("")
-      .trim();
+    const text = await aiComplete({ system, user: comment, maxTokens: 300, temperature: 0.6 });
     return text || null;
   } catch {
     return null;
