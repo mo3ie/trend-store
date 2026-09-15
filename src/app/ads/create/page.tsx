@@ -88,7 +88,8 @@ function CreateCampaignInner() {
   const [gender, setGender] = useState<"all" | "male" | "female">("all");
 
   // Ad goal / placements / Advantage+ audience / special category
-  const [objective, setObjective] = useState<"engagement" | "messages" | "traffic" | "calls" | "video_views" | "awareness">("engagement");
+  const [objective, setObjective] = useState<"engagement" | "messages" | "traffic" | "calls" | "video_views" | "awareness" | "page_likes">("engagement");
+  const [adText, setAdText] = useState(""); // page_likes promo caption
   const [placementMode, setPlacementMode] = useState<"auto" | "manual">("auto");
   const [placements, setPlacements] = useState<string[]>(["facebook", "instagram", "messenger", "audience_network"]);
   const [advantageAudience, setAdvantageAudience] = useState(true);
@@ -328,8 +329,9 @@ function CreateCampaignInner() {
 
   async function submit() {
     setError("");
+    const isPageLikes = objective === "page_likes";
     if (!selectedPage) { setError(t("اختر صفحتك أولاً", "Select your Page first")); return; }
-    if (!postUrl)       { setError(t("اختر منشورًا أو الصق رابطًا", "Select a post or paste a link")); return; }
+    if (!isPageLikes && !postUrl) { setError(t("اختر منشورًا أو الصق رابطًا", "Select a post or paste a link")); return; }
     if (usingCustom) {
       if (!budgetUsd || budgetUsd < 1) { setError(t("الحد الأدنى للميزانية 1$", "Minimum budget is $1")); return; }
       if (!daysVal   || daysVal < 1)   { setError(t("المدة يجب أن تكون يوم واحد على الأقل", "Duration must be at least one day")); return; }
@@ -347,10 +349,12 @@ function CreateCampaignInner() {
       advantageAudience,
       specialAdCategory: specialCategory || null,
       targetingB: audienceB ? cleanTargeting(audienceB.targeting) : null,
+      adText: isPageLikes ? adText : undefined,
     };
+    const postUrlOut = isPageLikes ? undefined : postUrl;
     const body = usingCustom
-      ? { pageId: selectedPage, pageName: page?.page_name, postUrl, budgetUsd, durationDays: daysVal, targeting: buildTargeting(), ...adOptions }
-      : { pageId: selectedPage, pageName: page?.page_name, postUrl, packageId: tierPkgId, durationDays: pkgDays, targeting: buildTargeting(), ...adOptions };
+      ? { pageId: selectedPage, pageName: page?.page_name, postUrl: postUrlOut, budgetUsd, durationDays: daysVal, targeting: buildTargeting(), ...adOptions }
+      : { pageId: selectedPage, pageName: page?.page_name, postUrl: postUrlOut, packageId: tierPkgId, durationDays: pkgDays, targeting: buildTargeting(), ...adOptions };
     const res  = await fetch("/api/promo/campaigns", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
@@ -460,8 +464,24 @@ function CreateCampaignInner() {
           </div>
         </div>
 
+        {/* Ad text — Page-likes ads promote the Page, so there is no post to pick */}
+        {objective === "page_likes" && (
+          <div style={card}>
+            <label style={{ fontWeight: 800, fontSize: 14, marginBottom: 4, display: "block" }}>
+              <PenLine size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
+              {t("نص إعلان الصفحة", "Page ad text")}
+            </label>
+            <p style={{ color: c.dim, fontSize: 12, margin: "0 0 12px", lineHeight: 1.6 }}>
+              {t("جملة قصيرة تشجّع الناس على متابعة صفحتك (ستظهر مع زر «أعجبني»). صورة صفحتك تُستخدم تلقائياً.", "A short line encouraging people to follow your Page (shown with a “Like” button). Your Page picture is used automatically.")}
+            </p>
+            <textarea value={adText} onChange={(e) => setAdText(e.target.value)} rows={3}
+              placeholder={t("مثال: تابعنا لأحدث العروض والمنتجات الحصرية 🌟", "e.g. Follow us for the latest deals & exclusive products 🌟")}
+              style={{ ...input, resize: "vertical" }} />
+          </div>
+        )}
+
         {/* Post selector */}
-        <div style={card}>
+        <div style={{ ...card, display: objective === "page_likes" ? "none" : undefined }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 12 }}>
             <label style={{ fontWeight: 800, fontSize: 14 }}>
               <Link2 size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
@@ -580,6 +600,7 @@ function CreateCampaignInner() {
               { id: "calls",       icon: Phone,         title: t("مكالمات", "Calls"),                   desc: t("اتصالات هاتفية", "Phone calls") },
               { id: "video_views", icon: PlayCircle,    title: t("مشاهدات فيديو", "Video views"),        desc: t("لمنشورات الفيديو", "For video posts") },
               { id: "awareness",   icon: Megaphone,     title: t("وصول وانتشار", "Awareness & reach"),   desc: t("أكبر عدد من الناس", "Reach the most people") },
+              { id: "page_likes",  icon: ThumbsUp,      title: t("إعجابات الصفحة", "Page likes"),        desc: t("زيادة متابعي صفحتك", "Grow your Page followers") },
             ] as const).map((o) => {
               const active = objective === o.id;
               return (

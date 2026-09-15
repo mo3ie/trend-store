@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { boostPost, extractPostId } from "@/services/meta";
+import { boostPost, extractPostId, getPagePicture } from "@/services/meta";
 
 // POST — create Meta ad for a paid campaign
 // Body: { campaignId }
@@ -41,14 +41,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "page token not found" }, { status: 500 });
   }
 
-  // Extract post ID from URL
-  const postId = extractPostId(campaign.post_url);
-  if (!postId) {
-    await supabaseAdmin
-      .from("ad_campaigns")
-      .update({ status: "failed", error_message: "تعذّر استخراج رقم المنشور من الرابط", updated_at: new Date().toISOString() })
-      .eq("id", campaignId);
-    return NextResponse.json({ error: "cannot extract post id" }, { status: 400 });
+  const isPageLikes = campaign.objective === "page_likes";
+
+  // Extract post ID from URL (not needed for Page-likes ads, which promote the Page).
+  let postId = "";
+  let pagePicture: string | undefined;
+  if (isPageLikes) {
+    pagePicture = (await getPagePicture(campaign.page_id, page.page_access_token)) || undefined;
+  } else {
+    const pid = extractPostId(campaign.post_url);
+    if (!pid) {
+      await supabaseAdmin
+        .from("ad_campaigns")
+        .update({ status: "failed", error_message: "تعذّر استخراج رقم المنشور من الرابط", updated_at: new Date().toISOString() })
+        .eq("id", campaignId);
+      return NextResponse.json({ error: "cannot extract post id" }, { status: 400 });
+    }
+    postId = pid;
   }
 
   try {
@@ -66,6 +75,8 @@ export async function POST(req: NextRequest) {
       advantageAudience: campaign.advantage_audience ?? undefined,
       specialAdCategory: campaign.special_ad_category ?? undefined,
       targetingB:        campaign.ab_test && campaign.targeting_b ? campaign.targeting_b : undefined,
+      adText:            isPageLikes ? (campaign.ad_text || undefined) : undefined,
+      pagePicture,
     });
 
     await supabaseAdmin

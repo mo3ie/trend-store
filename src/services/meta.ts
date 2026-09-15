@@ -168,6 +168,18 @@ export async function getSystemPageToken(pageId: string): Promise<string | null>
   }
 }
 
+// Large profile picture URL for a Page — used as the image on a Page-likes ad.
+export async function getPagePicture(pageId: string, pageToken?: string): Promise<string | null> {
+  try {
+    const data = await graph<{ data?: { url?: string } }>(
+      `${pageId}/picture?type=large&redirect=false`, "GET", undefined, pageToken
+    );
+    return data.data?.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Comment auto-reply bot (pages_manage_engagement + pages_messaging) ─────────
 
 // Posts a PUBLIC reply on a comment (e.g. "we messaged you privately ✅").
@@ -421,13 +433,14 @@ export function extractPostId(postUrl: string): string | null {
 // preserves the original post-boost behaviour; the others unlock the same goals
 // the Facebook "Boost post" flow offers.
 export type AdObjective =
-  | "engagement" | "messages" | "traffic" | "calls" | "video_views" | "awareness";
+  | "engagement" | "messages" | "traffic" | "calls" | "video_views" | "awareness" | "page_likes";
 
 export const OBJECTIVE_CONFIG: Record<AdObjective, {
   campaignObjective: string;
   optimizationGoal:  string;
   destinationType?:  string;
   needsPromotedPage?: boolean;
+  pageLikes?:        boolean; // promotes the Page itself, not a post
 }> = {
   engagement:  { campaignObjective: "OUTCOME_ENGAGEMENT", optimizationGoal: "POST_ENGAGEMENT", destinationType: "ON_POST" },
   messages:    { campaignObjective: "OUTCOME_ENGAGEMENT", optimizationGoal: "CONVERSATIONS",  destinationType: "MESSENGER",  needsPromotedPage: true },
@@ -435,6 +448,7 @@ export const OBJECTIVE_CONFIG: Record<AdObjective, {
   traffic:     { campaignObjective: "OUTCOME_TRAFFIC",    optimizationGoal: "LINK_CLICKS" },
   video_views: { campaignObjective: "OUTCOME_ENGAGEMENT", optimizationGoal: "THRUPLAY",       destinationType: "ON_POST" },
   awareness:   { campaignObjective: "OUTCOME_AWARENESS",  optimizationGoal: "REACH" },
+  page_likes:  { campaignObjective: "OUTCOME_ENGAGEMENT", optimizationGoal: "PAGE_LIKES",     needsPromotedPage: true, pageLikes: true },
 };
 
 // Manual placements → Meta publisher_platforms values.
@@ -454,6 +468,8 @@ interface BoostParams {
   advantageAudience?: boolean;      // Advantage+ audience (targeting expansion) on/off
   specialAdCategory?: string;       // "HOUSING" | "EMPLOYMENT" | "CREDIT" | "ISSUES_ELECTIONS_POLITICS"
   targetingB?:       Record<string, unknown>; // A/B split test — second audience
+  adText?:           string;        // page_likes: the promo caption on the Page ad
+  pagePicture?:      string;        // page_likes: image URL for the Page ad creative
 }
 
 interface BoostResult {
@@ -513,12 +529,23 @@ export async function boostPost(params: BoostParams): Promise<BoostResult> {
     return out;
   }
 
-  // 3) Creative — reference the existing page post (shared by every variant).
-  const creative = await graph<{ id: string }>(
-    `${AD_ACCOUNT}/adcreatives`,
-    "POST",
-    { name: "Creative", object_story_id: `${params.pageId}_${params.postId}` }
-  );
+  // 3) Creative — a Page-like ad promotes the Page itself (CTA "Like Page");
+  // every other objective references the existing page post.
+  const creativeBody = obj.pageLikes
+    ? {
+        name: "PageLikeCreative",
+        object_story_spec: {
+          page_id: params.pageId,
+          link_data: {
+            message: params.adText || "",
+            link: `https://www.facebook.com/${params.pageId}`,
+            ...(params.pagePicture ? { picture: params.pagePicture } : {}),
+            call_to_action: { type: "LIKE_PAGE", value: { page: params.pageId } },
+          },
+        },
+      }
+    : { name: "Creative", object_story_id: `${params.pageId}_${params.postId}` };
+  const creative = await graph<{ id: string }>(`${AD_ACCOUNT}/adcreatives`, "POST", creativeBody);
 
   async function makeAdSet(rawTargeting: Record<string, unknown>, budget: number, label: string): Promise<string> {
     const body: Record<string, unknown> = {

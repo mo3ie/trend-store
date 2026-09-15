@@ -38,10 +38,11 @@ export async function POST(req: Request) {
 
   const {
     pageId, pageName, postUrl, budgetUsd, durationDays, targeting, packageId,
-    objective, placements, advantageAudience, specialAdCategory, targetingB,
+    objective, placements, advantageAudience, specialAdCategory, targetingB, adText,
   } = await req.json();
 
-  const VALID_OBJECTIVES = ["engagement", "messages", "traffic", "calls", "video_views", "awareness"];
+  const VALID_OBJECTIVES = ["engagement", "messages", "traffic", "calls", "video_views", "awareness", "page_likes"];
+  const isPageLikes = objective === "page_likes";
   const VALID_PLACEMENTS = ["facebook", "instagram", "messenger", "audience_network"];
   const VALID_CATEGORIES = ["HOUSING", "EMPLOYMENT", "CREDIT", "ISSUES_ELECTIONS_POLITICS"];
   const objectiveFinal = VALID_OBJECTIVES.includes(objective) ? objective : "engagement";
@@ -50,7 +51,8 @@ export async function POST(req: Request) {
     : [];
   const categoryFinal = VALID_CATEGORIES.includes(specialAdCategory) ? specialAdCategory : null;
 
-  if (!pageId || !postUrl) {
+  // Page-likes ads promote the Page itself, so no post URL is required.
+  if (!pageId || (!postUrl && !isPageLikes)) {
     return NextResponse.json({ error: "بيانات ناقصة" }, { status: 400 });
   }
 
@@ -103,7 +105,8 @@ export async function POST(req: Request) {
       user_id:       user.id,
       page_id:       pageId,
       page_name:     pageName || null,
-      post_url:      postUrl,
+      post_url:      postUrl || null,
+      ad_text:       isPageLikes ? (adText || null) : null,
       budget_usd:    budgetUsdFinal,
       budget:        baseLyd,        // LYD figure shown to the user
       duration_days: days,
