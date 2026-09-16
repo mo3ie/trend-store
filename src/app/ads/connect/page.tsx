@@ -115,7 +115,7 @@ function ConnectPageInner() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", padding: "0 0 80px", transition: "background .2s,color .2s" }}>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", padding: "0 0 80px", overflowX: "hidden", transition: "background .2s,color .2s" }}>
 
       <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", gap: 12, maxWidth: 680, margin: "0 auto" }}>
         <button onClick={() => router.push("/ads")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
@@ -209,14 +209,10 @@ function ConnectPageInner() {
               <div key={page.id} onClick={() => toggleSelect(page.id)}
                 style={{ background: isSel ? "rgba(214,64,159,0.08)" : c.surface, border: `2px solid ${isSel ? `${PINK}88` : c.border}`, borderRadius: 15, padding: "15px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
                 {isSel ? <CheckSquare size={20} color={PINK} style={{ flexShrink: 0 }} /> : <Square size={20} color={c.dim} style={{ flexShrink: 0 }} />}
-                {page.page_picture ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={page.page_picture} alt="" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />
-                ) : (
-                  <div style={{ width: 44, height: 44, borderRadius: "50%", background: G_META, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Globe size={20} color="#fff" />
-                  </div>
-                )}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`https://graph.facebook.com/${page.page_id}/picture?type=square&width=88&height=88`} alt=""
+                  style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", background: G_META, flexShrink: 0 }} />
+
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{page.page_name}</div>
                   <div style={{ color: c.dim, fontSize: 12 }}>ID: {page.page_id}</div>

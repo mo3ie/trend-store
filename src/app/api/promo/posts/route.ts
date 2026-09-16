@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getPagePosts, getSystemPageToken } from "@/services/meta";
+import { getPagePosts } from "@/services/meta";
 
 async function getUser() {
   const store = await cookies();
@@ -36,21 +36,18 @@ export async function GET(req: Request) {
   if (!page) return NextResponse.json({ error: "الصفحة غير مرتبطة بحسابك" }, { status: 403 });
 
   try {
-    const posts = await getPagePosts(page.page_access_token);
+    const posts = await getPagePosts(pageId, page.page_access_token);
     return NextResponse.json({ posts });
   } catch (err: unknown) {
     // The stored OAuth page token can expire or be invalidated (code 190 /
-    // subcode 460 after a password change or Meta security reset). For pages
-    // the store's system user manages, fetch a fresh page token and retry so
-    // the post picker keeps working without forcing a re-connect.
-    const sysToken = await getSystemPageToken(pageId);
-    if (sysToken) {
-      try {
-        const posts = await getPagePosts(sysToken);
-        return NextResponse.json({ posts });
-      } catch { /* fall through */ }
-    }
-    // Both the stored token and the system-user fallback failed. If the stored
+    // subcode 460 after a password change or Meta security reset). Retry with the
+    // store's system-user token (omit the token → graph() uses SYS_TOKEN) — this
+    // works for Pages the system user manages, without forcing a reconnect.
+    try {
+      const posts = await getPagePosts(pageId, undefined);
+      return NextResponse.json({ posts });
+    } catch { /* fall through */ }
+    // Both the stored token and the system-user retry failed. If the stored
     // token was invalidated, tell the client to have the user reconnect this Page
     // (its posts can't be read until the OAuth token is refreshed).
     const msg = err instanceof Error ? err.message : "Meta API error";

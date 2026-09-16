@@ -125,7 +125,11 @@ export interface PagePost {
 
 // Lists a Page's recent published posts using the stored PAGE access token.
 // This read demonstrates the `pages_read_engagement` permission end-to-end.
-export async function getPagePosts(pageToken: string, limit = 15): Promise<PagePost[]> {
+// Reads a Page's recent posts. Queries by explicit PAGE ID (not `me/…`) so the
+// same call works with either the Page's own access token OR the store's
+// system-user token (SYS_TOKEN, used when `pageToken` is omitted) for Pages the
+// system user manages — surviving expired customer OAuth tokens.
+export async function getPagePosts(pageId: string, pageToken?: string, limit = 15): Promise<PagePost[]> {
   type RawPost = { id: string; message?: string; story?: string; created_time: string; full_picture?: string; permalink_url?: string };
   async function fetchFrom(edge: string): Promise<PagePost[]> {
     const data = await graph<{ data: RawPost[] }>(
@@ -144,11 +148,11 @@ export async function getPagePosts(pageToken: string, limit = 15): Promise<PageP
   // published_posts is the canonical list, but it omits some post types (shared
   // content, certain photo/video stories) — so some Pages come back empty. When
   // that happens, fall back to the Page feed. A permission error still THROWS
-  // here so the route can retry with a fresh system-user token.
-  const primary = await fetchFrom("me/published_posts");
+  // here so the route can retry with the system-user token.
+  const primary = await fetchFrom(`${pageId}/published_posts`);
   if (primary.length > 0) return primary;
   try {
-    const feed = await fetchFrom("me/feed");
+    const feed = await fetchFrom(`${pageId}/feed`);
     return feed.length > 0 ? feed : primary;
   } catch {
     return primary;

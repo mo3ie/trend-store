@@ -116,7 +116,7 @@ function CampaignsInner() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80, transition: "background .2s,color .2s" }}>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80, overflowX: "hidden", transition: "background .2s,color .2s" }}>
 
       <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 800, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

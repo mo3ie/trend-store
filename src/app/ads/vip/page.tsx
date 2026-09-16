@@ -71,7 +71,7 @@ export default function VipPage() {
   const expiry = st.until ? new Date(st.until).toLocaleDateString(rtl ? "ar-LY" : "en-GB") : null;
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 96, transition: "background .2s,color .2s" }}>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 96, overflowX: "hidden", transition: "background .2s,color .2s" }}>
 
       <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", gap: 12, maxWidth: 640, margin: "0 auto" }}>
         <button onClick={() => router.push("/ads")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>

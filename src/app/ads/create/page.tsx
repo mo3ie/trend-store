@@ -39,6 +39,8 @@ function CreateCampaignInner() {
   const { light } = useTheme();
   const Back = rtl ? ArrowLeft : ArrowRight;
   const LYD  = t("د.ل", "LYD");
+  // Permanent public Page picture (stored fbcdn URLs expire → broken logos).
+  const pagePic = (id: string) => `https://graph.facebook.com/${id}/picture?type=square&width=80&height=80`;
 
   const c = light ? {
     bg: "#fbf7ff", text: "#1e1330", muted: "#6b5b78", dim: "#8b7d97",
@@ -411,7 +413,7 @@ function CreateCampaignInner() {
   const card: React.CSSProperties = { background: c.surface, border: `2px solid ${c.border}`, borderRadius: 18, padding: 22 };
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80, transition: "background .2s,color .2s" }}>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80, overflowX: "hidden", transition: "background .2s,color .2s" }}>
 
       <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", gap: 12, maxWidth: 720, margin: "0 auto" }}>
         <button onClick={() => router.push("/ads/connect")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
@@ -439,9 +441,9 @@ function CreateCampaignInner() {
             <button type="button" onClick={() => setPageMenuOpen((o) => !o)}
               style={{ ...input, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", textAlign: rtl ? "right" : "left" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
-                {selectedPageObj?.page_picture && (
+                {selectedPageObj && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={selectedPageObj.page_picture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0 }} />
+                  <img src={pagePic(selectedPageObj.page_id)} alt="" style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
                 )}
                 {selectedPageObj ? selectedPageObj.page_name : t("اختر صفحة", "Choose a Page")}
               </span>
@@ -468,12 +470,9 @@ function CreateCampaignInner() {
                         style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
                           background: active ? PINK_BG : "transparent", border: "none", cursor: "pointer",
                           color: active ? PINK : c.text, textAlign: rtl ? "right" : "left", fontSize: 14, fontFamily: "inherit" }}>
-                        {p.page_picture ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={p.page_picture} alt="" style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0 }} />
-                        ) : (
-                          <div style={{ width: 26, height: 26, borderRadius: "50%", background: c.inputBg, flexShrink: 0 }} />
-                        )}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={pagePic(p.page_id)} alt="" style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, objectFit: "cover", background: c.inputBg }} />
+
                         <span style={{ flex: 1, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{p.page_name}</span>
                         {active && <CheckCircle size={15} color={PINK} style={{ flexShrink: 0 }} />}
                       </button>

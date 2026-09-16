@@ -76,7 +76,7 @@ export default function AdsLandingPage() {
   const card: React.CSSProperties = { background: c.surface, border: `2px solid ${c.border}`, borderRadius: 18 };
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 96, transition: "background .2s,color .2s" }}>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 96, overflowX: "hidden", transition: "background .2s,color .2s" }}>
 
       {/* Nav */}
       <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", maxWidth: 1100, margin: "0 auto" }}>
