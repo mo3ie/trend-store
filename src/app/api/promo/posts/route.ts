@@ -48,9 +48,16 @@ export async function GET(req: Request) {
       try {
         const posts = await getPagePosts(sysToken);
         return NextResponse.json({ posts });
-      } catch { /* fall through to the original error */ }
+      } catch { /* fall through */ }
     }
+    // Both the stored token and the system-user fallback failed. If the stored
+    // token was invalidated, tell the client to have the user reconnect this Page
+    // (its posts can't be read until the OAuth token is refreshed).
     const msg = err instanceof Error ? err.message : "Meta API error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const invalidated = /invalidat|expired|session|OAuth|code.?190|malformed|190/i.test(msg);
+    return NextResponse.json(
+      { posts: [], error: msg, reason: invalidated ? "reconnect" : "error" },
+      { status: 200 }
+    );
   }
 }

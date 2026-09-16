@@ -35,7 +35,9 @@ export interface AIParams {
 
 async function callProvider(p: { provider: Provider; key: string }, params: AIParams, maxTokens: number, temperature: number): Promise<string> {
   if (p.provider === "groq") {
-    const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+    // Default to an open model this account actually has access to. (Groq accounts
+    // vary; this one exposes openai/gpt-oss-* + qwen + allam, not Llama.)
+    const model = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${p.key}` },

@@ -49,7 +49,7 @@ function CreateCampaignInner() {
   };
 
   const input: React.CSSProperties = {
-    width: "100%", background: c.inputBg, border: `1px solid ${c.border}`,
+    width: "100%", minWidth: 0, background: c.inputBg, border: `1px solid ${c.border}`,
     borderRadius: 11, padding: "12px 14px", color: c.text, fontSize: 14, outline: "none",
     boxSizing: "border-box", fontFamily: "inherit",
   };
@@ -58,6 +58,7 @@ function CreateCampaignInner() {
   const [selectedPage, setSelectedPage] = useState("");
   const [postUrl, setPostUrl]   = useState("");
   const [posts, setPosts]       = useState<PagePost[]>([]);
+  const [postsReason, setPostsReason] = useState<string>("");
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState("");
   const [manualMode, setManualMode] = useState(false);
@@ -169,9 +170,10 @@ function CreateCampaignInner() {
     setLoadingPosts(true);
     setSelectedPostId("");
     setPostUrl("");
+    setPostsReason("");
     fetch(`/api/promo/posts?pageId=${encodeURIComponent(selectedPage)}`)
       .then((r) => r.json())
-      .then((d) => { setPosts(d.posts || []); setLoadingPosts(false); })
+      .then((d) => { setPosts(d.posts || []); setPostsReason(d.reason || ""); setLoadingPosts(false); })
       .catch(() => { setPosts([]); setLoadingPosts(false); });
   }, [selectedPage]);
 
@@ -549,6 +551,25 @@ function CreateCampaignInner() {
             </>
           ) : loadingPosts ? (
             <div style={{ textAlign: "center", padding: 24, color: c.dim }}><Loader2 size={22} className="spin" /></div>
+          ) : postsReason === "reconnect" ? (
+            <div style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: 12, padding: 16 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start", color: "#f59e0b" }}>
+                <AlertCircle size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+                <div style={{ fontSize: 13, lineHeight: 1.7, color: c.text }}>
+                  {t("انتهت صلاحية ربط هذه الصفحة (غالباً بسبب تغيير كلمة مرور فيسبوك). أعد ربطها لعرض منشوراتها، أو الصق رابط المنشور يدويًا.", "This Page's connection expired (often after a Facebook password change). Reconnect it to load its posts, or paste the post link manually.")}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                <button type="button" onClick={() => router.push("/ads/connect")}
+                  style={{ background: G_HERO, border: "none", borderRadius: 10, padding: "9px 16px", color: "#fff", fontWeight: 800, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>
+                  {t("إعادة ربط الصفحة", "Reconnect Page")}
+                </button>
+                <button type="button" onClick={() => setManualMode(true)}
+                  style={{ background: "transparent", border: `1px solid ${c.border}`, borderRadius: 10, padding: "9px 16px", color: c.muted, fontWeight: 700, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>
+                  {t("ألصق رابطًا بدلاً من ذلك", "Paste a link instead")}
+                </button>
+              </div>
+            </div>
           ) : posts.length === 0 ? (
             <p style={{ color: c.muted, fontSize: 13, lineHeight: 1.7 }}>
               {t("لا توجد منشورات على هذه الصفحة، أو تعذّر تحميلها. استخدم “الصق رابطًا”.", "No posts found on this Page, or they couldn't be loaded. Use “Or paste a link”.")}
