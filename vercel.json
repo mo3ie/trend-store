@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/promo/campaigns/daily-debit",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}

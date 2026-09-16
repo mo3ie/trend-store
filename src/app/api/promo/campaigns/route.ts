@@ -38,7 +38,7 @@ export async function POST(req: Request) {
 
   const {
     pageId, pageName, postUrl, budgetUsd, durationDays, targeting, packageId,
-    objective, placements, advantageAudience, specialAdCategory, targetingB, adText, continuous,
+    objective, placements, advantageAudience, specialAdCategory, targetingB, adText, adImage, continuous,
   } = await req.json();
 
   const VALID_OBJECTIVES = ["engagement", "messages", "traffic", "calls", "video_views", "awareness", "page_likes"];
@@ -122,6 +122,7 @@ export async function POST(req: Request) {
       page_name:     pageName || null,
       post_url:      postUrl || null,
       ad_text:       isPageLikes ? (adText || null) : null,
+      ad_image:      isPageLikes && typeof adImage === "string" && adImage ? adImage : null,
       budget_usd:    budgetUsdFinal,
       budget:        baseLyd,        // LYD figure shown to the user
       duration_days: isContinuous ? null : days,

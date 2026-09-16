@@ -48,7 +48,8 @@ export async function POST(req: NextRequest) {
   let postId = "";
   let pagePicture: string | undefined;
   if (isPageLikes) {
-    pagePicture = (await getPagePicture(campaign.page_id, page.page_access_token)) || undefined;
+    // Prefer the advertiser's uploaded image; otherwise use the Page picture.
+    pagePicture = campaign.ad_image || (await getPagePicture(campaign.page_id, page.page_access_token)) || undefined;
   } else {
     const pid = extractPostId(campaign.post_url);
     if (!pid) {

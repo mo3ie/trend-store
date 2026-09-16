@@ -7,7 +7,7 @@ import {
   Loader2, CheckCircle, AlertCircle, ChevronDown, Search, X, MapPin, Users2, Target, Crown, Eye,
   Sparkles, Save, Trash2, Plus, Bookmark, Map as MapIcon,
   MessageCircle, Phone, Megaphone, PlayCircle, ThumbsUp, Layers, Wand2, ShieldAlert,
-  Copy, SplitSquareHorizontal, PenLine, Infinity as InfinityIcon,
+  Copy, SplitSquareHorizontal, PenLine, Infinity as InfinityIcon, Image as ImageIcon,
 } from "lucide-react";
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
@@ -91,6 +91,9 @@ function CreateCampaignInner() {
   // Ad goal / placements / Advantage+ audience / special category
   const [objective, setObjective] = useState<"engagement" | "messages" | "traffic" | "calls" | "video_views" | "awareness" | "page_likes">("engagement");
   const [adText, setAdText] = useState(""); // page_likes promo caption
+  const [adImage, setAdImage] = useState(""); // page_likes custom image URL
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const [imgErr, setImgErr] = useState("");
   const [placementMode, setPlacementMode] = useState<"auto" | "manual">("auto");
   const [placements, setPlacements] = useState<string[]>(["facebook", "instagram", "messenger", "audience_network"]);
   const [advantageAudience, setAdvantageAudience] = useState(true);
@@ -187,6 +190,19 @@ function CreateCampaignInner() {
 
   function togglePlacement(p: string) {
     setPlacements((cur) => cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]);
+  }
+
+  async function uploadAdImage(file: File) {
+    setImgErr(""); setUploadingImg(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch("/api/promo/upload", { method: "POST", body: fd });
+      const d = await r.json();
+      if (!r.ok || !d.url) { setImgErr(d.error || t("تعذّر رفع الصورة", "Upload failed")); }
+      else setAdImage(d.url);
+    } catch { setImgErr(t("تعذّر رفع الصورة", "Upload failed")); }
+    setUploadingImg(false);
   }
 
   useEffect(() => {
@@ -351,6 +367,7 @@ function CreateCampaignInner() {
       specialAdCategory: specialCategory || null,
       targetingB: audienceB ? cleanTargeting(audienceB.targeting) : null,
       adText: isPageLikes ? adText : undefined,
+      adImage: isPageLikes ? (adImage || undefined) : undefined,
       continuous: usingCustom && continuous ? true : undefined,
     };
     const postUrlOut = isPageLikes ? undefined : postUrl;
@@ -479,6 +496,32 @@ function CreateCampaignInner() {
             <textarea value={adText} onChange={(e) => setAdText(e.target.value)} rows={3}
               placeholder={t("مثال: تابعنا لأحدث العروض والمنتجات الحصرية 🌟", "e.g. Follow us for the latest deals & exclusive products 🌟")}
               style={{ ...input, resize: "vertical" }} />
+
+            {/* Custom image (optional) */}
+            <label style={{ fontSize: 12.5, color: c.muted, display: "flex", alignItems: "center", gap: 6, margin: "16px 0 8px" }}>
+              <ImageIcon size={14} /> {t("صورة الإعلان (اختياري)", "Ad image (optional)")}
+            </label>
+            {adImage ? (
+              <div style={{ position: "relative", display: "inline-block" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={adImage} alt="" style={{ width: "100%", maxWidth: 260, borderRadius: 12, border: `1px solid ${c.border}`, display: "block" }} />
+                <button type="button" onClick={() => setAdImage("")}
+                  style={{ position: "absolute", top: 8, insetInlineEnd: 8, background: "rgba(0,0,0,0.6)", border: "none", borderRadius: "50%", width: 28, height: 28, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, border: `1.5px dashed ${c.border}`, borderRadius: 12, padding: "18px 0", cursor: uploadingImg ? "default" : "pointer", color: c.muted, fontSize: 13, fontWeight: 700, background: c.inputBg }}>
+                {uploadingImg ? <Loader2 size={16} className="spin" /> : <ImageIcon size={16} />}
+                {uploadingImg ? t("جارٍ الرفع…", "Uploading…") : t("ارفع صورة", "Upload an image")}
+                <input type="file" accept="image/*" hidden disabled={uploadingImg}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAdImage(f); e.target.value = ""; }} />
+              </label>
+            )}
+            {imgErr && <div style={{ color: "#ef4444", fontSize: 12, marginTop: 6 }}>{imgErr}</div>}
+            <p style={{ color: c.dim, fontSize: 11.5, margin: "8px 0 0", lineHeight: 1.6 }}>
+              {t("إن لم ترفع صورة، ستُستخدم صورة صفحتك تلقائياً. المقاس المفضّل مربّع (1080×1080).", "If you don't upload one, your Page picture is used. Square (1080×1080) works best.")}
+            </p>
           </div>
         )}
 
