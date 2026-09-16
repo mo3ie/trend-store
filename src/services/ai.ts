@@ -9,18 +9,21 @@
 
 type Provider = "groq" | "gemini" | "anthropic";
 
-function pickProvider(): { provider: Provider; key: string } | null {
+// All configured providers, in cost order. aiComplete tries them in turn so a bad
+// key / rate limit / outage on one falls through to the next instead of failing.
+function configuredProviders(): { provider: Provider; key: string }[] {
+  const list: { provider: Provider; key: string }[] = [];
   const groq = (process.env.GROQ_API_KEY || "").trim();
-  if (groq) return { provider: "groq", key: groq };
+  if (groq) list.push({ provider: "groq", key: groq });
   const gemini = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "").trim();
-  if (gemini) return { provider: "gemini", key: gemini };
+  if (gemini) list.push({ provider: "gemini", key: gemini });
   const anthropic = (process.env.ANTHROPIC_API_KEY || "").trim();
-  if (anthropic) return { provider: "anthropic", key: anthropic };
-  return null;
+  if (anthropic) list.push({ provider: "anthropic", key: anthropic });
+  return list;
 }
 
 export function hasAI(): boolean {
-  return pickProvider() !== null;
+  return configuredProviders().length > 0;
 }
 
 export interface AIParams {
@@ -30,17 +33,12 @@ export interface AIParams {
   temperature?: number;
 }
 
-export async function aiComplete(params: AIParams): Promise<string> {
-  const chosen = pickProvider();
-  if (!chosen) throw new Error("no_ai_provider");
-  const maxTokens = params.maxTokens ?? 800;
-  const temperature = params.temperature ?? 0.7;
-
-  if (chosen.provider === "groq") {
+async function callProvider(p: { provider: Provider; key: string }, params: AIParams, maxTokens: number, temperature: number): Promise<string> {
+  if (p.provider === "groq") {
     const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${chosen.key}` },
+      headers: { "content-type": "application/json", authorization: `Bearer ${p.key}` },
       body: JSON.stringify({
         model, max_tokens: maxTokens, temperature,
         messages: [{ role: "system", content: params.system }, { role: "user", content: params.user }],
@@ -52,9 +50,9 @@ export async function aiComplete(params: AIParams): Promise<string> {
     return (data.choices?.[0]?.message?.content || "").trim();
   }
 
-  if (chosen.provider === "gemini") {
+  if (p.provider === "gemini") {
     const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(chosen.key)}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(p.key)}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -66,14 +64,14 @@ export async function aiComplete(params: AIParams): Promise<string> {
     });
     if (!res.ok) throw new Error(`gemini_${res.status}`);
     const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    return (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("").trim();
+    return (data.candidates?.[0]?.content?.parts || []).map((x) => x.text || "").join("").trim();
   }
 
   // anthropic
   const model = process.env.BOT_AI_MODEL || "claude-sonnet-5";
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": chosen.key, "anthropic-version": "2023-06-01" },
+    headers: { "content-type": "application/json", "x-api-key": p.key, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({
       model, max_tokens: maxTokens, system: params.system,
       messages: [{ role: "user", content: params.user }],
@@ -83,6 +81,25 @@ export async function aiComplete(params: AIParams): Promise<string> {
   if (!res.ok) throw new Error(`anthropic_${res.status}`);
   const data = await res.json() as { content?: Array<{ type: string; text?: string }> };
   return (data.content || []).filter((b) => b.type === "text").map((b) => b.text || "").join("").trim();
+}
+
+export async function aiComplete(params: AIParams): Promise<string> {
+  const providers = configuredProviders();
+  if (providers.length === 0) throw new Error("no_ai_provider");
+  const maxTokens = params.maxTokens ?? 800;
+  const temperature = params.temperature ?? 0.7;
+
+  let lastErr: unknown;
+  for (const p of providers) {
+    try {
+      const out = await callProvider(p, params, maxTokens, temperature);
+      if (out) return out;
+      lastErr = new Error(`${p.provider}_empty`);
+    } catch (e) {
+      lastErr = e; // try the next provider (bad key, rate limit, outage)
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error("ai_failed");
 }
 
 // Extract a JSON object from a model reply that may be fenced or prefixed.
