@@ -12,6 +12,7 @@ import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
 import AdsBottomNav from "@/components/AdsBottomNav";
+import WalletModal from "@/components/WalletModal";
 
 const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
 const PINK    = "#d6409f";
@@ -19,9 +20,9 @@ const PINK    = "#d6409f";
 interface Campaign {
   id:                  string;
   page_name?:          string;
-  post_url:            string;
+  post_url?:           string | null;
   budget:              number;
-  duration_days:       number;
+  duration_days?:      number | null;
   total_price:         number;
   status:              string;
   external_campaign_id?: string;
@@ -31,7 +32,21 @@ interface Campaign {
   impressions?:        number;
   clicks?:             number;
   spend_usd?:          number;
+  objective?:          string;
+  continuous?:         boolean;
+  daily_price_lyd?:    number | null;
+  ab_test?:            boolean;
 }
+
+const OBJECTIVE_LABELS: Record<string, [string, string]> = {
+  engagement:  ["تفاعل", "Engagement"],
+  messages:    ["رسائل", "Messages"],
+  traffic:     ["زيارات", "Traffic"],
+  calls:       ["مكالمات", "Calls"],
+  video_views: ["مشاهدات", "Video views"],
+  awareness:   ["وصول", "Awareness"],
+  page_likes:  ["إعجابات الصفحة", "Page likes"],
+};
 
 function statusIcon(status: string) {
   switch (status) {
@@ -88,6 +103,7 @@ function CampaignsInner() {
   }
 
   const [busyId, setBusyId] = useState<string>("");
+  const [showWallet, setShowWallet] = useState(false);
   async function togglePause(camp: Campaign, action: "pause" | "resume") {
     if (action === "pause" && !confirm(t("إيقاف هذه الحملة؟ يمكنك تشغيلها لاحقاً.", "Pause this campaign? You can resume it later."))) return;
     setBusyId(camp.id);
@@ -95,6 +111,7 @@ function CampaignsInner() {
     const d = await r.json();
     setBusyId("");
     if (r.ok && d.campaign) setCampaigns((cs) => cs.map((x) => (x.id === camp.id ? { ...x, status: d.campaign.status } : x)));
+    else if (d.error === "insufficient_balance") { setShowWallet(true); }
     else alert(d.error || t("تعذّر تنفيذ الطلب", "Action failed"));
   }
 
@@ -151,14 +168,36 @@ function CampaignsInner() {
               <div key={camp.id} style={{ background: c.surface, border: `2px solid ${c.border}`, borderRadius: 18, padding: 20 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>
+                    <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>
                       {camp.page_name || t("حملة إعلانية", "Ad campaign")}
                     </div>
-                    <a href={camp.post_url} target="_blank" rel="noopener noreferrer"
-                      style={{ color: c.dim, fontSize: 12, display: "flex", alignItems: "center", gap: 4, textDecoration: "none", wordBreak: "break-all" }}>
-                      <ExternalLink size={11} />
-                      {camp.post_url.length > 50 ? camp.post_url.slice(0, 50) + "..." : camp.post_url}
-                    </a>
+                    {/* Type badges */}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+                      {camp.objective && OBJECTIVE_LABELS[camp.objective] && (
+                        <span style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "3px 9px", background: "rgba(109,40,217,0.14)", color: light ? "#6d28d9" : "#c4b5fd" }}>
+                          {t(OBJECTIVE_LABELS[camp.objective][0], OBJECTIVE_LABELS[camp.objective][1])}
+                        </span>
+                      )}
+                      {camp.continuous && (
+                        <span style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "3px 9px", background: "rgba(240,180,41,0.16)", color: "#f0b429" }}>
+                          {t("حتى الإيقاف ∞", "Until stopped ∞")}
+                        </span>
+                      )}
+                      {camp.ab_test && (
+                        <span style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "3px 9px", background: `${PINK}22`, color: PINK }}>
+                          {t("اختبار A/B", "A/B test")}
+                        </span>
+                      )}
+                    </div>
+                    {camp.post_url ? (
+                      <a href={camp.post_url} target="_blank" rel="noopener noreferrer"
+                        style={{ color: c.dim, fontSize: 12, display: "flex", alignItems: "center", gap: 4, textDecoration: "none", wordBreak: "break-all" }}>
+                        <ExternalLink size={11} />
+                        {camp.post_url.length > 50 ? camp.post_url.slice(0, 50) + "..." : camp.post_url}
+                      </a>
+                    ) : (
+                      <span style={{ color: c.dim, fontSize: 12 }}>{t("إعلان لزيادة إعجابات الصفحة", "A campaign to grow Page likes")}</span>
+                    )}
                   </div>
                   <div style={{
                     display: "flex", alignItems: "center", gap: 6,
@@ -175,9 +214,11 @@ function CampaignsInner() {
 
                 <div style={{ display: "flex", gap: 20, marginTop: 16, flexWrap: "wrap" }}>
                   {[
-                    { label: t("الميزانية", "Budget"), val: `${camp.budget} ${LYD}` },
-                    { label: t("المدة", "Duration"),   val: t(`${camp.duration_days} يوم`, `${camp.duration_days} days`) },
-                    { label: t("الإجمالي", "Total"),   val: `${camp.total_price} ${LYD}` },
+                    camp.continuous
+                      ? { label: t("يومياً", "Daily"), val: `${camp.daily_price_lyd ?? camp.total_price} ${LYD}` }
+                      : { label: t("الميزانية", "Budget"), val: `${camp.budget} ${LYD}` },
+                    { label: t("المدة", "Duration"),   val: camp.continuous ? t("حتى الإيقاف ∞", "Until stopped ∞") : t(`${camp.duration_days} يوم`, `${camp.duration_days} days`) },
+                    { label: camp.continuous ? t("دُفع (اليوم 1)", "Paid (day 1)") : t("الإجمالي", "Total"),   val: `${camp.total_price} ${LYD}` },
                   ].map((r) => (
                     <div key={r.label} style={{ textAlign: "center" }}>
                       <div style={{ fontSize: 11, color: c.dim, marginBottom: 2 }}>{r.label}</div>
@@ -238,9 +279,22 @@ function CampaignsInner() {
                   </div>
                 )}
                 {camp.status === "paused" && (
-                  <div style={{ marginTop: 10, background: "rgba(154,164,178,0.15)", borderRadius: 10, padding: "8px 12px", fontSize: 12, color: c.muted, display: "flex", gap: 8, alignItems: "center" }}>
-                    <Clock size={14} /> {t("الإعلان متوقف حالياً.", "The ad is currently paused.")}
-                  </div>
+                  camp.error_message ? (
+                    <div style={{ marginTop: 10, background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#f59e0b", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                      <span style={{ flex: 1, minWidth: 120 }}>{camp.error_message}</span>
+                      {camp.continuous && (
+                        <button onClick={() => setShowWallet(true)}
+                          style={{ background: G_HERO, border: "none", borderRadius: 9, padding: "6px 14px", color: "#fff", fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <Wallet size={13} /> {t("شحن المحفظة", "Top up")}
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 10, background: "rgba(154,164,178,0.15)", borderRadius: 10, padding: "8px 12px", fontSize: 12, color: c.muted, display: "flex", gap: 8, alignItems: "center" }}>
+                      <Clock size={14} /> {t("الإعلان متوقف حالياً.", "The ad is currently paused.")}
+                    </div>
+                  )
                 )}
 
                 {camp.status === "pending_payment" && (
@@ -289,6 +343,7 @@ function CampaignsInner() {
         )}
       </div>
 
+      {showWallet && <WalletModal onClose={() => setShowWallet(false)} />}
       <AdsBottomNav />
       <style>{`@keyframes spin-anim{to{transform:rotate(360deg)}} .spin{animation:spin-anim 1s linear infinite}`}</style>
     </div>
