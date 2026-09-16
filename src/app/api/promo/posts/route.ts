@@ -37,23 +37,24 @@ export async function GET(req: Request) {
 
   try {
     const posts = await getPagePosts(pageId, page.page_access_token);
-    return NextResponse.json({ posts });
+    return NextResponse.json({ posts, source: "page_token" });
   } catch (err: unknown) {
     // The stored OAuth page token can expire or be invalidated (code 190 /
     // subcode 460 after a password change or Meta security reset). Retry with the
     // store's system-user token (omit the token → graph() uses SYS_TOKEN) — this
     // works for Pages the system user manages, without forcing a reconnect.
+    let sysErr = "";
     try {
       const posts = await getPagePosts(pageId, undefined);
-      return NextResponse.json({ posts });
-    } catch { /* fall through */ }
+      return NextResponse.json({ posts, source: "system_token" });
+    } catch (e) { sysErr = e instanceof Error ? e.message : String(e); }
     // Both the stored token and the system-user retry failed. If the stored
     // token was invalidated, tell the client to have the user reconnect this Page
     // (its posts can't be read until the OAuth token is refreshed).
     const msg = err instanceof Error ? err.message : "Meta API error";
     const invalidated = /invalidat|expired|session|OAuth|code.?190|malformed|190/i.test(msg);
     return NextResponse.json(
-      { posts: [], error: msg, reason: invalidated ? "reconnect" : "error" },
+      { posts: [], error: msg, reason: invalidated ? "reconnect" : "error", debug: { pageTokenError: msg.slice(0, 200), systemTokenError: sysErr.slice(0, 200) } },
       { status: 200 }
     );
   }
