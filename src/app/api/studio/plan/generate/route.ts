@@ -3,6 +3,9 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
 import { aiComplete, hasAI, parseJsonReply } from "@/services/ai";
 
+// A full plan can take ~15s to generate — raise the function limit above the ~10s default.
+export const maxDuration = 60;
+
 // Free image generation (no key) — used when a post has no product photo.
 function pollinations(prompt: string): string {
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true`;
@@ -60,9 +63,10 @@ export async function POST(req: NextRequest) {
 
   let parsed: { summary?: string; posts?: AIPost[] };
   try {
-    const text = await aiComplete({ system, user: userMsg, maxTokens: 6000, temperature: 0.85 });
+    const text = await aiComplete({ system, user: userMsg, maxTokens: 12000, temperature: 0.85 });
     parsed = parseJsonReply(text);
-  } catch {
+  } catch (e) {
+    console.error("studio plan generate failed:", e instanceof Error ? e.message : e);
     return NextResponse.json({ error: "تعذّر توليد الخطة، حاول مجدداً" }, { status: 502 });
   }
   const aiPosts = Array.isArray(parsed.posts) ? parsed.posts.slice(0, total) : [];

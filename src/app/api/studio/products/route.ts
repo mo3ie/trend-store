@@ -62,11 +62,19 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ product: data });
 }
 
-// PATCH — update a product. Body: { id, ...fields }
+// PATCH — update one product ({ id, ...fields }) or many ({ ids:[...], available }).
 export async function PATCH(req: NextRequest) {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
   const b = await req.json();
+
+  // Bulk availability toggle for several items.
+  if (Array.isArray(b.ids) && b.ids.length > 0 && "available" in b) {
+    await supabaseAdmin.from("studio_products").update({ available: !!b.available })
+      .in("id", b.ids).eq("user_id", user.id);
+    return NextResponse.json({ ok: true });
+  }
+
   if (!b.id) return NextResponse.json({ error: "id مطلوب" }, { status: 400 });
 
   const patch: Record<string, unknown> = {};
@@ -80,11 +88,17 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ product: data });
 }
 
-// DELETE ?id=
+// DELETE ?id=  or  ?ids=a,b,c
 export async function DELETE(req: NextRequest) {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
   const id = req.nextUrl.searchParams.get("id");
+  const ids = req.nextUrl.searchParams.get("ids");
+  if (ids) {
+    const list = ids.split(",").map((x) => x.trim()).filter(Boolean);
+    if (list.length) await supabaseAdmin.from("studio_products").delete().in("id", list).eq("user_id", user.id);
+    return NextResponse.json({ ok: true });
+  }
   if (!id) return NextResponse.json({ error: "id مطلوب" }, { status: 400 });
   await supabaseAdmin.from("studio_products").delete().eq("id", id).eq("user_id", user.id);
   return NextResponse.json({ ok: true });

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Loader2, Store, Package, CalendarDays, Plus, Trash2, X,
   Image as ImageIcon, Save, CheckCircle, Sparkles, ChevronDown, Bot,
-  Copy, RefreshCw, Clock, Pencil,
+  Copy, RefreshCw, Clock, Pencil, Search, CheckSquare, Square, CircleCheck, CircleX,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
@@ -62,6 +62,7 @@ export default function StudioPage() {
   const [pages, setPages] = useState<Page[]>([]);
   const [selectedPage, setSelectedPage] = useState("");
   const [pageMenu, setPageMenu] = useState(false);
+  const [pageSearch, setPageSearch] = useState("");
   const [loadingPages, setLoadingPages] = useState(true);
   const [notAuthed, setNotAuthed] = useState(false);
   const [tab, setTab] = useState<"brand" | "catalog" | "plan">("brand");
@@ -88,6 +89,9 @@ export default function StudioPage() {
   const [bulkText, setBulkText] = useState("");
   const [bulkCategory, setBulkCategory] = useState("");
   const [savingBulk, setSavingBulk] = useState(false);
+  // Multi-select for the catalog
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedProds, setSelectedProds] = useState<Set<string>>(new Set());
 
   // Plan
   const [postsPerDay, setPostsPerDay] = useState(3);
@@ -245,6 +249,27 @@ export default function StudioPage() {
     await fetch("/api/studio/products", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, available: next }) });
   }
 
+  function toggleSelectProd(id: string) {
+    setSelectedProds((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  function selectAllProds() {
+    setSelectedProds((s) => (s.size === products.length ? new Set() : new Set(products.map((p) => p.id))));
+  }
+  async function bulkDelete() {
+    const ids = Array.from(selectedProds);
+    if (ids.length === 0 || !confirm(t(`حذف ${ids.length} صنفاً؟`, `Delete ${ids.length} item(s)?`))) return;
+    await fetch(`/api/studio/products?ids=${ids.join(",")}`, { method: "DELETE" });
+    setProducts(products.filter((p) => !selectedProds.has(p.id)));
+    setSelectedProds(new Set()); setSelectMode(false);
+  }
+  async function bulkAvailable(available: boolean) {
+    const ids = Array.from(selectedProds);
+    if (ids.length === 0) return;
+    setProducts(products.map((p) => (selectedProds.has(p.id) ? { ...p, available } : p)));
+    setSelectedProds(new Set()); setSelectMode(false);
+    await fetch("/api/studio/products", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, available }) });
+  }
+
   if (loadingPages) {
     return <div style={{ minHeight: "100vh", background: c.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><Loader2 size={30} color={PINK} className="spin" /><style>{`@keyframes spin-anim{to{transform:rotate(360deg)}}.spin{animation:spin-anim 1s linear infinite}`}</style></div>;
   }
@@ -307,14 +332,23 @@ export default function StudioPage() {
                 <ChevronDown size={16} color={c.dim} style={{ flexShrink: 0, transform: pageMenu ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
               </button>
               {pageMenu && (
-                <div style={{ position: "absolute", insetInline: 0, top: "calc(100% + 6px)", zIndex: 30, background: c.menuBg, border: `1px solid ${c.border}`, borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.28)", maxHeight: 300, overflowY: "auto" }}>
-                  {pages.map((p) => (
-                    <button key={p.id} type="button" onClick={() => { setSelectedPage(p.page_id); setPageMenu(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: p.page_id === selectedPage ? PINK_BG : "transparent", border: "none", cursor: "pointer", color: p.page_id === selectedPage ? PINK : c.text, textAlign: rtl ? "right" : "left", fontSize: 14, fontFamily: "inherit" }}>
+                <div style={{ position: "absolute", insetInline: 0, top: "calc(100% + 6px)", zIndex: 30, background: c.menuBg, border: `1px solid ${c.border}`, borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.28)", overflow: "hidden" }}>
+                  {pages.length > 6 && (
+                    <div style={{ position: "relative", padding: 8, borderBottom: `1px solid ${c.border}` }}>
+                      <Search size={15} color={c.dim} style={{ position: "absolute", insetInlineStart: 18, top: "50%", transform: "translateY(-50%)" }} />
+                      <input autoFocus value={pageSearch} onChange={(e) => setPageSearch(e.target.value)} placeholder={t("ابحث عن صفحة…", "Search a Page…")}
+                        style={{ ...input, padding: "9px 14px", paddingInlineStart: 36 }} />
+                    </div>
+                  )}
+                  <div style={{ maxHeight: 260, overflowY: "auto" }}>
+                  {pages.filter((p) => p.page_name.toLowerCase().includes(pageSearch.trim().toLowerCase())).map((p) => (
+                    <button key={p.id} type="button" onClick={() => { setSelectedPage(p.page_id); setPageMenu(false); setPageSearch(""); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: p.page_id === selectedPage ? PINK_BG : "transparent", border: "none", cursor: "pointer", color: p.page_id === selectedPage ? PINK : c.text, textAlign: rtl ? "right" : "left", fontSize: 14, fontFamily: "inherit" }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={pagePic(p.page_id)} alt="" style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
                       <span style={{ flex: 1, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{p.page_name}</span>
                     </button>
                   ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -370,11 +404,28 @@ export default function StudioPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                   <div style={{ fontWeight: 800, fontSize: 14 }}>{t(`الأصناف (${products.length})`, `Catalog (${products.length})`)}</div>
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {products.length > 0 && (
+                      <button onClick={() => { setSelectMode((v) => !v); setSelectedProds(new Set()); }} style={{ background: selectMode ? PINK_BG : c.inputBg, border: `1px solid ${selectMode ? PINK + "55" : c.border}`, borderRadius: 11, padding: "9px 13px", color: selectMode ? PINK : c.text, fontWeight: 800, cursor: "pointer", fontSize: 12.5, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}><CheckSquare size={14} /> {selectMode ? t("إلغاء", "Cancel") : t("تحديد", "Select")}</button>
+                    )}
                     <button onClick={() => { setBulkText(""); setBulkCategory(""); setShowBulk(true); }} style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 11, padding: "9px 13px", color: c.text, fontWeight: 800, cursor: "pointer", fontSize: 12.5, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}><Sparkles size={14} color={PINK} /> {t("قائمة سريعة", "Quick list")}</button>
-                    <button onClick={openAdd} style={{ background: G_HERO, border: "none", borderRadius: 11, padding: "9px 15px", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}><Plus size={15} /> {t("إضافة صنف", "Add item")}</button>
+                    <button onClick={openAdd} style={{ background: G_HERO, border: "none", borderRadius: 11, padding: "9px 15px", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}><Plus size={15} /> {t("إضافة", "Add")}</button>
                   </div>
                 </div>
+
+                {/* Selection action bar */}
+                {selectMode && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: "10px 12px" }}>
+                    <button onClick={selectAllProds} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", fontSize: 12.5, fontWeight: 700, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      {selectedProds.size === products.length ? <CheckSquare size={15} color={PINK} /> : <Square size={15} />} {t(`تحديد الكل (${selectedProds.size})`, `Select all (${selectedProds.size})`)}
+                    </button>
+                    <div style={{ marginInlineStart: "auto", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <button onClick={() => bulkAvailable(true)} disabled={selectedProds.size === 0} style={{ background: "rgba(34,197,94,0.14)", border: "1px solid #22c55e55", borderRadius: 9, padding: "6px 11px", color: "#22c55e", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedProds.size === 0 ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}><CircleCheck size={13} /> {t("متوفر", "In stock")}</button>
+                      <button onClick={() => bulkAvailable(false)} disabled={selectedProds.size === 0} style={{ background: "rgba(154,164,178,0.15)", border: `1px solid ${c.border}`, borderRadius: 9, padding: "6px 11px", color: c.muted, fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedProds.size === 0 ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}><CircleX size={13} /> {t("نافد", "Out")}</button>
+                      <button onClick={bulkDelete} disabled={selectedProds.size === 0} style={{ background: "rgba(239,68,68,0.14)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 9, padding: "6px 11px", color: "#ef4444", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedProds.size === 0 ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}><Trash2 size={13} /> {t("حذف", "Delete")}</button>
+                    </div>
+                  </div>
+                )}
                 <div style={{ fontSize: 11.5, color: c.dim, lineHeight: 1.6, marginTop: -4 }}>
                   {t("الصور اختيارية ومرجعية فقط — الموظف يصمّم صوراً جديدة لكل منشور ويعيد نشر الأصناف بصيغ وصور مختلفة.", "Images are optional references only — the employee designs fresh visuals for each post and re-posts items with new formats.")}
                 </div>
@@ -382,8 +433,10 @@ export default function StudioPage() {
                   <div style={{ ...card, textAlign: "center", color: c.muted, fontSize: 13.5, padding: 30 }}>{t("لا أصناف بعد. أضف منتجاتك (عطور، مكياج…) — أو الصق قائمة أسماء سريعة.", "No items yet. Add your products (perfumes, makeup…) — or paste a quick name list.")}</div>
                 ) : products.map((p) => {
                   const avail = p.available !== false;
+                  const sel = selectedProds.has(p.id);
                   return (
-                  <div key={p.id} style={{ ...card, padding: 14, display: "flex", gap: 12, alignItems: "center", opacity: avail ? 1 : 0.65 }}>
+                  <div key={p.id} onClick={selectMode ? () => toggleSelectProd(p.id) : undefined} style={{ ...card, padding: 14, display: "flex", gap: 12, alignItems: "center", opacity: avail ? 1 : 0.65, cursor: selectMode ? "pointer" : "default", borderColor: sel ? `${PINK}88` : c.border, background: sel ? "rgba(214,64,159,0.06)" : c.surface }}>
+                    {selectMode && (sel ? <CheckSquare size={20} color={PINK} style={{ flexShrink: 0 }} /> : <Square size={20} color={c.dim} style={{ flexShrink: 0 }} />)}
                     {p.images && p.images[0] ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={p.images[0]} alt="" style={{ width: 52, height: 52, borderRadius: 11, objectFit: "cover", flexShrink: 0 }} />
@@ -394,13 +447,14 @@ export default function StudioPage() {
                       <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
                       <div style={{ fontSize: 12, color: c.dim, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{[p.category, p.price_text].filter(Boolean).join(" · ") || t("بدون سعر", "no price")}</div>
                     </div>
-                    {/* availability toggle */}
-                    <button onClick={() => toggleAvailable(p)} title={avail ? t("متوفر", "In stock") : t("غير متوفر", "Out of stock")}
-                      style={{ background: avail ? "rgba(34,197,94,0.14)" : "rgba(154,164,178,0.15)", border: `1px solid ${avail ? "#22c55e55" : c.border}`, borderRadius: 100, padding: "5px 11px", color: avail ? "#22c55e" : c.muted, cursor: "pointer", fontSize: 11, fontWeight: 800, flexShrink: 0, fontFamily: "inherit" }}>
-                      {avail ? t("متوفر", "In") : t("نافد", "Out")}
-                    </button>
-                    <button onClick={() => openEdit(p)} style={{ background: PINK_BG, border: `1px solid ${PINK}44`, borderRadius: 9, padding: "7px 9px", color: PINK, cursor: "pointer", flexShrink: 0 }}><Save size={13} /></button>
-                    <button onClick={() => deleteProduct(p.id)} style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 9, padding: "7px 9px", color: "#ef4444", cursor: "pointer", flexShrink: 0 }}><Trash2 size={14} /></button>
+                    {!selectMode && <>
+                      <button onClick={() => toggleAvailable(p)} title={avail ? t("متوفر", "In stock") : t("غير متوفر", "Out of stock")}
+                        style={{ background: avail ? "rgba(34,197,94,0.14)" : "rgba(154,164,178,0.15)", border: `1px solid ${avail ? "#22c55e55" : c.border}`, borderRadius: 100, padding: "5px 11px", color: avail ? "#22c55e" : c.muted, cursor: "pointer", fontSize: 11, fontWeight: 800, flexShrink: 0, fontFamily: "inherit" }}>
+                        {avail ? t("متوفر", "In") : t("نافد", "Out")}
+                      </button>
+                      <button onClick={() => openEdit(p)} style={{ background: PINK_BG, border: `1px solid ${PINK}44`, borderRadius: 9, padding: "7px 9px", color: PINK, cursor: "pointer", flexShrink: 0 }}><Pencil size={13} /></button>
+                      <button onClick={() => deleteProduct(p.id)} style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 9, padding: "7px 9px", color: "#ef4444", cursor: "pointer", flexShrink: 0 }}><Trash2 size={14} /></button>
+                    </>}
                   </div>
                   );
                 })}
