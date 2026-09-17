@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Loader2, Store, Package, CalendarDays, Plus, Trash2, X,
   Image as ImageIcon, Save, CheckCircle, Sparkles, ChevronDown, Bot,
+  Copy, RefreshCw, Clock, Pencil,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
@@ -20,6 +21,11 @@ interface Product { id: string; category?: string; name: string; price_text?: st
 interface Brand {
   brand_name?: string; phones?: string[]; addresses?: string[]; links?: string[];
   hours?: string; tone?: string; logo_url?: string; extra?: string;
+}
+interface Plan { id: string; posts_per_day: number; duration_days: number; start_date?: string; status: string; summary?: string; }
+interface PlanPost {
+  id: string; scheduled_for?: string; caption?: string; hashtags?: string; cta?: string;
+  post_type?: string; image_url?: string; image_source?: string; image_prompt?: string; status?: string;
 }
 
 // Module-scope so inputs keep focus across re-renders (an inline component would remount).
@@ -83,9 +89,17 @@ export default function StudioPage() {
   const [bulkCategory, setBulkCategory] = useState("");
   const [savingBulk, setSavingBulk] = useState(false);
 
-  // Plan controls (generation lands next batch)
+  // Plan
   const [postsPerDay, setPostsPerDay] = useState(3);
   const [durationDays, setDurationDays] = useState(7);
+  const [plan, setPlan] = useState<Plan | null>(null);
+  const [planPosts, setPlanPosts] = useState<PlanPost[]>([]);
+  const [generating, setGenerating] = useState(false);
+  const [planErr, setPlanErr] = useState("");
+  const [approving, setApproving] = useState(false);
+  const [editPost, setEditPost] = useState<PlanPost | null>(null);
+  const [savingPost, setSavingPost] = useState(false);
+  const [copiedId, setCopiedId] = useState("");
 
   useEffect(() => {
     fetch("/api/promo/pages").then((r) => {
@@ -110,7 +124,58 @@ export default function StudioPage() {
       setLinksText((br.links || []).join("\n"));
     }).catch(() => setBrand({}));
     fetch(`/api/studio/products?pageId=${encodeURIComponent(selectedPage)}`).then((r) => r.json()).then((d) => setProducts(d.products || [])).catch(() => setProducts([]));
+    fetch(`/api/studio/plan?pageId=${encodeURIComponent(selectedPage)}`).then((r) => r.json()).then((d) => {
+      setPlan(d.plan || null); setPlanPosts(d.posts || []);
+      if (d.plan) { setPostsPerDay(d.plan.posts_per_day); setDurationDays(d.plan.duration_days); }
+    }).catch(() => { setPlan(null); setPlanPosts([]); });
   }, [selectedPage]);
+
+  async function generatePlan() {
+    setPlanErr(""); setGenerating(true);
+    try {
+      const r = await fetch("/api/studio/plan/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pageId: selectedPage, postsPerDay, durationDays }) });
+      const d = await r.json();
+      if (!r.ok) { setPlanErr(d.error || t("تعذّر التوليد", "Generation failed")); }
+      else { setPlan(d.plan); setPlanPosts(d.posts || []); }
+    } catch { setPlanErr(t("تعذّر التوليد", "Generation failed")); }
+    setGenerating(false);
+  }
+
+  async function approvePlan() {
+    if (!plan) return;
+    setApproving(true);
+    const r = await fetch("/api/studio/plan", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: plan.id, status: "approved" }) });
+    const d = await r.json();
+    setApproving(false);
+    if (r.ok && d.plan) { setPlan(d.plan); setPlanPosts((ps) => ps.map((p) => (p.status === "draft" ? { ...p, status: "approved" } : p))); }
+  }
+  async function discardPlan() {
+    if (!plan || !confirm(t("حذف هذه الخطة كاملة؟", "Delete this entire plan?"))) return;
+    await fetch(`/api/studio/plan?id=${plan.id}`, { method: "DELETE" });
+    setPlan(null); setPlanPosts([]);
+  }
+  async function savePost(fields: Partial<PlanPost> & { regenerate?: boolean }) {
+    if (!editPost) return;
+    setSavingPost(true);
+    const r = await fetch("/api/studio/plan/post", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editPost.id, ...fields }) });
+    const d = await r.json();
+    setSavingPost(false);
+    if (r.ok && d.post) {
+      setPlanPosts((ps) => ps.map((p) => (p.id === d.post.id ? d.post : p)));
+      setEditPost(d.post);
+      if (fields.regenerate === undefined && !("image_url" in fields)) setEditPost(null); // close on a full save
+    }
+  }
+  async function deletePlanPost(id: string) {
+    if (!confirm(t("حذف هذا المنشور من الخطة؟", "Remove this post from the plan?"))) return;
+    await fetch(`/api/studio/plan/post?id=${id}`, { method: "DELETE" });
+    setPlanPosts((ps) => ps.filter((p) => p.id !== id));
+    setEditPost(null);
+  }
+  async function copyCaption(p: PlanPost) {
+    const text = [p.caption, p.hashtags].filter(Boolean).join("\n\n");
+    try { await navigator.clipboard.writeText(text); setCopiedId(p.id); setTimeout(() => setCopiedId(""), 1600); } catch { /* ignore */ }
+  }
 
   async function uploadImage(file: File): Promise<string | null> {
     const fd = new FormData(); fd.append("file", file);
@@ -342,22 +407,79 @@ export default function StudioPage() {
               </div>
             )}
 
-            {/* PLAN TAB (generation lands next) */}
+            {/* PLAN TAB */}
             {tab === "plan" && (
-              <div style={card}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800, fontSize: 15, marginBottom: 6 }}><Sparkles size={17} color={PINK} /> {t("خطة النشر الأسبوعية", "Weekly content plan")}</div>
-                <p style={{ color: c.dim, fontSize: 12.5, margin: "0 0 16px", lineHeight: 1.7 }}>{t("حدّد كم منشوراً يومياً وكم يوماً، وسيصمّم الموظف خطة كاملة (نصوص + صور) تراجعها وتوافق عليها.", "Set posts per day and how many days; the employee will draft a full plan (captions + images) for you to review & approve.")}</p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <Field muted={c.muted} label={t("منشورات يومياً", "Posts per day")}><input type="number" min={1} max={10} style={input} value={postsPerDay} onChange={(e) => setPostsPerDay(Math.max(1, Math.min(10, Number(e.target.value) || 1)))} /></Field>
-                  <Field muted={c.muted} label={t("عدد الأيام", "Number of days")}><input type="number" min={1} max={30} style={input} value={durationDays} onChange={(e) => setDurationDays(Math.max(1, Math.min(30, Number(e.target.value) || 7)))} /></Field>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Generator controls */}
+                <div style={card}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800, fontSize: 15, marginBottom: 6 }}><Sparkles size={17} color={PINK} /> {plan ? t("توليد خطة جديدة", "Generate a new plan") : t("خطة النشر", "Content plan")}</div>
+                  <p style={{ color: c.dim, fontSize: 12.5, margin: "0 0 14px", lineHeight: 1.7 }}>{t("حدّد عدد المنشورات اليومية والمدة، ويصمّم الموظف الخطة كاملة (نصوص + صور).", "Set posts per day and duration; the employee designs the full plan (captions + images).")}</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <Field muted={c.muted} label={t("منشورات يومياً", "Posts per day")}><input type="number" min={1} max={10} style={input} value={postsPerDay} onChange={(e) => setPostsPerDay(Math.max(1, Math.min(10, Number(e.target.value) || 1)))} /></Field>
+                    <Field muted={c.muted} label={t("عدد الأيام", "Number of days")}><input type="number" min={1} max={30} style={input} value={durationDays} onChange={(e) => setDurationDays(Math.max(1, Math.min(30, Number(e.target.value) || 7)))} /></Field>
+                  </div>
+                  <div style={{ fontSize: 12, color: c.muted, marginBottom: 10 }}>{t(`= ${Math.min(postsPerDay * durationDays, 40)} منشوراً`, `= ${Math.min(postsPerDay * durationDays, 40)} posts`)}{postsPerDay * durationDays > 40 ? t(" (الحد 40)", " (max 40)") : ""}</div>
+                  {planErr && <div style={{ color: "#ef4444", fontSize: 12.5, marginBottom: 10 }}>{planErr}</div>}
+                  <button onClick={generatePlan} disabled={generating || products.length === 0} style={{ width: "100%", background: G_HERO, border: "none", borderRadius: 13, padding: "13px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", opacity: generating || products.length === 0 ? 0.65 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                    {generating ? <Loader2 size={17} className="spin" /> : <Sparkles size={17} />} {generating ? t("يصمّم الموظف الخطة…", "The employee is designing…") : plan ? t("توليد خطة جديدة (يستبدل الحالية)", "Generate new (replaces current)") : t("توليد الخطة", "Generate plan")}
+                  </button>
+                  {products.length === 0 && <p style={{ fontSize: 11.5, color: c.dim, textAlign: "center", marginTop: 8 }}>{t("أضف أصنافاً في الكتالوج أولاً.", "Add catalog items first.")}</p>}
                 </div>
-                <div style={{ background: PINK_BG, border: `1px solid ${PINK}44`, borderRadius: 12, padding: 14, fontSize: 12.5, color: c.muted, lineHeight: 1.7, marginTop: 6 }}>
-                  {t(`سيصمّم الموظف ${postsPerDay * durationDays} منشوراً على مدى ${durationDays} أيام.`, `The employee will design ${postsPerDay * durationDays} posts over ${durationDays} days.`)}
-                </div>
-                <button disabled style={{ width: "100%", marginTop: 14, background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 13, padding: "13px 0", color: c.dim, fontWeight: 800, fontSize: 14, cursor: "not-allowed", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  <Sparkles size={16} /> {t("توليد الخطة — قريباً جداً", "Generate plan — coming very soon")}
-                </button>
-                <p style={{ fontSize: 11.5, color: c.dim, textAlign: "center", marginTop: 8 }}>{t("أكمل بيانات المتجر والأصناف أولاً؛ توليد الخطة بالذكاء في الدفعة القادمة.", "Fill store info & catalog first; AI plan generation ships in the next batch.")}</p>
+
+                {/* Generated plan */}
+                {plan && planPosts.length > 0 && (
+                  <>
+                    <div style={{ ...card, padding: 16 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: 14 }}>{t(`الخطة (${planPosts.length} منشوراً)`, `Plan (${planPosts.length} posts)`)} {plan.status === "approved" && <span style={{ color: "#22c55e", fontSize: 12 }}>· {t("معتمدة ✓", "Approved ✓")}</span>}</div>
+                          {plan.summary && <div style={{ fontSize: 12, color: c.muted, marginTop: 3, lineHeight: 1.6 }}>{plan.summary}</div>}
+                        </div>
+                        <button onClick={discardPlan} style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 10, padding: "8px 12px", color: "#ef4444", cursor: "pointer", fontSize: 12.5, fontWeight: 700, fontFamily: "inherit" }}>{t("حذف الخطة", "Delete plan")}</button>
+                      </div>
+                      <div style={{ background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.25)", borderRadius: 11, padding: "10px 13px", fontSize: 12, color: "#3b82f6", marginTop: 12, lineHeight: 1.7, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                        <Clock size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+                        {t("النشر التلقائي يحتاج صلاحية فيسبوك (قيد الطلب). الآن: راجع وعدّل ووافق، وانسخ نص كل منشور وحمّل صورته لنشره بنفسك.", "Auto-publishing needs a Facebook permission (being requested). For now: review, edit, approve — copy each caption and download its image to post yourself.")}
+                      </div>
+                    </div>
+
+                    {/* posts grouped by day */}
+                    {Array.from(new Set(planPosts.map((p) => (p.scheduled_for || "").slice(0, 10)))).map((day) => (
+                      <div key={day}>
+                        <div style={{ fontSize: 12.5, fontWeight: 800, color: c.muted, margin: "4px 2px 8px", display: "flex", alignItems: "center", gap: 6 }}>
+                          <CalendarDays size={14} color={PINK} /> {new Date(day).toLocaleDateString(rtl ? "ar-LY" : "en-GB", { weekday: "long", day: "numeric", month: "short" })}
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                          {planPosts.filter((p) => (p.scheduled_for || "").slice(0, 10) === day).map((p) => (
+                            <div key={p.id} style={{ ...card, padding: 12, display: "flex", gap: 12 }}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={p.image_url} alt="" style={{ width: 74, height: 74, borderRadius: 12, objectFit: "cover", flexShrink: 0, background: c.inputBg }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                                  {p.post_type && <span style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "2px 8px", background: PINK_BG, color: PINK }}>{p.post_type}</span>}
+                                  <span style={{ fontSize: 11, color: c.dim, display: "inline-flex", alignItems: "center", gap: 3 }}><Clock size={11} /> {p.scheduled_for ? new Date(p.scheduled_for).toLocaleTimeString(rtl ? "ar-LY" : "en-GB", { hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                                  {p.status === "approved" && <CheckCircle size={13} color="#22c55e" />}
+                                </div>
+                                <div style={{ fontSize: 13, lineHeight: 1.6, color: c.text, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.caption}</div>
+                                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                                  <button onClick={() => setEditPost(p)} style={{ background: PINK_BG, border: `1px solid ${PINK}44`, borderRadius: 9, padding: "6px 12px", color: PINK, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 5 }}><Pencil size={12} /> {t("تعديل", "Edit")}</button>
+                                  <button onClick={() => copyCaption(p)} style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 9, padding: "6px 12px", color: copiedId === p.id ? "#22c55e" : c.muted, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 5 }}>{copiedId === p.id ? <CheckCircle size={12} /> : <Copy size={12} />} {copiedId === p.id ? t("نُسخ", "Copied") : t("نسخ النص", "Copy")}</button>
+                                  <a href={p.image_url} target="_blank" rel="noopener noreferrer" style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 9, padding: "6px 12px", color: c.muted, textDecoration: "none", fontSize: 12, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 5 }}><ImageIcon size={12} /> {t("الصورة", "Image")}</a>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    {plan.status !== "approved" && (
+                      <button onClick={approvePlan} disabled={approving} style={{ width: "100%", background: "#22c55e", border: "none", borderRadius: 14, padding: "15px 0", color: "#fff", fontWeight: 900, fontSize: 16, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: approving ? 0.7 : 1 }}>
+                        {approving ? <Loader2 size={18} className="spin" /> : <CheckCircle size={18} />} {t("اعتماد الخطة كاملة", "Approve whole plan")}
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </>
@@ -447,6 +569,39 @@ export default function StudioPage() {
             <button onClick={addBulk} disabled={savingBulk || fromLines(bulkText).length === 0} style={{ width: "100%", background: G_HERO, border: "none", borderRadius: 13, padding: "13px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", opacity: savingBulk || fromLines(bulkText).length === 0 ? 0.6 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               {savingBulk ? <Loader2 size={17} className="spin" /> : <Plus size={17} />} {t("إضافة القائمة", "Add list")}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit planned post modal */}
+      {editPost && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) setEditPost(null); }} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 12, direction: rtl ? "rtl" : "ltr" }}>
+          <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 500, borderRadius: 22, padding: 20, fontFamily: "Cairo,sans-serif", maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ fontWeight: 900, fontSize: 16 }}>{t("تعديل المنشور", "Edit post")}</div>
+              <button onClick={() => setEditPost(null)} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer" }}><X size={20} /></button>
+            </div>
+            {/* Image + controls */}
+            <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={editPost.image_url} alt="" style={{ width: 90, height: 90, borderRadius: 12, objectFit: "cover", flexShrink: 0, background: c.inputBg }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 7, justifyContent: "center" }}>
+                <button onClick={() => savePost({ regenerate: true })} disabled={savingPost} style={{ background: PINK_BG, border: `1px solid ${PINK}44`, borderRadius: 9, padding: "7px 12px", color: PINK, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>{savingPost ? <Loader2 size={12} className="spin" /> : <RefreshCw size={12} />} {t("صورة جديدة بالذكاء", "New AI image")}</button>
+                <label style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 9, padding: "7px 12px", color: c.muted, cursor: "pointer", fontSize: 12, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  {uploadingImg ? <Loader2 size={12} className="spin" /> : <ImageIcon size={12} />} {t("رفع صورة", "Upload image")}
+                  <input type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; setUploadingImg(true); const u = await uploadImage(f); setUploadingImg(false); if (u) savePost({ image_url: u, image_source: "upload" }); e.target.value = ""; }} />
+                </label>
+              </div>
+            </div>
+            <Field muted={c.muted} label={t("نص المنشور", "Caption")}><textarea rows={5} style={{ ...input, resize: "vertical", lineHeight: 1.8 }} value={editPost.caption || ""} onChange={(e) => setEditPost({ ...editPost, caption: e.target.value })} /></Field>
+            <Field muted={c.muted} label={t("الهاشتاقات", "Hashtags")}><input style={input} value={editPost.hashtags || ""} onChange={(e) => setEditPost({ ...editPost, hashtags: e.target.value })} /></Field>
+            <Field muted={c.muted} label={t("دعوة لإجراء", "Call to action")}><input style={input} value={editPost.cta || ""} onChange={(e) => setEditPost({ ...editPost, cta: e.target.value })} /></Field>
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button onClick={() => savePost({ caption: editPost.caption, hashtags: editPost.hashtags, cta: editPost.cta })} disabled={savingPost} style={{ flex: 1, background: G_HERO, border: "none", borderRadius: 13, padding: "13px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", opacity: savingPost ? 0.7 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                {savingPost ? <Loader2 size={16} className="spin" /> : <Save size={16} />} {t("حفظ", "Save")}
+              </button>
+              <button onClick={() => deletePlanPost(editPost.id)} style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 13, padding: "13px 16px", color: "#ef4444", cursor: "pointer", fontFamily: "inherit" }}><Trash2 size={16} /></button>
+            </div>
           </div>
         </div>
       )}

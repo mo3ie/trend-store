@@ -1,0 +1,121 @@
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getAuthUser } from "@/lib/authUser";
+import { aiComplete, hasAI, parseJsonReply } from "@/services/ai";
+
+// Free image generation (no key) — used when a post has no product photo.
+function pollinations(prompt: string): string {
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true`;
+}
+
+interface AIPost {
+  day?: number; slot?: number; product?: string; type?: string;
+  caption?: string; hashtags?: string; cta?: string; image_prompt?: string;
+}
+
+// POST — generate a content plan. Body: { pageId, postsPerDay, durationDays, startDate? }
+export async function POST(req: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
+  if (!hasAI()) return NextResponse.json({ error: "الذكاء الاصطناعي غير متاح حالياً" }, { status: 503 });
+
+  const body = await req.json();
+  const pageId = String(body.pageId || "");
+  if (!pageId) return NextResponse.json({ error: "pageId مطلوب" }, { status: 400 });
+  const postsPerDay = Math.max(1, Math.min(10, Number(body.postsPerDay) || 3));
+  const durationDays = Math.max(1, Math.min(30, Number(body.durationDays) || 7));
+  const total = Math.min(postsPerDay * durationDays, 40); // cap to keep AI output + cost sane
+  const startDate = body.startDate ? new Date(body.startDate) : new Date();
+
+  const [{ data: brand }, { data: products }] = await Promise.all([
+    supabaseAdmin.from("studio_brands").select("*").eq("user_id", user.id).eq("page_id", pageId).maybeSingle(),
+    supabaseAdmin.from("studio_products").select("*").eq("user_id", user.id).eq("page_id", pageId).eq("active", true),
+  ]);
+  const items = (products || []).filter((p) => p.available !== false);
+  if (items.length === 0) return NextResponse.json({ error: "أضف أصنافاً متوفّرة أولاً في الكتالوج" }, { status: 400 });
+
+  const brandLines = [
+    brand?.brand_name && `Store: ${brand.brand_name}`,
+    brand?.tone && `Voice: ${brand.tone}`,
+    brand?.phones?.length && `Phones: ${brand.phones.join(", ")}`,
+    brand?.addresses?.length && `Addresses: ${brand.addresses.join(" | ")}`,
+    brand?.links?.length && `Links: ${brand.links.join(" , ")}`,
+    brand?.hours && `Hours: ${brand.hours}`,
+    brand?.extra && `Extra: ${brand.extra}`,
+  ].filter(Boolean).join("\n");
+  const catalog = items.map((p) => `- ${p.name}${p.category ? ` [${p.category}]` : ""}${p.price_text ? ` — ${p.price_text}` : ""}`).join("\n");
+
+  const system = [
+    "You are an expert Arabic social-media manager for a small business in LIBYA.",
+    "Design a Facebook content plan. Write engaging LIBYAN-friendly ARABIC captions that sell without being pushy.",
+    `Produce EXACTLY ${total} posts total, spread as ${postsPerDay} per day over ${durationDays} days.`,
+    "Vary the angle: single-product highlight, offer/discount, bundle, tip/how-to, question/engagement, testimonial-style, new-arrival.",
+    "Each caption: a strong hook, value, ONE clear call to action, the store's phone or link when relevant, and 2-5 fitting emojis.",
+    "Only use products from the catalog. Pick the best product(s) for each post.",
+    "image_prompt: a short ENGLISH visual description to generate a photo for the post (product-focused, clean, well-lit).",
+    "Return ONLY JSON, no prose, exactly:",
+    '{"summary": "<one short Arabic sentence>", "posts": [{"day": <1..N>, "slot": <1..postsPerDay>, "product": "<exact catalog name or empty>", "type": "<short Arabic label>", "caption": "<Arabic>", "hashtags": "<#.. #..>", "cta": "<short Arabic>", "image_prompt": "<English>"}]}',
+  ].join(" ");
+  const userMsg = `STORE INFO:\n${brandLines || "(none)"}\n\nCATALOG (${items.length} items):\n${catalog}`;
+
+  let parsed: { summary?: string; posts?: AIPost[] };
+  try {
+    const text = await aiComplete({ system, user: userMsg, maxTokens: 6000, temperature: 0.85 });
+    parsed = parseJsonReply(text);
+  } catch {
+    return NextResponse.json({ error: "تعذّر توليد الخطة، حاول مجدداً" }, { status: 502 });
+  }
+  const aiPosts = Array.isArray(parsed.posts) ? parsed.posts.slice(0, total) : [];
+  if (aiPosts.length === 0) return NextResponse.json({ error: "لم يُنتج المساعد منشورات، حاول مجدداً" }, { status: 502 });
+
+  // Match an AI product string to a catalog item (loose containment match).
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+  function matchProduct(name?: string) {
+    if (!name) return null;
+    const n = norm(name);
+    return items.find((p) => { const pn = norm(p.name); return pn === n || pn.includes(n) || n.includes(pn); }) || null;
+  }
+  // Slot times spread between 10:00 and 21:00.
+  function slotTime(slot: number) {
+    if (postsPerDay === 1) return 18;
+    const start = 10, end = 21;
+    return Math.round(start + ((end - start) * (slot - 1)) / Math.max(1, postsPerDay - 1));
+  }
+
+  // Create the plan.
+  const { data: plan, error: planErr } = await supabaseAdmin
+    .from("studio_plans").insert({
+      user_id: user.id, page_id: pageId, posts_per_day: postsPerDay, duration_days: durationDays,
+      start_date: startDate.toISOString().slice(0, 10), status: "draft",
+      summary: typeof parsed.summary === "string" ? parsed.summary : null,
+    }).select().single();
+  if (planErr || !plan) return NextResponse.json({ error: planErr?.message || "تعذّر إنشاء الخطة" }, { status: 500 });
+
+  const rows = aiPosts.map((ap, i) => {
+    const day = Math.max(1, Math.min(durationDays, Number(ap.day) || Math.floor(i / postsPerDay) + 1));
+    const slot = Math.max(1, Math.min(postsPerDay, Number(ap.slot) || (i % postsPerDay) + 1));
+    const when = new Date(startDate);
+    when.setDate(when.getDate() + (day - 1));
+    when.setHours(slotTime(slot), 0, 0, 0);
+    const prod = matchProduct(ap.product);
+    const prompt = ap.image_prompt || (prod ? `${prod.name} product photo, clean studio lighting` : "attractive product photo");
+    const productImg = prod?.images?.[0];
+    return {
+      plan_id: plan.id, user_id: user.id, page_id: pageId,
+      scheduled_for: when.toISOString(),
+      caption: ap.caption || "",
+      hashtags: ap.hashtags || null,
+      cta: ap.cta || null,
+      post_type: ap.type || null,
+      product_id: prod?.id || null,
+      image_prompt: prompt,
+      image_url: productImg || pollinations(prompt),
+      image_source: productImg ? "product" : "ai",
+      status: "draft",
+    };
+  });
+  const { data: posts, error: postsErr } = await supabaseAdmin.from("studio_posts").insert(rows).select();
+  if (postsErr) return NextResponse.json({ error: postsErr.message }, { status: 500 });
+
+  return NextResponse.json({ plan, posts: posts || [] });
+}
