@@ -16,7 +16,7 @@ const PINK    = "#d6409f";
 const PINK_BG = "rgba(214,64,159,0.12)";
 
 interface Page { id: string; page_id: string; page_name: string; }
-interface Product { id: string; category?: string; name: string; price_text?: string; description?: string; images?: string[]; active?: boolean; }
+interface Product { id: string; category?: string; name: string; price_text?: string; description?: string; images?: string[]; active?: boolean; available?: boolean; }
 interface Brand {
   brand_name?: string; phones?: string[]; addresses?: string[]; links?: string[];
   hours?: string; tone?: string; logo_url?: string; extra?: string;
@@ -62,6 +62,9 @@ export default function StudioPage() {
 
   // Brand
   const [brand, setBrand] = useState<Brand>({});
+  const [phonesText, setPhonesText] = useState("");     // raw multiline (fixes Enter/newline)
+  const [addressesText, setAddressesText] = useState("");
+  const [linksText, setLinksText] = useState("");
   const [savingBrand, setSavingBrand] = useState(false);
   const [brandSaved, setBrandSaved] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -69,9 +72,16 @@ export default function StudioPage() {
   // Catalog
   const [products, setProducts] = useState<Product[]>([]);
   const [showAdd, setShowAdd] = useState(false);
-  const [draft, setDraft] = useState<Omit<Product, "id">>({ name: "" });
+  const [editingId, setEditingId] = useState<string>("");
+  const [draft, setDraft] = useState<Omit<Product, "id">>({ name: "", available: true });
   const [savingProd, setSavingProd] = useState(false);
+  const [prodAdded, setProdAdded] = useState(false);
   const [uploadingImg, setUploadingImg] = useState(false);
+  // Bulk quick-add
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [bulkCategory, setBulkCategory] = useState("");
+  const [savingBulk, setSavingBulk] = useState(false);
 
   // Plan controls (generation lands next batch)
   const [postsPerDay, setPostsPerDay] = useState(3);
@@ -92,7 +102,13 @@ export default function StudioPage() {
 
   useEffect(() => {
     if (!selectedPage) return;
-    fetch(`/api/studio/brand?pageId=${encodeURIComponent(selectedPage)}`).then((r) => r.json()).then((d) => setBrand(d.brand || {})).catch(() => setBrand({}));
+    fetch(`/api/studio/brand?pageId=${encodeURIComponent(selectedPage)}`).then((r) => r.json()).then((d) => {
+      const br = d.brand || {};
+      setBrand(br);
+      setPhonesText((br.phones || []).join("\n"));
+      setAddressesText((br.addresses || []).join("\n"));
+      setLinksText((br.links || []).join("\n"));
+    }).catch(() => setBrand({}));
     fetch(`/api/studio/products?pageId=${encodeURIComponent(selectedPage)}`).then((r) => r.json()).then((d) => setProducts(d.products || [])).catch(() => setProducts([]));
   }, [selectedPage]);
 
@@ -103,30 +119,66 @@ export default function StudioPage() {
     return r.ok && d.url ? d.url : null;
   }
 
+  const fromLines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
+
   async function saveBrand() {
     setSavingBrand(true); setBrandSaved(false);
-    const r = await fetch("/api/studio/brand", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pageId: selectedPage, ...brand }) });
+    const body = { pageId: selectedPage, ...brand, phones: fromLines(phonesText), addresses: fromLines(addressesText), links: fromLines(linksText) };
+    const r = await fetch("/api/studio/brand", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     setSavingBrand(false);
     if (r.ok) { setBrandSaved(true); setTimeout(() => setBrandSaved(false), 2500); }
   }
 
-  async function addProduct() {
+  function openAdd() { setEditingId(""); setDraft({ name: "", available: true }); setProdAdded(false); setShowAdd(true); }
+  function openEdit(p: Product) { setEditingId(p.id); setDraft({ name: p.name, category: p.category, price_text: p.price_text, description: p.description, images: p.images || [], available: p.available !== false }); setProdAdded(false); setShowAdd(true); }
+
+  async function saveProduct(keepOpen: boolean) {
     if (!draft.name.trim()) return;
     setSavingProd(true);
+    if (editingId) {
+      const r = await fetch("/api/studio/products", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingId, ...draft }) });
+      const d = await r.json();
+      setSavingProd(false);
+      if (r.ok && d.product) { setProducts(products.map((p) => (p.id === editingId ? d.product : p))); setShowAdd(false); }
+      return;
+    }
     const r = await fetch("/api/studio/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pageId: selectedPage, ...draft }) });
     const d = await r.json();
     setSavingProd(false);
-    if (r.ok && d.product) { setProducts([d.product, ...products]); setShowAdd(false); setDraft({ name: "" }); }
+    if (r.ok && d.product) {
+      setProducts((cur) => [d.product, ...cur]);
+      if (keepOpen) { setDraft({ name: "", available: true }); setProdAdded(true); setTimeout(() => setProdAdded(false), 1800); }
+      else setShowAdd(false);
+    }
   }
+
+  async function addBulk() {
+    const items = fromLines(bulkText).map((line) => {
+      // "name - price" or "name" (Arabic dash or hyphen)
+      const m = line.split(/\s[-–—]\s|\s-\s/);
+      const name = (m[0] || line).trim();
+      const price_text = m.length > 1 ? line.slice(name.length).replace(/^[\s-–—]+/, "").trim() : undefined;
+      return { name, price_text, category: bulkCategory.trim() || undefined };
+    }).filter((x) => x.name);
+    if (items.length === 0) return;
+    setSavingBulk(true);
+    const r = await fetch("/api/studio/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pageId: selectedPage, items }) });
+    const d = await r.json();
+    setSavingBulk(false);
+    if (r.ok && d.products) { setProducts([...(d.products as Product[]), ...products]); setShowBulk(false); setBulkText(""); setBulkCategory(""); }
+  }
+
   async function deleteProduct(id: string) {
     if (!confirm(t("حذف هذا الصنف؟", "Delete this item?"))) return;
     await fetch(`/api/studio/products?id=${id}`, { method: "DELETE" });
     setProducts(products.filter((p) => p.id !== id));
   }
 
-  // textarea list helpers (one item per line)
-  const asLines = (v?: string[]) => (v || []).join("\n");
-  const fromLines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
+  async function toggleAvailable(p: Product) {
+    const next = !(p.available !== false);
+    setProducts(products.map((x) => (x.id === p.id ? { ...x, available: next } : x)));
+    await fetch("/api/studio/products", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, available: next }) });
+  }
 
   if (loadingPages) {
     return <div style={{ minHeight: "100vh", background: c.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><Loader2 size={30} color={PINK} className="spin" /><style>{`@keyframes spin-anim{to{transform:rotate(360deg)}}.spin{animation:spin-anim 1s linear infinite}`}</style></div>;
@@ -225,16 +277,19 @@ export default function StudioPage() {
                   ) : (
                     <div style={{ width: 60, height: 60, borderRadius: 14, background: c.inputBg, border: `1px dashed ${c.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}><ImageIcon size={22} color={c.dim} /></div>
                   )}
-                  <label style={{ fontSize: 13, color: PINK, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    {uploadingLogo ? <Loader2 size={14} className="spin" /> : <ImageIcon size={14} />} {t("شعار المتجر", "Store logo")}
-                    <input type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; setUploadingLogo(true); const u = await uploadImage(f); setUploadingLogo(false); if (u) setBrand({ ...brand, logo_url: u }); e.target.value = ""; }} />
-                  </label>
+                  <div>
+                    <label style={{ fontSize: 13, color: PINK, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      {uploadingLogo ? <Loader2 size={14} className="spin" /> : <ImageIcon size={14} />} {t("شعار المتجر", "Store logo")}
+                      <input type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; setUploadingLogo(true); const u = await uploadImage(f); setUploadingLogo(false); if (u) setBrand({ ...brand, logo_url: u }); e.target.value = ""; }} />
+                    </label>
+                    <div style={{ fontSize: 11, color: c.dim, marginTop: 3, lineHeight: 1.5 }}>{t("يُستخدم على تصاميم المنشورات فقط — لا يغيّر شعار صفحتك في فيسبوك.", "Used on post designs only — it does NOT change your Facebook Page logo.")}</div>
+                  </div>
                 </div>
                 <Field muted={c.muted} label={t("اسم المتجر", "Store name")}><input style={input} value={brand.brand_name || ""} onChange={(e) => setBrand({ ...brand, brand_name: e.target.value })} placeholder={t("مثال: متجر لمسة أنوثة", "e.g. Lamsa Beauty")} /></Field>
                 <Field muted={c.muted} label={t("نبرة العلامة / وصف المتجر", "Brand voice / description")}><textarea rows={2} style={{ ...input, resize: "vertical" }} value={brand.tone || ""} onChange={(e) => setBrand({ ...brand, tone: e.target.value })} placeholder={t("مثال: متجر مستلزمات زينة نسائية راقٍ، لهجة ودودة وأنيقة", "e.g. Elegant women's beauty shop, warm & classy tone")} /></Field>
-                <Field muted={c.muted} label={t("أرقام الهاتف (رقم في كل سطر)", "Phone numbers (one per line)")}><textarea rows={2} style={{ ...input, resize: "vertical" }} value={asLines(brand.phones)} onChange={(e) => setBrand({ ...brand, phones: fromLines(e.target.value) })} placeholder={"091xxxxxxx\n092xxxxxxx"} /></Field>
-                <Field muted={c.muted} label={t("العناوين (عنوان في كل سطر)", "Addresses (one per line)")}><textarea rows={2} style={{ ...input, resize: "vertical" }} value={asLines(brand.addresses)} onChange={(e) => setBrand({ ...brand, addresses: fromLines(e.target.value) })} placeholder={t("طرابلس - شارع...", "Tripoli - ...")} /></Field>
-                <Field muted={c.muted} label={t("روابط (صفحات/موقع، رابط في كل سطر)", "Links (pages/site, one per line)")}><textarea rows={2} style={{ ...input, resize: "vertical" }} value={asLines(brand.links)} onChange={(e) => setBrand({ ...brand, links: fromLines(e.target.value) })} placeholder={"https://facebook.com/...\nhttps://instagram.com/..."} /></Field>
+                <Field muted={c.muted} label={t("أرقام الهاتف (رقم في كل سطر)", "Phone numbers (one per line)")}><textarea rows={3} style={{ ...input, resize: "vertical" }} value={phonesText} onChange={(e) => setPhonesText(e.target.value)} placeholder={"091xxxxxxx\n092xxxxxxx"} /></Field>
+                <Field muted={c.muted} label={t("العناوين (عنوان في كل سطر)", "Addresses (one per line)")}><textarea rows={3} style={{ ...input, resize: "vertical" }} value={addressesText} onChange={(e) => setAddressesText(e.target.value)} placeholder={t("طرابلس - شارع...", "Tripoli - ...")} /></Field>
+                <Field muted={c.muted} label={t("روابط (صفحات/موقع، رابط في كل سطر)", "Links (pages/site, one per line)")}><textarea rows={3} style={{ ...input, resize: "vertical" }} value={linksText} onChange={(e) => setLinksText(e.target.value)} placeholder={"https://facebook.com/...\nhttps://instagram.com/..."} /></Field>
                 <Field muted={c.muted} label={t("أوقات العمل", "Working hours")}><input style={input} value={brand.hours || ""} onChange={(e) => setBrand({ ...brand, hours: e.target.value })} placeholder={t("يومياً 10ص - 11م", "Daily 10am - 11pm")} /></Field>
                 <Field muted={c.muted} label={t("معلومات إضافية (اختياري)", "Extra info (optional)")}><textarea rows={2} style={{ ...input, resize: "vertical" }} value={brand.extra || ""} onChange={(e) => setBrand({ ...brand, extra: e.target.value })} placeholder={t("توصيل، عروض دائمة، إلخ", "Delivery, standing offers, etc.")} /></Field>
 
@@ -248,27 +303,42 @@ export default function StudioPage() {
             {/* CATALOG TAB */}
             {tab === "catalog" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                   <div style={{ fontWeight: 800, fontSize: 14 }}>{t(`الأصناف (${products.length})`, `Catalog (${products.length})`)}</div>
-                  <button onClick={() => { setDraft({ name: "" }); setShowAdd(true); }} style={{ background: G_HERO, border: "none", borderRadius: 11, padding: "9px 15px", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}><Plus size={15} /> {t("إضافة صنف", "Add item")}</button>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => { setBulkText(""); setBulkCategory(""); setShowBulk(true); }} style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 11, padding: "9px 13px", color: c.text, fontWeight: 800, cursor: "pointer", fontSize: 12.5, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}><Sparkles size={14} color={PINK} /> {t("قائمة سريعة", "Quick list")}</button>
+                    <button onClick={openAdd} style={{ background: G_HERO, border: "none", borderRadius: 11, padding: "9px 15px", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}><Plus size={15} /> {t("إضافة صنف", "Add item")}</button>
+                  </div>
+                </div>
+                <div style={{ fontSize: 11.5, color: c.dim, lineHeight: 1.6, marginTop: -4 }}>
+                  {t("الصور اختيارية ومرجعية فقط — الموظف يصمّم صوراً جديدة لكل منشور ويعيد نشر الأصناف بصيغ وصور مختلفة.", "Images are optional references only — the employee designs fresh visuals for each post and re-posts items with new formats.")}
                 </div>
                 {products.length === 0 ? (
-                  <div style={{ ...card, textAlign: "center", color: c.muted, fontSize: 13.5, padding: 30 }}>{t("لا أصناف بعد. أضف منتجاتك (عطور، مكياج…) ليصنع منها الموظف منشورات.", "No items yet. Add your products (perfumes, makeup…) so the employee can build posts from them.")}</div>
-                ) : products.map((p) => (
-                  <div key={p.id} style={{ ...card, padding: 14, display: "flex", gap: 12, alignItems: "center" }}>
+                  <div style={{ ...card, textAlign: "center", color: c.muted, fontSize: 13.5, padding: 30 }}>{t("لا أصناف بعد. أضف منتجاتك (عطور، مكياج…) — أو الصق قائمة أسماء سريعة.", "No items yet. Add your products (perfumes, makeup…) — or paste a quick name list.")}</div>
+                ) : products.map((p) => {
+                  const avail = p.available !== false;
+                  return (
+                  <div key={p.id} style={{ ...card, padding: 14, display: "flex", gap: 12, alignItems: "center", opacity: avail ? 1 : 0.65 }}>
                     {p.images && p.images[0] ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.images[0]} alt="" style={{ width: 56, height: 56, borderRadius: 11, objectFit: "cover", flexShrink: 0 }} />
+                      <img src={p.images[0]} alt="" style={{ width: 52, height: 52, borderRadius: 11, objectFit: "cover", flexShrink: 0 }} />
                     ) : (
-                      <div style={{ width: 56, height: 56, borderRadius: 11, background: c.inputBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Package size={20} color={c.dim} /></div>
+                      <div style={{ width: 52, height: 52, borderRadius: 11, background: c.inputBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Package size={20} color={c.dim} /></div>
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
-                      <div style={{ fontSize: 12, color: c.dim, marginTop: 2 }}>{[p.category, p.price_text].filter(Boolean).join(" · ") || t("بدون سعر", "no price")}</div>
+                      <div style={{ fontSize: 12, color: c.dim, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{[p.category, p.price_text].filter(Boolean).join(" · ") || t("بدون سعر", "no price")}</div>
                     </div>
+                    {/* availability toggle */}
+                    <button onClick={() => toggleAvailable(p)} title={avail ? t("متوفر", "In stock") : t("غير متوفر", "Out of stock")}
+                      style={{ background: avail ? "rgba(34,197,94,0.14)" : "rgba(154,164,178,0.15)", border: `1px solid ${avail ? "#22c55e55" : c.border}`, borderRadius: 100, padding: "5px 11px", color: avail ? "#22c55e" : c.muted, cursor: "pointer", fontSize: 11, fontWeight: 800, flexShrink: 0, fontFamily: "inherit" }}>
+                      {avail ? t("متوفر", "In") : t("نافد", "Out")}
+                    </button>
+                    <button onClick={() => openEdit(p)} style={{ background: PINK_BG, border: `1px solid ${PINK}44`, borderRadius: 9, padding: "7px 9px", color: PINK, cursor: "pointer", flexShrink: 0 }}><Save size={13} /></button>
                     <button onClick={() => deleteProduct(p.id)} style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 9, padding: "7px 9px", color: "#ef4444", cursor: "pointer", flexShrink: 0 }}><Trash2 size={14} /></button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -299,16 +369,29 @@ export default function StudioPage() {
         <div onClick={(e) => { if (e.target === e.currentTarget) setShowAdd(false); }} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 12, direction: rtl ? "rtl" : "ltr" }}>
           <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 480, borderRadius: 22, padding: 20, fontFamily: "Cairo,sans-serif", maxHeight: "88vh", overflowY: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ fontWeight: 900, fontSize: 16 }}>{t("صنف جديد", "New item")}</div>
+              <div style={{ fontWeight: 900, fontSize: 16 }}>{editingId ? t("تعديل الصنف", "Edit item") : t("صنف جديد", "New item")}</div>
               <button onClick={() => setShowAdd(false)} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer" }}><X size={20} /></button>
             </div>
-            <Field muted={c.muted} label={t("اسم الصنف", "Item name")}><input style={input} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder={t("مثال: عطر فلورا", "e.g. Flora perfume")} /></Field>
+            <Field muted={c.muted} label={t("اسم الصنف", "Item name")}><input autoFocus style={input} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder={t("مثال: عطر فلورا", "e.g. Flora perfume")} /></Field>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <Field muted={c.muted} label={t("القسم", "Category")}><input style={input} value={draft.category || ""} onChange={(e) => setDraft({ ...draft, category: e.target.value })} placeholder={t("عطور", "Perfumes")} /></Field>
               <Field muted={c.muted} label={t("السعر", "Price")}><input style={input} value={draft.price_text || ""} onChange={(e) => setDraft({ ...draft, price_text: e.target.value })} placeholder={t("50 د.ل", "50 LYD")} /></Field>
             </div>
+            {/* Availability */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              {([[true, t("متوفر", "In stock")], [false, t("غير متوفر", "Out of stock")]] as const).map(([v, lbl]) => {
+                const on = (draft.available !== false) === v;
+                return (
+                  <button key={String(v)} type="button" onClick={() => setDraft({ ...draft, available: v })}
+                    style={{ flex: 1, padding: "10px 0", borderRadius: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 800, fontSize: 13,
+                      border: on ? `2px solid ${v ? "#22c55e" : "#ef4444"}` : `1px solid ${c.border}`,
+                      background: on ? (v ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.1)") : "transparent",
+                      color: on ? (v ? "#22c55e" : "#ef4444") : c.muted }}>{lbl}</button>
+                );
+              })}
+            </div>
             <Field muted={c.muted} label={t("وصف (اختياري)", "Description (optional)")}><textarea rows={2} style={{ ...input, resize: "vertical" }} value={draft.description || ""} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
-            <Field muted={c.muted} label={t("صور المنتج", "Product images")}>
+            <Field muted={c.muted} label={t("صور مرجعية (اختياري)", "Reference images (optional)")}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {(draft.images || []).map((u, i) => (
                   <div key={i} style={{ position: "relative" }}>
@@ -323,8 +406,46 @@ export default function StudioPage() {
                 </label>
               </div>
             </Field>
-            <button onClick={addProduct} disabled={savingProd || !draft.name.trim()} style={{ width: "100%", marginTop: 12, background: G_HERO, border: "none", borderRadius: 13, padding: "13px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", opacity: savingProd || !draft.name.trim() ? 0.6 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              {savingProd ? <Loader2 size={17} className="spin" /> : <Plus size={17} />} {t("إضافة", "Add")}
+            {prodAdded && <div style={{ textAlign: "center", color: "#22c55e", fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>✓ {t("تمت الإضافة — أضف التالي", "Added — add the next")}</div>}
+            {editingId ? (
+              <button onClick={() => saveProduct(false)} disabled={savingProd || !draft.name.trim()} style={{ width: "100%", marginTop: 6, background: G_HERO, border: "none", borderRadius: 13, padding: "13px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", opacity: savingProd || !draft.name.trim() ? 0.6 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                {savingProd ? <Loader2 size={17} className="spin" /> : <Save size={17} />} {t("حفظ التعديل", "Save changes")}
+              </button>
+            ) : (
+              <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                <button onClick={() => saveProduct(true)} disabled={savingProd || !draft.name.trim()} style={{ flex: 1, background: G_HERO, border: "none", borderRadius: 13, padding: "13px 0", color: "#fff", fontWeight: 900, fontSize: 14, cursor: "pointer", opacity: savingProd || !draft.name.trim() ? 0.6 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                  {savingProd ? <Loader2 size={16} className="spin" /> : <Plus size={16} />} {t("إضافة والتالي", "Add & next")}
+                </button>
+                <button onClick={() => saveProduct(false)} disabled={savingProd || !draft.name.trim()} style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 13, padding: "13px 18px", color: c.text, fontWeight: 800, fontSize: 14, cursor: "pointer", opacity: savingProd || !draft.name.trim() ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                  {t("إضافة وإغلاق", "Add & close")}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Bulk quick-add modal */}
+      {showBulk && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) setShowBulk(false); }} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 12, direction: rtl ? "rtl" : "ltr" }}>
+          <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 480, borderRadius: 22, padding: 20, fontFamily: "Cairo,sans-serif", maxHeight: "88vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <div style={{ fontWeight: 900, fontSize: 16 }}>{t("قائمة سريعة بالأصناف", "Quick item list")}</div>
+              <button onClick={() => setShowBulk(false)} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer" }}><X size={20} /></button>
+            </div>
+            <p style={{ color: c.dim, fontSize: 12, lineHeight: 1.7, margin: "0 0 12px" }}>
+              {t("ضع كل صنف في سطر. يمكنك كتابة الاسم فقط، أو «الاسم - السعر». والموظف الذكي يصنّف كل اسم لاحقاً.", "One item per line. Just the name, or “name - price”. The AI employee classifies each name later.")}
+            </p>
+            <Field muted={c.muted} label={t("القسم لكل هذه القائمة (اختياري)", "Category for this whole list (optional)")}>
+              <input style={input} value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} placeholder={t("مثال: عطور", "e.g. Perfumes")} />
+            </Field>
+            <Field muted={c.muted} label={t("الأصناف", "Items")}>
+              <textarea rows={8} style={{ ...input, resize: "vertical", lineHeight: 1.9 }} value={bulkText} onChange={(e) => setBulkText(e.target.value)}
+                placeholder={t("عطر فلورا - 120 د.ل\nمسكارا لوريال - 45 د.ل\nأحمر شفاه مات", "Flora perfume - 120\nLoreal mascara - 45\nMatte lipstick")} />
+            </Field>
+            <div style={{ fontSize: 11.5, color: c.dim, marginBottom: 10 }}>{t(`${fromLines(bulkText).length} صنف`, `${fromLines(bulkText).length} items`)}</div>
+            <button onClick={addBulk} disabled={savingBulk || fromLines(bulkText).length === 0} style={{ width: "100%", background: G_HERO, border: "none", borderRadius: 13, padding: "13px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", opacity: savingBulk || fromLines(bulkText).length === 0 ? 0.6 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              {savingBulk ? <Loader2 size={17} className="spin" /> : <Plus size={17} />} {t("إضافة القائمة", "Add list")}
             </button>
           </div>
         </div>
