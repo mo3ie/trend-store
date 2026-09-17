@@ -46,6 +46,7 @@ function ConnectPageInner() {
   const [health, setHealth] = useState<Record<string, string>>({});
   const [checking, setChecking] = useState(false);
   const [removingDead, setRemovingDead] = useState(false);
+  const [notAuthed, setNotAuthed] = useState(false);
 
   useEffect(() => {
     const s = searchParams.get("success");
@@ -68,6 +69,8 @@ function ConnectPageInner() {
   async function loadPages() {
     setLoading(true);
     const res  = await fetch("/api/promo/pages");
+    if (res.status === 401) { setNotAuthed(true); setLoading(false); return; }
+    setNotAuthed(false);
     const data = await res.json();
     setPages(data.pages || []);
     setLoading(false);
@@ -101,6 +104,7 @@ function ConnectPageInner() {
     setConnecting(true);
     setError("");
     const res  = await fetch("/api/promo/pages/connect");
+    if (res.status === 401) { setNotAuthed(true); setConnecting(false); return; }
     const data = await res.json();
     if (data.url) { window.location.href = data.url; }
     else { setError(data.error || t("حدث خطأ", "Something went wrong")); setConnecting(false); }
@@ -154,6 +158,23 @@ function ConnectPageInner() {
       </div>
 
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "22px 20px" }}>
+
+        {notAuthed ? (
+          <div style={{ background: c.surface, border: `2px solid ${c.border}`, borderRadius: 20, padding: "36px 24px", textAlign: "center" }}>
+            <div style={{ width: 60, height: 60, borderRadius: 18, background: G_HERO, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+              <Globe size={28} color="#fff" />
+            </div>
+            <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 8 }}>{t("لم تسجّل الدخول إلى الموقع", "You're not logged in")}</div>
+            <p style={{ color: c.muted, fontSize: 14, lineHeight: 1.8, margin: "0 0 22px" }}>
+              {t("يجب تسجيل الدخول إلى حسابك في المتجر أولاً لتتمكّن من ربط صفحاتك وإدارة إعلاناتك.", "Please sign in to your store account first to connect your Pages and manage your ads.")}
+            </p>
+            <button onClick={() => router.push(`/login?next=${encodeURIComponent("/ads/connect")}`)}
+              style={{ width: "100%", background: G_HERO, border: "none", borderRadius: 15, padding: "15px 0", color: "#fff", fontWeight: 900, fontSize: 16, cursor: "pointer", fontFamily: "inherit" }}>
+              {t("تسجيل الدخول", "Sign in")}
+            </button>
+          </div>
+        ) : (
+        <>
 
         {success && (
           <div style={{ background: "rgba(34,197,94,0.15)", border: "1px solid #22c55e55", borderRadius: 14, padding: "14px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, color: "#22c55e" }}>
@@ -298,6 +319,8 @@ function ConnectPageInner() {
             style={{ marginTop: 30, width: "100%", background: G_HERO, border: "none", borderRadius: 15, padding: "16px 0", color: "#fff", fontWeight: 900, fontSize: 16, cursor: "pointer", fontFamily: "inherit" }}>
             {t("التالي — إنشاء حملة إعلانية", "Next — create a campaign")}
           </button>
+        )}
+        </>
         )}
       </div>
 
