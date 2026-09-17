@@ -79,7 +79,10 @@ export async function GET(req: NextRequest) {
     // an extra token that lets the bot fail over when one gets rate-limited).
     await appendPoolTokens(userId, pages);
 
-    return NextResponse.redirect(`${base}/ads/connect?success=1`);
+    // Diagnostic: how many Pages Facebook returned this login (so we can tell if a
+    // Page whose token is dead was actually re-granted). Shown on /ads/connect.
+    console.log("OAuth callback OK: user", userId, "pages", pages.length, pages.map((p) => p.id).join(","));
+    return NextResponse.redirect(`${base}/ads/connect?success=1&connected=${pages.length}`);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "error";
     console.error("Meta OAuth callback error:", msg);

@@ -47,7 +47,8 @@ function ConnectPageInner() {
   useEffect(() => {
     const s = searchParams.get("success");
     const e = searchParams.get("error");
-    if (s === "1") setSuccess(t("تم ربط الصفحات بنجاح!", "Pages connected successfully!"));
+    const n = searchParams.get("connected");
+    if (s === "1") setSuccess(t(`تم ربط الصفحات بنجاح!${n ? ` (فيسبوك أرجع ${n} صفحة)` : ""}`, `Pages connected successfully!${n ? ` (Facebook returned ${n} Pages)` : ""}`));
     if (e === "cancelled")    setError(t("تم إلغاء الربط", "Connection cancelled"));
     if (e === "no_pages")     setError(t("لم نجد صفحات متاحة في حسابك", "No available Pages found in your account"));
     if (e === "oauth_failed") {
