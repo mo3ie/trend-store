@@ -1,6 +1,6 @@
 "use client";
 
-import { Megaphone, MessageSquareReply, ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { Megaphone, MessageSquareReply, ArrowLeft, ArrowRight, Check, Bot } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import LangToggle from "@/components/LangToggle";
 
@@ -41,6 +41,25 @@ const TOOLS = [
       ["ردّ عام + رسالة خاصة", "Public reply + private DM"],
       ["قواعد كلمات مفتاحية + ذكاء", "Keyword rules + AI"],
       ["حماية من الحظر", "Anti-block protection"],
+    ] as const,
+  },
+  {
+    key: "studio",
+    name: ["الموظف الذكي", "AI Employee"] as const,
+    tagline: ["ينشر لك يومياً كموظف تسويق", "Posts daily like a marketing employee"] as const,
+    desc: [
+      "أخبره ببيانات متجرك وأصنافك، واختر عدد المنشورات اليومية — فيصمّم خطة محتوى كاملة (نصوص وصور)، يجدولها، يردّ بالأسعار، ويموّل ما تريد.",
+      "Give it your store info and products, pick posts per day — it drafts a full content plan (captions & images), schedules them, replies with prices, and boosts what you choose.",
+    ] as const,
+    href: "/studio",
+    icon: Bot,
+    color: "#d6409f",
+    accent: "#ff7a59",
+    features: [
+      ["خطة نشر أسبوعية بالذكاء", "AI weekly content plan"],
+      ["كتالوج أصناف وصور", "Catalog with images"],
+      ["ردّ تلقائي بالأسعار", "Auto-reply with prices"],
+      ["تمويل منشورات مختارة", "Boost selected posts"],
     ] as const,
   },
 ];
