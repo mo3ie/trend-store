@@ -43,6 +43,9 @@ function ConnectPageInner() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [health, setHealth] = useState<Record<string, string>>({});
+  const [checking, setChecking] = useState(false);
+  const [removingDead, setRemovingDead] = useState(false);
 
   useEffect(() => {
     const s = searchParams.get("success");
@@ -68,6 +71,30 @@ function ConnectPageInner() {
     const data = await res.json();
     setPages(data.pages || []);
     setLoading(false);
+    checkHealth();
+  }
+
+  async function checkHealth() {
+    setChecking(true);
+    try {
+      const r = await fetch("/api/promo/pages/health");
+      const d = await r.json();
+      if (r.ok) setHealth(d.statuses || {});
+    } catch { /* ignore */ }
+    setChecking(false);
+  }
+
+  async function removeDead() {
+    const dead = pages.filter((p) => health[p.page_id] === "dead");
+    if (dead.length === 0) return;
+    if (!confirm(t(
+      `حذف ${dead.length} صفحة فقدت الصلاحية من القائمة؟ (يمكنك ربطها لاحقاً بعد إعادة صلاحية الأدمن في فيسبوك)`,
+      `Remove ${dead.length} Page(s) that lost access? (You can reconnect them later after restoring the admin role on Facebook.)`))) return;
+    setRemovingDead(true);
+    const ids = dead.map((p) => p.id);
+    await fetch(`/api/promo/pages?ids=${ids.join(",")}`, { method: "DELETE" });
+    setPages((p) => p.filter((x) => !ids.includes(x.id)));
+    setRemovingDead(false);
   }
 
   async function connectMeta() {
@@ -162,10 +189,36 @@ function ConnectPageInner() {
           </button>
         </div>
 
+        {/* Dead-pages warning + cleanup */}
+        {(() => {
+          const dead = pages.filter((p) => health[p.page_id] === "dead");
+          if (dead.length === 0) return null;
+          return (
+            <div style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.4)", borderRadius: 14, padding: 16, marginBottom: 18 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start", color: "#f59e0b", fontWeight: 800, fontSize: 14 }}>
+                <XCircle size={18} style={{ flexShrink: 0, marginTop: 1 }} />
+                {t(`${dead.length} صفحة فقدت الصلاحية وتحتاج إعادة تفعيل`, `${dead.length} Page(s) lost access and need re-authorization`)}
+              </div>
+              <p style={{ color: c.muted, fontSize: 12.5, lineHeight: 1.8, margin: "10px 0 0" }}>
+                {t(
+                  "هذه الصفحات لم يعُد حساب فيسبوك المرتبط أدمن عليها (غالباً أُزيلت الصلاحية أو غُيّرت كلمة المرور). لإصلاحها: افتح كل صفحة في فيسبوك ← الإعدادات ← Page Roles، وتأكّد أن حسابك أدمن، ثم اضغط «Connect via Meta» من جديد. أو احذفها لتنظيف القائمة.",
+                  "The connected Facebook account is no longer an admin on these Pages (role removed or password changed). To fix: open each Page on Facebook → Settings → Page Roles, make your account an admin, then press “Connect via Meta” again. Or remove them to tidy the list.",
+                )}
+              </p>
+              <button onClick={removeDead} disabled={removingDead}
+                style={{ marginTop: 12, background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.4)", borderRadius: 11, padding: "9px 16px", color: "#ef4444", cursor: "pointer", fontSize: 13, fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}>
+                {removingDead ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
+                {t(`حذف الصفحات المنتهية (${dead.length})`, `Remove expired Pages (${dead.length})`)}
+              </button>
+            </div>
+          );
+        })()}
+
         {/* Pages list header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
           <h2 style={{ fontSize: 15, fontWeight: 800, margin: 0, color: c.text }}>
             {t("الصفحات المرتبطة", "Connected Pages")} ({pages.length})
+            {checking && <Loader2 size={13} className="spin" style={{ marginInlineStart: 8, verticalAlign: "middle", color: c.dim }} />}
           </h2>
           {selected.size > 0 && (
             <button onClick={deleteSelected} disabled={deleting}
@@ -216,7 +269,13 @@ function ConnectPageInner() {
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{page.page_name}</div>
-                  <div style={{ color: c.dim, fontSize: 12 }}>ID: {page.page_id}</div>
+                  {health[page.page_id] === "dead" ? (
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 3, background: "rgba(245,158,11,0.15)", color: "#f59e0b", borderRadius: 100, padding: "2px 9px", fontSize: 11, fontWeight: 800 }}>
+                      <XCircle size={11} /> {t("تحتاج إعادة صلاحية", "Needs re-authorization")}
+                    </div>
+                  ) : (
+                    <div style={{ color: c.dim, fontSize: 12 }}>ID: {page.page_id}</div>
+                  )}
                 </div>
                 <button onClick={(e) => { e.stopPropagation(); deletePage(page.id); }}
                   style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 9, padding: "6px 10px", color: "#ef4444", cursor: "pointer", flexShrink: 0 }}>

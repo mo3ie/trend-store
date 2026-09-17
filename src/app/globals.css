@@ -64,6 +64,10 @@
 /* خلفية نيون */
 body {
   background: var(--page-bg);
+  /* Never let a stray wide element push the page wider than the screen (which on
+     mobile makes the browser zoom out to a desktop-looking layout). */
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 .category-card, .shein-wrapper, .offer-card, .hero-btn, .neon-btn, .card-hover {

@@ -172,6 +172,19 @@ export async function getSystemPageToken(pageId: string): Promise<string | null>
   }
 }
 
+// Quick validity check for a stored Page token (does a trivial page read).
+// Returns false when the token is invalidated/expired (e.g. 190/460) — i.e. the
+// Page needs re-authorization.
+export async function isPageTokenAlive(pageId: string, token: string | null): Promise<boolean> {
+  if (!token) return false;
+  try {
+    await graph(`${pageId}?fields=id`, "GET", undefined, token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Large profile picture URL for a Page — used as the image on a Page-likes ad.
 export async function getPagePicture(pageId: string, pageToken?: string): Promise<string | null> {
   try {
