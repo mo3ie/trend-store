@@ -6,9 +6,10 @@ import { aiComplete, hasAI, parseJsonReply } from "@/services/ai";
 // A full plan can take ~15s to generate — raise the function limit above the ~10s default.
 export const maxDuration = 60;
 
-// Free image generation (no key) — used when a post has no product photo.
-function pollinations(prompt: string): string {
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true`;
+// Free image generation (no key) — FLUX model + prompt enhancement for much better
+// quality than the default. Used when a post has no product photo.
+export function pollinations(prompt: string): string {
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&model=flux&enhance=true&seed=${Math.floor(Math.random() * 1e6)}`;
 }
 
 interface AIPost {
@@ -29,6 +30,8 @@ export async function POST(req: NextRequest) {
   const durationDays = Math.max(1, Math.min(30, Number(body.durationDays) || 7));
   const total = Math.min(postsPerDay * durationDays, 40); // cap to keep AI output + cost sane
   const startDate = body.startDate ? new Date(body.startDate) : new Date();
+  const types = Array.isArray(body.types) ? body.types.map(String).filter(Boolean).slice(0, 20) : [];
+  const guidance = typeof body.guidance === "string" ? body.guidance.slice(0, 800).trim() : "";
 
   const [{ data: brand }, { data: products }] = await Promise.all([
     supabaseAdmin.from("studio_brands").select("*").eq("user_id", user.id).eq("page_id", pageId).maybeSingle(),
@@ -52,7 +55,10 @@ export async function POST(req: NextRequest) {
     "You are an expert Arabic social-media manager for a small business in LIBYA.",
     "Design a Facebook content plan. Write engaging LIBYAN-friendly ARABIC captions that sell without being pushy.",
     `Produce EXACTLY ${total} posts total, spread as ${postsPerDay} per day over ${durationDays} days.`,
-    "Vary the angle: single-product highlight, offer/discount, bundle, tip/how-to, question/engagement, testimonial-style, new-arrival.",
+    types.length
+      ? `Use ONLY these post angles (rotate among them): ${types.join(" | ")}. The "type" field must be one of these (in Arabic).`
+      : "Vary the angle: single-product highlight, offer/discount, bundle, tip/how-to, question/engagement, testimonial-style, new-arrival.",
+    guidance ? `Follow the owner's guidance closely: ${guidance}` : "",
     "Each caption: a strong hook, value, ONE clear call to action, the store's phone or link when relevant, and 2-5 fitting emojis.",
     "Only use products from the catalog. Pick the best product(s) for each post.",
     "image_prompt: a short ENGLISH visual description to generate a photo for the post (product-focused, clean, well-lit).",
