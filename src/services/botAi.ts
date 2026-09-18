@@ -16,7 +16,8 @@ export function aiAvailable(): boolean {
 export async function generateAiReply(
   comment: string,
   persona: string | null,
-  pageName?: string | null
+  pageName?: string | null,
+  catalog?: string | null,
 ): Promise<string | null> {
   if (!hasAI() || !comment.trim()) return null;
 
@@ -25,9 +26,11 @@ export async function generateAiReply(
       `You are a helpful sales assistant for the Facebook page "${pageName || "our store"}".`,
     "You are replying privately to someone who commented on a Facebook post.",
     "Rules: reply in the SAME language as the comment (Arabic → Arabic, Libyan dialect is fine).",
-    "Keep it under 45 words, warm and concrete. Never invent prices, stock, or delivery",
-    "details you were not given — if you don't know, ask the customer for what you need",
-    "or tell them a representative will follow up. No greetings boilerplate, no emojis spam.",
+    "Keep it under 45 words, warm and concrete.",
+    catalog
+      ? `Use ONLY this live PRICE LIST for prices/availability — quote the exact price when asked, and if an item is marked (نافد) say it's currently out of stock:\n${catalog}\nIf the asked item isn't in the list, ask the customer to clarify or say a rep will follow up.`
+      : "Never invent prices, stock, or delivery details you were not given — if you don't know, ask the customer or say a representative will follow up.",
+    "No greetings boilerplate, no emoji spam.",
   ].join(" ");
 
   try {

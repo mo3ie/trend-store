@@ -381,7 +381,18 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
   let aiPrivate: string | null = null;
   if (!rule && !useOverride) {
     if (config.ai_enabled && aiAvailable()) {
-      aiPrivate = await generateAiReply(ev.message, config.ai_persona, config.page_name);
+      // Feed the AI the store's live catalog (from the AI Employee) so it can quote
+      // exact, always-up-to-date prices/availability without inventing them.
+      let catalog: string | null = null;
+      const { data: items } = await supabaseAdmin
+        .from("studio_products").select("name, category, price_text, available")
+        .eq("user_id", config.user_id).eq("page_id", ev.pageId).eq("active", true).limit(300);
+      if (items && items.length) {
+        catalog = items.map((p) =>
+          `- ${p.name}${p.category ? ` [${p.category}]` : ""}${p.price_text ? ` — ${p.price_text}` : ""}${p.available === false ? " (نافد)" : ""}`
+        ).join("\n");
+      }
+      aiPrivate = await generateAiReply(ev.message, config.ai_persona, config.page_name, catalog);
     }
     if (!aiPrivate) {
       update.public_status = "skipped";
