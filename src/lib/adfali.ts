@@ -1,13 +1,18 @@
 // Edfali (ادفع لي) — مصرف التجارة والتنمية
-// SOAP 1.1 — endpoint only reachable from whitelisted IPs (Vercel)
+// SOAP 1.1 — نطاق المصرف على HTTPS، ولم يعد مقيَّدًا بقائمة عناوين
 // Method 1: DoPTrans   → sends OTP to customer, returns sessionID
 // Method 2: OnlineConfTrans → confirms OTP, returns "OK" on success
 
-const ENDPOINT = "http://62.240.55.2:6187/BCDUssd/NewEdfali.asmx";
+// العنوان من المصرف، وقابل للتغيير بلا نشر.
+//
+// كان عنوان IP خامًا على HTTP ومقيَّدًا بقائمة عناوين، فكان أي تغيير من المصرف
+// يوقف الدفع حتى يُنشر الموقع من جديد. أرسل المصرف نطاقًا على HTTPS
+// (2026-09-19)، وجُعل قابلاً للضبط من البيئة حتى لا نعيد هذه الدورة.
+const ENDPOINT = process.env.EDFALI_ENDPOINT || "https://edfali.bcd.ly/api/BCDUssd/NewEdfali.asmx";
 const SYS_PW   = "123@xdsr$#!!";
 
 const ERRORS: Record<string, string> = {
-  PW:    "كلمة مرور الخدمة خاطئة",
+  PW:    "بيانات حساب التاجر مرفوضة لدى المصرف",
   PW1:   "كلمة مرور الخدمة خاطئة",
   ACC:   "الحساب التاجر غير مفعّل",
   LIMIT: "المبلغ خارج الحدود المسموح بها",
