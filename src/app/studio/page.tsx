@@ -6,7 +6,7 @@ import {
   ArrowLeft, ArrowRight, Loader2, Store, Package, CalendarDays, Plus, Trash2, X,
   Image as ImageIcon, Save, CheckCircle, Sparkles, ChevronDown, Bot,
   Copy, RefreshCw, Clock, Pencil, Search, CheckSquare, Square, CircleCheck, CircleX,
-  Brain, Globe, DollarSign,
+  Brain, Globe, DollarSign, Bell, AlertTriangle, AlertCircle,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
@@ -85,7 +85,8 @@ export default function StudioPage() {
   const [pageSearch, setPageSearch] = useState("");
   const [loadingPages, setLoadingPages] = useState(true);
   const [notAuthed, setNotAuthed] = useState(false);
-  const [tab, setTab] = useState<"brand" | "catalog" | "plan">("brand");
+  const [tab, setTab] = useState<"brand" | "catalog" | "plan" | "alerts">("brand");
+  const [alerts, setAlerts] = useState<{ id: string; severity: string; area: string; title: string; detail?: string; at?: string }[]>([]);
 
   // Brand
   const [brand, setBrand] = useState<Brand>({});
@@ -177,6 +178,7 @@ export default function StudioPage() {
     fetch(`/api/studio/memory?pageId=${encodeURIComponent(selectedPage)}`).then((r) => r.json()).then((d) => {
       setBrainStyle(d.memory?.style || ""); setBrainNotes(d.memory?.notes || "");
     }).catch(() => {});
+    fetch(`/api/studio/alerts?pageId=${encodeURIComponent(selectedPage)}`).then((r) => r.json()).then((d) => setAlerts(d.alerts || [])).catch(() => setAlerts([]));
   }, [selectedPage]);
 
   async function saveBrain() {
@@ -375,9 +377,10 @@ export default function StudioPage() {
 
   const selPage = pages.find((p) => p.page_id === selectedPage);
   const tabs = [
-    { id: "brand" as const,   icon: Store,        label: t("بيانات المتجر", "Store info") },
+    { id: "brand" as const,   icon: Store,        label: t("المتجر", "Store") },
     { id: "catalog" as const, icon: Package,      label: t("الأصناف", "Catalog") },
-    { id: "plan" as const,    icon: CalendarDays, label: t("خطة النشر", "Content plan") },
+    { id: "plan" as const,    icon: CalendarDays, label: t("الخطة", "Plan") },
+    { id: "alerts" as const,  icon: Bell,         label: t("التنبيهات", "Alerts"), badge: alerts.length },
   ];
 
   return (
@@ -441,11 +444,15 @@ export default function StudioPage() {
 
             {/* Tabs */}
             <div style={{ display: "flex", gap: 6, background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 13, padding: 5 }}>
-              {tabs.map((tb) => (
-                <button key={tb.id} onClick={() => setTab(tb.id)} style={{ flex: 1, border: "none", cursor: "pointer", borderRadius: 9, padding: "9px 0", fontFamily: "inherit", fontWeight: 800, fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: tab === tb.id ? G_HERO : "transparent", color: tab === tb.id ? "#fff" : c.muted }}>
+              {tabs.map((tb) => {
+                const badge = (tb as { badge?: number }).badge || 0;
+                return (
+                <button key={tb.id} onClick={() => setTab(tb.id)} style={{ flex: 1, border: "none", cursor: "pointer", borderRadius: 9, padding: "9px 0", fontFamily: "inherit", fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, position: "relative", background: tab === tb.id ? G_HERO : "transparent", color: tab === tb.id ? "#fff" : c.muted }}>
                   <tb.icon size={15} /> {tb.label}
+                  {badge > 0 && <span style={{ background: "#ef4444", color: "#fff", borderRadius: 100, minWidth: 16, height: 16, fontSize: 10, fontWeight: 900, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{badge}</span>}
                 </button>
-              ))}
+                );
+              })}
             </div>
 
             {/* BRAND TAB */}
@@ -682,6 +689,38 @@ export default function StudioPage() {
                     )}
                   </>
                 )}
+              </div>
+            )}
+
+            {/* ALERTS TAB */}
+            {tab === "alerts" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ fontSize: 13, color: c.muted, lineHeight: 1.7, marginBottom: 2 }}>{t("تنبيهات الأخطاء والمشاكل عبر الإعلانات، الموظف الذكي، وبوت الرد لهذه الصفحة.", "Error & issue alerts across Ads, the AI Employee, and the reply bot for this Page.")}</div>
+                {alerts.length === 0 ? (
+                  <div style={{ ...card, textAlign: "center", padding: 36 }}>
+                    <CheckCircle size={40} color="#22c55e" style={{ marginBottom: 12 }} />
+                    <div style={{ fontWeight: 800, fontSize: 15 }}>{t("كل شيء على ما يرام", "All clear")}</div>
+                    <div style={{ fontSize: 13, color: c.muted, marginTop: 4 }}>{t("لا توجد أخطاء أو تنبيهات حالياً.", "No errors or alerts right now.")}</div>
+                  </div>
+                ) : alerts.map((a) => {
+                  const col = a.severity === "error" ? "#ef4444" : a.severity === "warning" ? "#f59e0b" : "#3b82f6";
+                  const Icon = a.severity === "error" ? AlertCircle : AlertTriangle;
+                  const areaLbl = a.area === "ads" ? t("الإعلانات", "Ads") : a.area === "bot" ? t("البوت", "Bot") : t("الموظف", "Employee");
+                  return (
+                    <div key={a.id} style={{ ...card, padding: 14, display: "flex", gap: 12, alignItems: "flex-start", borderColor: `${col}55` }}>
+                      <div style={{ width: 34, height: 34, borderRadius: 10, background: `${col}1f`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={17} color={col} /></div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "2px 8px", background: c.inputBg, color: c.muted }}>{areaLbl}</span>
+                          <span style={{ fontWeight: 800, fontSize: 13.5, color: c.text }}>{a.title}</span>
+                        </div>
+                        {a.detail && <div style={{ fontSize: 12.5, color: c.muted, marginTop: 4, lineHeight: 1.6, wordBreak: "break-word" }}>{a.detail}</div>}
+                        {a.area === "ads" && <button onClick={() => router.push("/ads/campaigns")} style={{ marginTop: 8, background: "none", border: "none", color: PINK, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", padding: 0 }}>{t("فتح حملاتي ←", "Open my campaigns →")}</button>}
+                        {a.area === "bot" && <button onClick={() => router.push("/bot")} style={{ marginTop: 8, background: "none", border: "none", color: PINK, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", padding: 0 }}>{t("فتح البوت ←", "Open the bot →")}</button>}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </>
