@@ -33,9 +33,10 @@ export async function POST(req: NextRequest) {
   const types = Array.isArray(body.types) ? body.types.map(String).filter(Boolean).slice(0, 20) : [];
   const guidance = typeof body.guidance === "string" ? body.guidance.slice(0, 800).trim() : "";
 
-  const [{ data: brand }, { data: products }] = await Promise.all([
+  const [{ data: brand }, { data: products }, { data: memory }] = await Promise.all([
     supabaseAdmin.from("studio_brands").select("*").eq("user_id", user.id).eq("page_id", pageId).maybeSingle(),
     supabaseAdmin.from("studio_products").select("*").eq("user_id", user.id).eq("page_id", pageId).eq("active", true),
+    supabaseAdmin.from("studio_memory").select("style, notes").eq("user_id", user.id).eq("page_id", pageId).maybeSingle(),
   ]);
   const items = (products || []).filter((p) => p.available !== false);
   if (items.length === 0) return NextResponse.json({ error: "أضف أصنافاً متوفّرة أولاً في الكتالوج" }, { status: 400 });
@@ -59,6 +60,8 @@ export async function POST(req: NextRequest) {
       ? `Use ONLY these post angles (rotate among them): ${types.join(" | ")}. The "type" field must be one of these (in Arabic).`
       : "Vary the angle: single-product highlight, offer/discount, bundle, tip/how-to, question/engagement, testimonial-style, new-arrival.",
     guidance ? `Follow the owner's guidance closely: ${guidance}` : "",
+    memory?.style ? `This owner's established STYLE/voice (keep to it): ${memory.style}` : "",
+    memory?.notes ? `The owner's accumulated preferences over time (respect them): ${memory.notes}` : "",
     "Each caption: a strong hook, value, ONE clear call to action, the store's phone or link when relevant, and 2-5 fitting emojis.",
     "Only use products from the catalog. Pick the best product(s) for each post.",
     "image_prompt: a short ENGLISH visual description to generate a photo for the post (product-focused, clean, well-lit).",
@@ -126,6 +129,18 @@ export async function POST(req: NextRequest) {
   });
   const { data: posts, error: postsErr } = await supabaseAdmin.from("studio_posts").insert(rows).select();
   if (postsErr) return NextResponse.json({ error: postsErr.message }, { status: 500 });
+
+  // Grow the owner's brain: remember this run's guidance (deduped, capped).
+  if (guidance) {
+    const prev = memory?.notes || "";
+    if (!prev.includes(guidance)) {
+      const merged = (prev ? prev + "\n• " : "• ") + guidance;
+      await supabaseAdmin.from("studio_memory").upsert(
+        { user_id: user.id, page_id: pageId, notes: merged.slice(-3500), updated_at: new Date().toISOString() },
+        { onConflict: "user_id,page_id" }
+      );
+    }
+  }
 
   return NextResponse.json({ plan, posts: posts || [] });
 }

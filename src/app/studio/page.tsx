@@ -6,6 +6,7 @@ import {
   ArrowLeft, ArrowRight, Loader2, Store, Package, CalendarDays, Plus, Trash2, X,
   Image as ImageIcon, Save, CheckCircle, Sparkles, ChevronDown, Bot,
   Copy, RefreshCw, Clock, Pencil, Search, CheckSquare, Square, CircleCheck, CircleX,
+  Brain, Globe,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
@@ -127,6 +128,18 @@ export default function StudioPage() {
   const [editPost, setEditPost] = useState<PlanPost | null>(null);
   const [savingPost, setSavingPost] = useState(false);
   const [copiedId, setCopiedId] = useState("");
+  // Employee "brain" / style memory
+  const [brainStyle, setBrainStyle] = useState("");
+  const [brainNotes, setBrainNotes] = useState("");
+  const [showBrain, setShowBrain] = useState(false);
+  const [savingBrain, setSavingBrain] = useState(false);
+  const [brainSaved, setBrainSaved] = useState(false);
+  // Web image search (in edit modal)
+  const [showImgSearch, setShowImgSearch] = useState(false);
+  const [imgQuery, setImgQuery] = useState("");
+  const [imgResults, setImgResults] = useState<{ url: string; thumb: string }[]>([]);
+  const [imgSearching, setImgSearching] = useState(false);
+  const [imgErr, setImgErr] = useState("");
 
   useEffect(() => {
     fetch("/api/promo/pages").then((r) => {
@@ -155,7 +168,28 @@ export default function StudioPage() {
       setPlan(d.plan || null); setPlanPosts(d.posts || []);
       if (d.plan) { setPostsPerDay(d.plan.posts_per_day); setDurationDays(d.plan.duration_days); }
     }).catch(() => { setPlan(null); setPlanPosts([]); });
+    fetch(`/api/studio/memory?pageId=${encodeURIComponent(selectedPage)}`).then((r) => r.json()).then((d) => {
+      setBrainStyle(d.memory?.style || ""); setBrainNotes(d.memory?.notes || "");
+    }).catch(() => {});
   }, [selectedPage]);
+
+  async function saveBrain() {
+    setSavingBrain(true); setBrainSaved(false);
+    const r = await fetch("/api/studio/memory", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pageId: selectedPage, style: brainStyle, notes: brainNotes }) });
+    setSavingBrain(false);
+    if (r.ok) { setBrainSaved(true); setTimeout(() => setBrainSaved(false), 2200); }
+  }
+
+  async function searchImages(q: string) {
+    setImgErr(""); setImgSearching(true); setImgResults([]);
+    try {
+      const r = await fetch(`/api/studio/images/search?q=${encodeURIComponent(q)}`);
+      const d = await r.json();
+      if (!r.ok) setImgErr(d.message || t("بحث الصور غير متاح", "Image search unavailable"));
+      else setImgResults(d.images || []);
+    } catch { setImgErr(t("تعذّر البحث", "Search failed")); }
+    setImgSearching(false);
+  }
 
   async function generatePlan() {
     setPlanErr(""); setGenerating(true);
@@ -501,6 +535,31 @@ export default function StudioPage() {
             {/* PLAN TAB */}
             {tab === "plan" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Employee brain / your signature */}
+                <div style={{ ...card, padding: 16 }}>
+                  <button type="button" onClick={() => setShowBrain((v) => !v)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: rtl ? "right" : "left", padding: 0 }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#6d28d9,#d6409f)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Brain size={17} color="#fff" /></div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 800 }}>{t("عقل الموظف — بصمتك الخاصة", "Employee brain — your signature")}</div>
+                      <div style={{ fontSize: 11.5, color: c.dim, marginTop: 2 }}>{t("يتذكّر أسلوبك ولغتك ويطوّرها في كل خطة.", "Remembers your style & voice and refines it each plan.")}</div>
+                    </div>
+                    <ChevronDown size={16} color={c.dim} style={{ flexShrink: 0, transform: showBrain ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+                  </button>
+                  {showBrain && (
+                    <div style={{ marginTop: 14 }}>
+                      <Field muted={c.muted} label={t("أسلوبي ولغتي (يلتزم بها الموظف)", "My style & voice (the employee keeps to it)")}>
+                        <textarea rows={2} style={{ ...input, resize: "vertical" }} value={brainStyle} onChange={(e) => setBrainStyle(e.target.value)} placeholder={t("مثال: لهجة ليبية ودودة، جُمل قصيرة، إيموجي معتدل، أركّز على الجودة والثقة", "e.g. Warm Libyan tone, short sentences, moderate emojis, focus on quality & trust")} />
+                      </Field>
+                      <Field muted={c.muted} label={t("ملاحظات متراكمة (تُضاف تلقائياً من توجيهاتك)", "Accumulated notes (auto-added from your guidance)")}>
+                        <textarea rows={3} style={{ ...input, resize: "vertical" }} value={brainNotes} onChange={(e) => setBrainNotes(e.target.value)} placeholder={t("يتراكم هنا ما تطلبه مع الوقت…", "Your recurring preferences accumulate here…")} />
+                      </Field>
+                      <button onClick={saveBrain} disabled={savingBrain} style={{ background: brainSaved ? "#22c55e" : G_HERO, border: "none", borderRadius: 12, padding: "11px 20px", color: "#fff", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 7 }}>
+                        {savingBrain ? <Loader2 size={15} className="spin" /> : brainSaved ? <CheckCircle size={15} /> : <Save size={15} />} {brainSaved ? t("حُفظ", "Saved") : t("حفظ العقل", "Save brain")}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {/* Generator controls */}
                 <div style={card}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800, fontSize: 15, marginBottom: 6 }}><Sparkles size={17} color={PINK} /> {plan ? t("توليد خطة جديدة", "Generate a new plan") : t("خطة النشر", "Content plan")}</div>
@@ -717,8 +776,27 @@ export default function StudioPage() {
                   {uploadingImg ? <Loader2 size={12} className="spin" /> : <ImageIcon size={12} />} {t("رفع صورة", "Upload image")}
                   <input type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; setUploadingImg(true); const u = await uploadImage(f); setUploadingImg(false); if (u) savePost({ image_url: u, image_source: "upload" }); e.target.value = ""; }} />
                 </label>
+                <button onClick={() => { setShowImgSearch((v) => !v); if (!showImgSearch) { const q = editPost.image_prompt || ""; setImgQuery(q); if (q) searchImages(q); } }} style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 9, padding: "7px 12px", color: c.muted, cursor: "pointer", fontSize: 12, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}><Globe size={12} /> {t("صور من الإنترنت", "Web images")}</button>
               </div>
             </div>
+            {/* Web image search panel */}
+            {showImgSearch && (
+              <div style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+                <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                  <input value={imgQuery} onChange={(e) => setImgQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && searchImages(imgQuery)} placeholder={t("ابحث عن صورة (بالإنجليزية أفضل)…", "Search images (English works best)…")} style={{ ...input, background: c.bg }} />
+                  <button onClick={() => searchImages(imgQuery)} disabled={imgSearching} style={{ background: G_HERO, border: "none", borderRadius: 10, padding: "0 14px", color: "#fff", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center" }}>{imgSearching ? <Loader2 size={16} className="spin" /> : <Search size={16} />}</button>
+                </div>
+                {imgErr && <div style={{ fontSize: 12, color: "#f59e0b", lineHeight: 1.6 }}>{imgErr}</div>}
+                {imgResults.length > 0 && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(80px,1fr))", gap: 8, maxHeight: 240, overflowY: "auto" }}>
+                    {imgResults.map((im, i) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={i} src={im.thumb} alt="" onClick={() => { savePost({ image_url: im.url, image_source: "stock" }); setShowImgSearch(false); }} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 9, cursor: "pointer", border: `1px solid ${c.border}` }} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <Field muted={c.muted} label={t("نص المنشور", "Caption")}><textarea rows={5} style={{ ...input, resize: "vertical", lineHeight: 1.8 }} value={editPost.caption || ""} onChange={(e) => setEditPost({ ...editPost, caption: e.target.value })} /></Field>
             <Field muted={c.muted} label={t("الهاشتاقات", "Hashtags")}><input style={input} value={editPost.hashtags || ""} onChange={(e) => setEditPost({ ...editPost, hashtags: e.target.value })} /></Field>
             <Field muted={c.muted} label={t("دعوة لإجراء", "Call to action")}><input style={input} value={editPost.cta || ""} onChange={(e) => setEditPost({ ...editPost, cta: e.target.value })} /></Field>
