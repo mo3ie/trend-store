@@ -132,6 +132,8 @@ export default function StudioPage() {
   const [bbDays, setBbDays] = useState("3");
   const [savingBoost, setSavingBoost] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishMsg, setPublishMsg] = useState("");
   const [editPost, setEditPost] = useState<PlanPost | null>(null);
   const [savingPost, setSavingPost] = useState(false);
   const [copiedId, setCopiedId] = useState("");
@@ -217,6 +219,17 @@ export default function StudioPage() {
     const d = await r.json();
     setApproving(false);
     if (r.ok && d.plan) { setPlan(d.plan); setPlanPosts((ps) => ps.map((p) => (p.status === "draft" ? { ...p, status: "approved" } : p))); }
+  }
+  async function publishPlan() {
+    if (!plan) return;
+    if (!confirm(t("نشر وجدولة كل منشورات الخطة على فيسبوك؟", "Publish & schedule all plan posts to Facebook?"))) return;
+    setPublishing(true); setPublishMsg("");
+    const r = await fetch("/api/studio/plan/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ planId: plan.id }) });
+    const d = await r.json();
+    setPublishing(false);
+    if (!r.ok) { setPublishMsg(d.error || t("تعذّر النشر", "Publish failed")); return; }
+    setPlanPosts(d.posts || planPosts);
+    setPublishMsg(t(`تم: ${d.published} منشوراً نُشر، ${d.scheduled} مجدول${d.failed ? `، ${d.failed} فشل` : ""}.`, `Done: ${d.published} published, ${d.scheduled} scheduled${d.failed ? `, ${d.failed} failed` : ""}.`));
   }
   async function discardPlan() {
     if (!plan || !confirm(t("حذف هذه الخطة كاملة؟", "Delete this entire plan?"))) return;
@@ -667,6 +680,9 @@ export default function StudioPage() {
                                   {p.post_type && <span style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "2px 8px", background: PINK_BG, color: PINK }}>{p.post_type}</span>}
                                   <span style={{ fontSize: 11, color: c.dim, display: "inline-flex", alignItems: "center", gap: 3 }}><Clock size={11} /> {p.scheduled_for ? new Date(p.scheduled_for).toLocaleTimeString(rtl ? "ar-LY" : "en-GB", { hour: "2-digit", minute: "2-digit" }) : ""}</span>
                                   {p.status === "approved" && <CheckCircle size={13} color="#22c55e" />}
+                                  {p.status === "scheduled" && <span style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "2px 8px", background: "rgba(59,130,246,0.14)", color: "#3b82f6" }}>{t("مجدول ✓", "Scheduled ✓")}</span>}
+                                  {p.status === "published" && <span style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "2px 8px", background: "rgba(34,197,94,0.16)", color: "#22c55e" }}>{t("منشور ✓", "Published ✓")}</span>}
+                                  {p.status === "failed" && <span style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "2px 8px", background: "rgba(239,68,68,0.14)", color: "#ef4444" }}>{t("فشل النشر", "Publish failed")}</span>}
                                   {p.boost && <span style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "2px 8px", background: "rgba(240,180,41,0.16)", color: "#f0b429", display: "inline-flex", alignItems: "center", gap: 3 }}><DollarSign size={10} /> {t(`ممول $${p.boost_budget_usd}/يوم × ${p.boost_days}ي`, `Boost $${p.boost_budget_usd}/d × ${p.boost_days}d`)}</span>}
                                 </div>
                                 <div style={{ fontSize: 13, lineHeight: 1.6, color: c.text, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.caption}</div>
@@ -682,10 +698,24 @@ export default function StudioPage() {
                       </div>
                     ))}
 
-                    {plan.status !== "approved" && (
+                    {plan.status !== "approved" && plan.status !== "active" && (
                       <button onClick={approvePlan} disabled={approving} style={{ width: "100%", background: "#22c55e", border: "none", borderRadius: 14, padding: "15px 0", color: "#fff", fontWeight: 900, fontSize: 16, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: approving ? 0.7 : 1 }}>
                         {approving ? <Loader2 size={18} className="spin" /> : <CheckCircle size={18} />} {t("اعتماد الخطة كاملة", "Approve whole plan")}
                       </button>
+                    )}
+
+                    {/* Auto-publish */}
+                    {(plan.status === "approved" || plan.status === "active") && (
+                      <div style={{ ...card, padding: 16 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800, fontSize: 14.5, marginBottom: 6 }}><Bot size={17} color={PINK} /> {t("النشر التلقائي", "Auto-publish")}</div>
+                        <p style={{ color: c.muted, fontSize: 12.5, margin: "0 0 12px", lineHeight: 1.7 }}>
+                          {t("ينشر الموظف المنشورات المعتمدة ويجدولها على فيسبوك في أوقاتها. يتطلب صلاحية النشر من فيسبوك (قيد الطلب) — سيعمل فور اعتمادها.", "The employee publishes & schedules approved posts to Facebook at their times. Requires the Facebook publishing permission (being requested) — it works the moment it's approved.")}
+                        </p>
+                        {publishMsg && <div style={{ fontSize: 12.5, color: publishMsg.includes(t("فشل", "failed")) ? "#f59e0b" : "#22c55e", marginBottom: 10, lineHeight: 1.6 }}>{publishMsg}</div>}
+                        <button onClick={publishPlan} disabled={publishing} style={{ width: "100%", background: G_HERO, border: "none", borderRadius: 13, padding: "14px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: publishing ? 0.7 : 1 }}>
+                          {publishing ? <Loader2 size={17} className="spin" /> : <CalendarDays size={17} />} {t("نشر وجدولة على فيسبوك", "Publish & schedule to Facebook")}
+                        </button>
+                      </div>
                     )}
                   </>
                 )}

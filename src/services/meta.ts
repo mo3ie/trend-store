@@ -185,6 +185,25 @@ export async function isPageTokenAlive(pageId: string, token: string | null): Pr
   }
 }
 
+// Publishes (or schedules) a photo post with a caption on a Page. Requires
+// pages_manage_posts on the page token. Pass scheduledUnix (seconds, 10min–75days
+// ahead) to schedule; omit to publish immediately. Returns the feed post id.
+export async function publishPagePhoto(
+  pageId: string,
+  pageToken: string,
+  opts: { message: string; imageUrl: string; scheduledUnix?: number }
+): Promise<{ postId: string | null; photoId: string }> {
+  const body: Record<string, unknown> = { url: opts.imageUrl, caption: opts.message };
+  if (opts.scheduledUnix && opts.scheduledUnix > Math.floor(Date.now() / 1000) + 300) {
+    body.published = false;
+    body.scheduled_publish_time = opts.scheduledUnix;
+  } else {
+    body.published = true;
+  }
+  const data = await graph<{ id: string; post_id?: string }>(`${pageId}/photos`, "POST", body, pageToken);
+  return { postId: data.post_id ?? null, photoId: data.id };
+}
+
 // Large profile picture URL for a Page — used as the image on a Page-likes ad.
 export async function getPagePicture(pageId: string, pageToken?: string): Promise<string | null> {
   try {
