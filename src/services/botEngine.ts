@@ -40,6 +40,8 @@ export interface PostOverride {
   public_replies?: string[];
   private_reply?:  string;
   attachments?:    BotAttachment[];
+  disabled?:       boolean;   // per-post kill switch (skip auto-reply on this post)
+  like?:           boolean;   // per-post override of like_comments
 }
 
 // Finds the override for a post. Webhook post ids are "{pageId}_{postId}" while the
@@ -355,6 +357,8 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
 
   // A post-specific custom reply wins over keyword rules for comments on that post.
   const override = getOverride(config.post_overrides, ev.postId);
+  // Per-post kill switch: the owner turned auto-reply off for this specific post.
+  if (override?.disabled) return "post_reply_disabled";
   const useOverride = overrideHasContent(override);
 
   // Match a rule (unless a post override is answering this comment).
@@ -449,7 +453,7 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
   }
 
   // 3) Like the comment (best-effort — never fails the delivery).
-  if (config.like_comments) {
+  if (override?.like ?? config.like_comments) {
     await withRotation(config.id, (tok) => likeComment(ev.commentId, tok), preferId, ev.pageId);
   }
 

@@ -23,7 +23,7 @@ export async function PATCH(req: NextRequest) {
     patch.image_url = pollinations(cur?.image_prompt || (typeof b.image_prompt === "string" ? b.image_prompt : "product photo"));
     patch.image_source = "ai";
   }
-  for (const k of ["caption", "hashtags", "cta", "image_url", "image_source", "scheduled_for", "status", "image_prompt", "post_type"]) {
+  for (const k of ["caption", "hashtags", "cta", "image_url", "image_source", "scheduled_for", "status", "image_prompt", "post_type", "reply_config"]) {
     if (k in b) patch[k] = b[k];
   }
   if ("boost" in b) patch.boost = !!b.boost;

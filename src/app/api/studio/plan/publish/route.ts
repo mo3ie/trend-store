@@ -31,6 +31,13 @@ export async function POST(req: NextRequest) {
 
   await supabaseAdmin.from("studio_plans").update({ auto_publish: true, status: "active" }).eq("id", planId);
 
+  // Bot config for this page — per-post reply settings are written into its
+  // post_overrides so the reply bot uses each post's custom reply once it's live.
+  const { data: botCfg } = await supabaseAdmin
+    .from("bot_configs").select("id, post_overrides").eq("user_id", user.id).eq("page_id", plan.page_id).eq("platform", "meta").maybeSingle();
+  const overrides: Record<string, unknown> = { ...((botCfg?.post_overrides as Record<string, unknown>) || {}) };
+  let overridesTouched = false;
+
   const now = Math.floor(Date.now() / 1000);
   let published = 0, scheduled = 0, failed = 0;
   for (const p of posts || []) {
@@ -40,18 +47,37 @@ export async function POST(req: NextRequest) {
     try {
       const res = await publishPagePhoto(plan.page_id, token, { message: caption, imageUrl: p.image_url, scheduledUnix: whenUnix });
       const isScheduled = whenUnix > now + 300;
+      const externalId = res.postId || res.photoId;
       await supabaseAdmin.from("studio_posts").update({
         status: isScheduled ? "scheduled" : "published",
-        external_post_id: res.postId || res.photoId,
+        external_post_id: externalId,
         published_at: isScheduled ? null : new Date().toISOString(),
         error: null,
       }).eq("id", p.id);
       if (isScheduled) scheduled++; else published++;
+
+      // Bind this post's reply settings to the bot (keyed by the numeric post id).
+      const rc = p.reply_config as { enabled?: boolean; public_replies?: string[]; private_reply?: string; like?: boolean } | null;
+      if (botCfg && rc && externalId) {
+        const numeric = externalId.includes("_") ? externalId.split("_")[1] : externalId;
+        overrides[numeric] = rc.enabled === false
+          ? { disabled: true }
+          : {
+              public_replies: (rc.public_replies || []).filter((s) => (s || "").trim()),
+              private_reply:  rc.private_reply || "",
+              like:           rc.like,
+            };
+        overridesTouched = true;
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Meta error";
       await supabaseAdmin.from("studio_posts").update({ status: "failed", error: msg.slice(0, 300) }).eq("id", p.id);
       failed++;
     }
+  }
+
+  if (overridesTouched && botCfg) {
+    await supabaseAdmin.from("bot_configs").update({ post_overrides: overrides }).eq("id", botCfg.id);
   }
 
   const { data: updated } = await supabaseAdmin

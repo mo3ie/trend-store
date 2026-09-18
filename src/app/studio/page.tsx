@@ -6,7 +6,7 @@ import {
   ArrowLeft, ArrowRight, Loader2, Store, Package, CalendarDays, Plus, Trash2, X,
   Image as ImageIcon, Save, CheckCircle, Sparkles, ChevronDown, Bot,
   Copy, RefreshCw, Clock, Pencil, Search, CheckSquare, Square, CircleCheck, CircleX,
-  Brain, Globe, DollarSign, Bell, AlertTriangle, AlertCircle,
+  Brain, Globe, DollarSign, Bell, AlertTriangle, AlertCircle, MessageSquareReply, ThumbsUp,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
@@ -42,11 +42,14 @@ const POST_IDEAS: [string, string][] = [
 ];
 
 interface Plan { id: string; posts_per_day: number; duration_days: number; start_date?: string; status: string; summary?: string; }
+interface ReplyConfig { enabled?: boolean; public_replies?: string[]; private_reply?: string; like?: boolean }
 interface PlanPost {
   id: string; scheduled_for?: string; caption?: string; hashtags?: string; cta?: string;
   post_type?: string; image_url?: string; image_source?: string; image_prompt?: string; status?: string;
   boost?: boolean; boost_budget_usd?: number | null; boost_days?: number | null;
+  reply_config?: ReplyConfig | null;
 }
+interface BotInfo { hasConfig: boolean; enabled: boolean; subscribed: boolean; aiEnabled: boolean; likeComments: boolean; activeTokenId: string | null; configId: string | null; tokens: { id: string; label: string }[] }
 
 // Module-scope so inputs keep focus across re-renders (an inline component would remount).
 function Field({ label, muted, children }: { label: string; muted: string; children: React.ReactNode }) {
@@ -87,6 +90,7 @@ export default function StudioPage() {
   const [notAuthed, setNotAuthed] = useState(false);
   const [tab, setTab] = useState<"brand" | "catalog" | "plan" | "alerts">("brand");
   const [alerts, setAlerts] = useState<{ id: string; severity: string; area: string; title: string; detail?: string; at?: string }[]>([]);
+  const [botInfo, setBotInfo] = useState<BotInfo | null>(null);
 
   // Brand
   const [brand, setBrand] = useState<Brand>({});
@@ -181,7 +185,13 @@ export default function StudioPage() {
       setBrainStyle(d.memory?.style || ""); setBrainNotes(d.memory?.notes || "");
     }).catch(() => {});
     fetch(`/api/studio/alerts?pageId=${encodeURIComponent(selectedPage)}`).then((r) => r.json()).then((d) => setAlerts(d.alerts || [])).catch(() => setAlerts([]));
+    fetch(`/api/studio/bot-info?pageId=${encodeURIComponent(selectedPage)}`).then((r) => r.json()).then((d) => setBotInfo(d)).catch(() => setBotInfo(null));
   }, [selectedPage]);
+
+  async function setActiveToken(tokenId: string) {
+    setBotInfo((b) => (b ? { ...b, activeTokenId: tokenId } : b));
+    await fetch("/api/studio/bot-info", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pageId: selectedPage, action: "set_token", tokenId }) });
+  }
 
   async function saveBrain() {
     setSavingBrain(true); setBrainSaved(false);
@@ -906,8 +916,58 @@ export default function StudioPage() {
                 </div>
               )}
             </div>
+            {/* Auto-reply settings for this post */}
+            {(() => {
+              const rc: ReplyConfig = editPost.reply_config || { enabled: true };
+              const on = rc.enabled !== false;
+              const setRC = (patch: Partial<ReplyConfig>) => setEditPost({ ...editPost, reply_config: { ...rc, ...patch } });
+              return (
+                <div style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+                  <button type="button" onClick={() => setRC({ enabled: !on })} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: rtl ? "right" : "left", padding: 0 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 9, background: on ? "linear-gradient(135deg,#16a34a,#4ade80)" : c.surface, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><MessageSquareReply size={15} color={on ? "#fff" : c.muted} /></div>
+                    <div style={{ flex: 1, fontSize: 13, fontWeight: 800, color: on ? "#16a34a" : c.text }}>{t("الرد الآلي على هذا المنشور", "Auto-reply on this post")}</div>
+                    <div style={{ width: 40, height: 23, borderRadius: 100, background: on ? "#16a34a" : c.border, position: "relative", flexShrink: 0 }}><div style={{ position: "absolute", top: 3, insetInlineStart: on ? 20 : 3, width: 17, height: 17, borderRadius: "50%", background: "#fff" }} /></div>
+                  </button>
+                  {!botInfo?.subscribed && (
+                    <div style={{ marginTop: 10, fontSize: 12, color: "#f59e0b", lineHeight: 1.6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ flex: 1, minWidth: 140 }}>{t("بوت الرد غير مفعّل لهذه الصفحة.", "The reply bot isn't active for this Page.")}</span>
+                      <button onClick={() => router.push("/bot")} style={{ background: G_HERO, border: "none", borderRadius: 9, padding: "6px 12px", color: "#fff", fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>{t("تفعيل البوت", "Set up bot")}</button>
+                    </div>
+                  )}
+                  {on && (
+                    <div style={{ marginTop: 12 }}>
+                      <Field muted={c.muted} label={t("ردود عامة (تعليق) — رد في كل سطر، يُختار عشوائياً", "Public replies (comment) — one per line, chosen at random")}>
+                        <textarea rows={2} style={{ ...input, background: c.bg, resize: "vertical" }} value={(rc.public_replies || []).join("\n")} onChange={(e) => setRC({ public_replies: e.target.value.split("\n") })} placeholder={t("شكراً لتفاعلك 🌸\nراسلناك على الخاص ✅", "Thanks! 🌸\nWe messaged you privately ✅")} />
+                      </Field>
+                      <Field muted={c.muted} label={t("رسالة خاصة (Messenger)", "Private message (Messenger)")}>
+                        <textarea rows={2} style={{ ...input, background: c.bg, resize: "vertical" }} value={rc.private_reply || ""} onChange={(e) => setRC({ private_reply: e.target.value })} placeholder={t("أهلاً! سعر المنتج ... والتوصيل متاح 🚚", "Hi! The price is … and we deliver 🚚")} />
+                      </Field>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
+                        <span style={{ fontSize: 12.5, color: c.muted, display: "inline-flex", alignItems: "center", gap: 6 }}><ThumbsUp size={13} /> {t("إعجاب تلقائي بالتعليق", "Auto-like the comment")}</span>
+                        <button type="button" onClick={() => setRC({ like: !(rc.like ?? botInfo?.likeComments ?? false) })} style={{ width: 40, height: 23, borderRadius: 100, background: (rc.like ?? botInfo?.likeComments) ? "#16a34a" : c.border, position: "relative", border: "none", cursor: "pointer", flexShrink: 0 }}><div style={{ position: "absolute", top: 3, insetInlineStart: (rc.like ?? botInfo?.likeComments) ? 20 : 3, width: 17, height: 17, borderRadius: "50%", background: "#fff" }} /></button>
+                      </div>
+                      {/* AI status */}
+                      <div style={{ fontSize: 12, color: c.dim, marginBottom: 10, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        {botInfo?.aiEnabled ? <span style={{ color: "#16a34a", fontWeight: 700 }}>✓ {t("ردود الذكاء الاصطناعي مفعّلة (للأسئلة غير المتوقعة، بالأسعار من الكتالوج)", "AI replies on (for unusual questions, prices from your catalog)")}</span>
+                          : <span>{t("ردود الذكاء الاصطناعي معطّلة.", "AI replies are off.")} <button onClick={() => router.push("/bot")} style={{ background: "none", border: "none", color: PINK, cursor: "pointer", fontWeight: 700, fontFamily: "inherit", padding: 0 }}>{t("تفعيلها", "Enable")}</button></span>}
+                      </div>
+                      {/* Linked account switcher */}
+                      {botInfo && botInfo.tokens.length > 0 && (
+                        <div>
+                          <label style={{ fontSize: 11.5, color: c.muted, display: "block", marginBottom: 5 }}>{t("الحساب المربوط للرد (بدّله إذا حدث حظر)", "Linked reply account (switch if blocked)")}</label>
+                          <select value={botInfo.activeTokenId || ""} onChange={(e) => setActiveToken(e.target.value)} style={{ ...input, background: c.bg }}>
+                            {botInfo.tokens.map((tk) => <option key={tk.id} value={tk.id}>{tk.label}</option>)}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              <button onClick={() => savePost({ caption: editPost.caption, hashtags: editPost.hashtags, cta: editPost.cta, scheduled_for: editPost.scheduled_for, boost: editPost.boost, boost_budget_usd: editPost.boost_budget_usd, boost_days: editPost.boost_days })} disabled={savingPost} style={{ flex: 1, background: G_HERO, border: "none", borderRadius: 13, padding: "13px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", opacity: savingPost ? 0.7 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <button onClick={() => savePost({ caption: editPost.caption, hashtags: editPost.hashtags, cta: editPost.cta, scheduled_for: editPost.scheduled_for, boost: editPost.boost, boost_budget_usd: editPost.boost_budget_usd, boost_days: editPost.boost_days, reply_config: editPost.reply_config })} disabled={savingPost} style={{ flex: 1, background: G_HERO, border: "none", borderRadius: 13, padding: "13px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", opacity: savingPost ? 0.7 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                 {savingPost ? <Loader2 size={16} className="spin" /> : <Save size={16} />} {t("حفظ", "Save")}
               </button>
               <button onClick={() => deletePlanPost(editPost.id)} style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 13, padding: "13px 16px", color: "#ef4444", cursor: "pointer", fontFamily: "inherit" }}><Trash2 size={16} /></button>
