@@ -4,10 +4,12 @@ import { useState, useEffect, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Loader2, Music2, Plus, MessageSquare, Sparkles, Zap,
-  ShieldCheck, CheckCircle, XCircle, Settings2, Search,
+  ShieldCheck, CheckCircle, XCircle, Settings2, Search, Radio,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
+import { useTikTokDemo } from "@/hooks/useTikTokDemo";
 import LangToggle from "@/components/LangToggle";
+import { TikTokDemoAccountCard } from "@/components/tiktok-demo/DemoAccountCard";
 
 // TikTok brand palette — deliberately distinct from the blue Facebook console.
 const GRADIENT = "linear-gradient(135deg, #0b0b12 0%, #17141f 100%)";
@@ -18,9 +20,12 @@ const GREEN = "#22c55e";
 interface Sub { status: string; expires_at: string | null; }
 interface Config { id: string; enabled: boolean; }
 interface Account {
-  page_id: string; page_name: string; page_picture?: string;
-  config: Config; subscription: Sub | null;
+  account_id: string; page_id: string; page_name: string; page_picture?: string;
+  granted_scopes?: string[]; token_status?: string;
+  config: Config | null; subscription: Sub | null;
 }
+/** App-level webhook state — one configuration serves every connected account. */
+interface WebhookState { subscribed: boolean; event_type: string; last_event_at: string | null; }
 
 function subActive(s: Sub | null): boolean {
   return !!s && s.status === "active" && (!s.expires_at || new Date(s.expires_at).getTime() > Date.now());
@@ -38,7 +43,11 @@ function TikTokBotInner() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [connecting, setConnecting] = useState(false);
+  const [webhook, setWebhook] = useState<WebhookState | null>(null);
   const [q, setQ] = useState("");
+  // Prototype state for the TikTok Accounts API demonstration. It is local-only and is
+  // rendered alongside — never instead of — the real connected accounts below.
+  const demo = useTikTokDemo();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,6 +56,7 @@ function TikTokBotInner() {
       fetch("/api/bot/settings").then((r) => r.json()).catch(() => ({ monthly_price_lyd: 50 })),
     ]);
     setAccounts(cfg.accounts || []);
+    setWebhook(cfg.webhook ?? null);
     setPrice(Number(st.monthly_price_lyd ?? 50));
     setLoading(false);
   }, []);
@@ -56,10 +66,11 @@ function TikTokBotInner() {
     const e = searchParams.get("error");
     if (s === "1") setSuccess(t("تم ربط حساب تيك توك بنجاح!", "TikTok account connected!"));
     if (e === "cancelled") setError(t("تم إلغاء الربط", "Connection cancelled"));
-    if (e === "oauth_failed") {
-      const reason = searchParams.get("reason");
-      setError(t(`فشل الربط${reason ? ` — ${reason}` : ""}`, `Connection failed${reason ? ` — ${reason}` : ""}`));
-    }
+    // Fixed error codes from the hardened callback (no raw upstream text is reflected).
+    if (e === "invalid_state") setError(t("رابط الربط غير صالح — أعد المحاولة من جديد", "Invalid connection link — please start again"));
+    if (e === "expired") setError(t("انتهت صلاحية محاولة الربط — أعد المحاولة", "The connection attempt expired — please try again"));
+    if (e === "not_signed_in") setError(t("سجّل الدخول أولاً ثم أعد الربط", "Please sign in first, then connect again"));
+    if (e === "oauth_failed") setError(t("فشل الربط — حاول مرة أخرى", "Connection failed — please try again"));
     load();
   }, [searchParams, load, t]);
 
@@ -95,6 +106,8 @@ function TikTokBotInner() {
             <XCircle size={17} /> {error}
           </div>
         )}
+
+        {demo.hydrated && demo.connected && <TikTokDemoAccountCard />}
 
         {/* Hero */}
         <div style={{ background: `linear-gradient(135deg, ${PINK}1c, ${CYAN}12)`, border: `1px solid ${PINK}33`, borderRadius: 20, padding: 28, marginBottom: 28 }}>
@@ -146,6 +159,18 @@ function TikTokBotInner() {
           </div>
         ) : (
           <>
+            {webhook && (
+              <div style={{ background: webhook.subscribed ? "rgba(34,197,94,0.10)" : "rgba(251,191,36,0.10)",
+                border: `1px solid ${webhook.subscribed ? "rgba(34,197,94,0.30)" : "rgba(251,191,36,0.30)"}`,
+                borderRadius: 12, padding: "11px 15px", marginBottom: 14, display: "flex", alignItems: "center", gap: 9,
+                fontSize: 13, color: webhook.subscribed ? "#86efac" : "#fbbf24" }}>
+                <Radio size={15} />
+                {webhook.subscribed
+                  ? t("الردّ الفوري مفعّل — تصل التعليقات لحظياً", "Instant replies active — comments arrive in real time")
+                  : t("الردّ الفوري غير مفعّل بعد — يعمل البوت بالفحص الدوري", "Instant delivery not enabled yet — the bot falls back to periodic checks")}
+              </div>
+            )}
+
             <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 14px", flexWrap: "wrap" }}>
               <h3 style={{ fontSize: 15, fontWeight: 700, color: "#cbd5e1", margin: 0 }}>
                 {t("حساباتك", "Your accounts")} ({accounts.length})
@@ -180,8 +205,18 @@ function TikTokBotInner() {
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.page_name}</div>
-                      <div style={{ fontSize: 12, marginTop: 4, color: on ? GREEN : active ? "#fbbf24" : "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}>
+                      <div style={{ fontSize: 12, marginTop: 4, color: on ? GREEN : active ? "#fbbf24" : "#94a3b8", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                         {on ? <><CheckCircle size={13} /> {t("يعمل", "Running")}</> : active ? t("مشترك — متوقف", "Subscribed — off") : t("غير مشترك", "Not subscribed")}
+                        {a.token_status && a.token_status !== "active" && (
+                          <span style={{ color: "#f87171" }}>
+                            • {t("يحتاج إعادة ربط", "Needs reconnect")}
+                          </span>
+                        )}
+                        {!!a.granted_scopes?.length && (
+                          <span style={{ color: "#64748b" }}>
+                            • {a.granted_scopes.length} {t("صلاحية", "permissions")}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <button onClick={() => router.push(`/tiktok-bot/${a.page_id}`)}

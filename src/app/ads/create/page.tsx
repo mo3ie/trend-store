@@ -124,7 +124,9 @@ function CreateCampaignInner() {
   const [aiDesc, setAiDesc]       = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState("");
+  const [aiExpected, setAiExpected] = useState("");
   const [aiErr, setAiErr]         = useState("");
+  const [autoLoading, setAutoLoading] = useState(false);
   // A/B test
   const [abOn, setAbOn]           = useState(false);
   const [audienceBId, setAudienceBId] = useState("");
@@ -309,19 +311,51 @@ function CreateCampaignInner() {
     return Object.fromEntries(Object.entries(obj || {}).filter(([k]) => !k.startsWith("_")));
   }
 
+  // Apply an AI plan (targeting + budget/days + message) to the form.
+  function applyAiPlan(d: Record<string, unknown>) {
+    if (typeof d.ageMin === "number") setAgeMin(d.ageMin as number);
+    if (typeof d.ageMax === "number") setAgeMax(d.ageMax as number);
+    setGender(d.gender === "male" ? "male" : d.gender === "female" ? "female" : "all");
+    if (Array.isArray(d.cities))    setCities(d.cities as GeoCity[]);
+    if (Array.isArray(d.interests)) setInterests(d.interests as AdInterest[]);
+    // Budget & duration only make sense in VIP free-budget mode.
+    if (usingCustom) {
+      if (typeof d.budgetUsd === "number") setUsdInput(String(d.budgetUsd));
+      if (typeof d.days === "number") { setDays(String(d.days)); setEndDate(""); }
+    }
+    setAiSummary((d.message as string) || (d.summary as string) || "");
+    setAiExpected((d.expected as string) || "");
+    setShowAdvanced(true);
+  }
+
   async function runAi() {
-    setAiErr(""); setAiSummary(""); setAiLoading(true);
+    setAiErr(""); setAiSummary(""); setAiExpected(""); setAiLoading(true);
     const r = await fetch("/api/promo/ai-targeting", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ description: aiDesc }) });
     const d = await r.json();
     setAiLoading(false);
     if (!r.ok) { setAiErr(d.message || d.error || t("تعذّر المساعد", "Assistant failed")); return; }
-    if (typeof d.ageMin === "number") setAgeMin(d.ageMin);
-    if (typeof d.ageMax === "number") setAgeMax(d.ageMax);
-    setGender(d.gender === "male" ? "male" : d.gender === "female" ? "female" : "all");
-    if (Array.isArray(d.cities))    setCities(d.cities);
-    if (Array.isArray(d.interests)) setInterests(d.interests);
-    setAiSummary(d.summary || "");
-    setShowAdvanced(true);
+    applyAiPlan(d);
+  }
+
+  // One-tap: AI auto-picks the whole audience/plan (VIP) from page + goal context.
+  async function autoTargetVip() {
+    setAiErr(""); setAiOpen(true); setAutoLoading(true); setAiSummary(""); setAiExpected("");
+    const pageName = pages.find((p) => p.page_id === selectedPage)?.page_name || "";
+    const goalAr: Record<string, string> = { engagement: "تفاعل", messages: "رسائل", traffic: "زيارات", calls: "مكالمات", video_views: "مشاهدات", awareness: "وصول", page_likes: "إعجابات الصفحة" };
+    const desc = `أعلن عن صفحة/منشور "${pageName}" في ليبيا، الهدف: ${goalAr[objective] || "تفاعل"}. اقترح أفضل استهداف وميزانية ومدة ونتائج متوقعة.`;
+    const r = await fetch("/api/promo/ai-targeting", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ description: desc }) });
+    const d = await r.json();
+    setAutoLoading(false);
+    if (!r.ok) { setAiErr(d.message || d.error || t("تعذّر المساعد", "Assistant failed")); return; }
+    applyAiPlan(d);
+  }
+
+  // One-tap smart defaults (regular accounts, no AI): broad, safe Libyan audience.
+  function autoTargetRegular() {
+    setCities([]); setRegions([]); setMapPin(null); setInterests([]);
+    setAgeMin(18); setAgeMax(55); setGender("all"); setAdvantageAudience(true);
+    setAiSummary(t("تم ضبط استهداف تلقائي واسع: كل ليبيا، الأعمار 18–55، الجنسان، مع توسيع Advantage+ لأفضل وصول.", "Auto broad targeting set: all of Libya, ages 18–55, both genders, Advantage+ expansion for best reach."));
+    setAiExpected(""); setShowAdvanced(true);
   }
 
   // Snapshot the current targeting for saving (keeps display metadata under _ keys).
@@ -692,23 +726,43 @@ function CreateCampaignInner() {
               <Target size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />
               {t("الاستهداف", "Targeting")}
             </label>
-            {isVip && (
-              <button type="button" onClick={() => setAiOpen((o) => !o)}
-                style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "linear-gradient(135deg,#f0b429,#ff9d2f)", border: "none", borderRadius: 10, padding: "8px 14px", color: "#1a1330", fontWeight: 800, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>
-                <Sparkles size={14} /> {t("مساعد ذكي", "AI assistant")}
-              </button>
-            )}
+            <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+              {isVip ? (
+                <>
+                  <button type="button" onClick={autoTargetVip} disabled={autoLoading}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "linear-gradient(135deg,#f0b429,#ff9d2f)", border: "none", borderRadius: 10, padding: "8px 13px", color: "#1a1330", fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit", opacity: autoLoading ? 0.7 : 1 }}>
+                    {autoLoading ? <Loader2 size={13} className="spin" /> : <Sparkles size={13} />} {t("استهداف تلقائي بالذكاء", "AI auto-target")}
+                  </button>
+                  <button type="button" onClick={() => setAiOpen((o) => !o)}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "1px solid rgba(240,180,41,0.5)", borderRadius: 10, padding: "8px 13px", color: "#f0b429", fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                    <Sparkles size={13} /> {t("مساعد ذكي", "AI assistant")}
+                  </button>
+                </>
+              ) : (
+                <button type="button" onClick={autoTargetRegular}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, background: PINK_BG, border: `1px solid ${PINK}55`, borderRadius: 10, padding: "8px 13px", color: PINK, fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                  <Target size={13} /> {t("استهداف تلقائي", "Auto-target")}
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* AI recommendation (message + expected results) — for auto-target & assistant */}
+          {(aiSummary || aiExpected) && (
+            <div style={{ background: PINK_BG, border: `1px solid ${PINK}44`, borderRadius: 14, padding: 14, marginBottom: 16 }}>
+              {aiSummary && <div style={{ fontSize: 13, color: c.text, lineHeight: 1.7 }}>✨ {aiSummary}</div>}
+              {aiExpected && <div style={{ fontSize: 12, color: c.muted, marginTop: 6, lineHeight: 1.6, display: "flex", gap: 6, alignItems: "flex-start" }}><Eye size={13} style={{ flexShrink: 0, marginTop: 2 }} /> {t("النتائج المتوقّعة:", "Expected results:")} {aiExpected}</div>}
+            </div>
+          )}
 
           {/* AI assistant (VIP) */}
           {isVip && aiOpen && (
             <div style={{ background: "rgba(240,180,41,0.08)", border: "1px solid rgba(240,180,41,0.4)", borderRadius: 14, padding: 16, marginBottom: 18 }}>
-              <label style={{ fontSize: 12.5, color: "#f0b429", fontWeight: 700, display: "block", marginBottom: 8 }}>{t("صف منتجك وجمهورك، ويقترح المساعد أفضل استهداف:", "Describe your product & audience; the assistant suggests the best targeting:")}</label>
+              <label style={{ fontSize: 12.5, color: "#f0b429", fontWeight: 700, display: "block", marginBottom: 8 }}>{t("صف منتجك وجمهورك، ويقترح المساعد أفضل استهداف وميزانية ونتائج:", "Describe your product & audience; the assistant suggests targeting, budget & expected results:")}</label>
               <textarea value={aiDesc} onChange={(e) => setAiDesc(e.target.value)} rows={2}
                 placeholder={t("مثال: متجر عطور نسائية فاخرة، أستهدف النساء في طرابلس وبنغازي", "e.g. Luxury women's perfume shop targeting women in Tripoli & Benghazi")}
                 style={{ ...input, resize: "vertical" }} />
               {aiErr && <div style={{ color: "#ef4444", fontSize: 12, marginTop: 8 }}>{aiErr}</div>}
-              {aiSummary && <div style={{ color: "#f0b429", fontSize: 12.5, marginTop: 8, lineHeight: 1.6 }}>✨ {aiSummary}</div>}
               <button type="button" onClick={runAi} disabled={aiLoading || !aiDesc.trim()}
                 style={{ marginTop: 10, background: "linear-gradient(135deg,#f0b429,#ff9d2f)", border: "none", borderRadius: 11, padding: "10px 18px", color: "#1a1330", fontWeight: 800, fontSize: 13, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 8, opacity: aiLoading ? 0.7 : 1 }}>
                 {aiLoading ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />} {t("اقترح استهدافاً", "Suggest targeting")}

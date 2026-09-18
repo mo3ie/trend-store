@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Loader2, Music2, MessageSquare, Settings2, Activity,
-  Video, Trash2, Save, Power, CreditCard, AlertTriangle, Sparkles,
+  Video, Trash2, Save, Power, CreditCard, AlertTriangle, Sparkles, KeyRound,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import LangToggle from "@/components/LangToggle";
@@ -22,7 +22,8 @@ interface Config {
   ai_persona: string | null; throttle_per_min: number;
 }
 interface Account {
-  page_id: string; page_name: string; page_picture?: string;
+  account_id: string; page_id: string; page_name: string; page_picture?: string;
+  username?: string | null; granted_scopes?: string[]; token_status?: string;
   config: Config; subscription: Sub | null;
 }
 interface Rule {
@@ -61,7 +62,10 @@ export default function TikTokBotManage() {
       fetch("/api/bot/settings").then((r) => r.json()).catch(() => ({ monthly_price_lyd: 50 })),
     ]);
     setPrice(Number(st.monthly_price_lyd ?? 50));
-    setAccount((cfg.accounts || []).find((a: Account) => a.page_id === accountId) ?? null);
+    const found = (cfg.accounts || []).find(
+      (a: Account) => a.page_id === accountId || a.account_id === accountId,
+    );
+    setAccount(found && found.config ? found : null);
     setLoading(false);
   }, [accountId]);
 
@@ -95,7 +99,9 @@ export default function TikTokBotManage() {
   async function disconnect() {
     if (!account) return;
     if (!confirm(t("إلغاء ربط هذا الحساب؟", "Disconnect this account?"))) return;
-    await fetch(`/api/tiktok/configs?id=${account.config.id}`, { method: "DELETE" });
+    // Disconnect revokes the token at TikTok, then destroys the local credential.
+    const query = account.account_id ? `accountId=${account.account_id}` : `id=${account.config.id}`;
+    await fetch(`/api/tiktok/configs?${query}`, { method: "DELETE" });
     router.push("/tiktok-bot");
   }
 
@@ -181,7 +187,7 @@ export default function TikTokBotManage() {
         </div>
 
         {tab === "rules" && <RulesTab configId={account.config.id} t={t} />}
-        {tab === "settings" && <SettingsTab config={account.config} patch={patchConfig} onDisconnect={disconnect} t={t} />}
+        {tab === "settings" && <SettingsTab config={account.config} patch={patchConfig} onDisconnect={disconnect} scopes={account.granted_scopes} t={t} />}
         {tab === "videos" && <VideosTab t={t} />}
         {tab === "activity" && <ActivityTab configId={account.config.id} t={t} />}
       </div>
@@ -217,8 +223,9 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 }
 
 // ── Settings tab ─────────────────────────────────────────────────────────────
-function SettingsTab({ config, patch, onDisconnect, t }: {
-  config: Config; patch: (p: Partial<Config>) => Promise<boolean>; onDisconnect: () => void; t: TF;
+function SettingsTab({ config, patch, onDisconnect, scopes, t }: {
+  config: Config; patch: (p: Partial<Config>) => Promise<boolean>; onDisconnect: () => void;
+  scopes?: string[]; t: TF;
 }) {
   return (
     <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: "6px 20px 20px" }}>
@@ -245,6 +252,26 @@ function SettingsTab({ config, patch, onDisconnect, t }: {
           placeholder={t("مثال: أنت موظف مبيعات لطيف في محل إلكترونيات في بنغازي…", "e.g. You are a friendly sales rep at an electronics shop in Benghazi…")}
           style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "11px 14px", color: "#fff", fontSize: 13.5, resize: "vertical" }} />
       </div>
+
+      {!!scopes?.length && (
+        <div style={{ marginTop: 18 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 7 }}>
+            <KeyRound size={14} color={CYAN} /> {t("الصلاحيات الممنوحة", "Granted permissions")}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {scopes.map((sc) => (
+              <span key={sc} style={{ fontSize: 11.5, color: "#cbd5e1", background: "rgba(255,255,255,0.06)",
+                border: `1px solid ${BORDER}`, borderRadius: 999, padding: "4px 10px" }}>{sc}</span>
+            ))}
+          </div>
+          <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 8, lineHeight: 1.7 }}>
+            {t(
+              "تُمنح هذه الصلاحيات من تيك توك عند الربط — لتغييرها أعد ربط الحساب.",
+              "TikTok grants these at connection time — reconnect the account to change them.",
+            )}
+          </div>
+        </div>
+      )}
 
       <button onClick={onDisconnect}
         style={{ width: "100%", marginTop: 20, background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 11, padding: "12px 0", color: "#f87171", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>

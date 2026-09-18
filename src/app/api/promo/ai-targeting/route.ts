@@ -31,19 +31,21 @@ export async function POST(req: Request) {
   if (!description || !String(description).trim()) return NextResponse.json({ error: "صف جمهورك المستهدف" }, { status: 400 });
 
   const system = [
-    "You are a Facebook Ads targeting expert for advertisers in LIBYA.",
-    "Given the advertiser's description of their product/audience, propose a targeting spec.",
+    "You are a Facebook Ads strategist for advertisers in LIBYA. Budgets are in USD.",
+    "Given the advertiser's product/goal, propose a full plan: audience targeting + a sensible budget & duration + expected results.",
     "Return ONLY a JSON object, no prose, with this exact shape:",
-    '{"ageMin":number,"ageMax":number,"gender":"all"|"male"|"female",',
-    '"cities":[string],"interests":[string],"summary":string}',
+    '{"ageMin":number,"ageMax":number,"gender":"all"|"male"|"female","cities":[string],"interests":[string],',
+    '"budgetUsd":number,"days":number,"expected":string,"message":string}',
     "cities: 1-5 Libyan city names (English spelling, e.g. Tripoli, Benghazi, Misrata) — [] means all Libya.",
     "interests: 2-8 broad Facebook interest names in ENGLISH (e.g. Online shopping, Cosmetics, Real estate).",
-    "ageMin 13-65, ageMax 13-65. summary: one short Arabic sentence explaining the choice.",
+    "ageMin 13-65, ageMax 13-65. budgetUsd: a realistic total budget 3-100. days: 1-30.",
+    "expected: one short ARABIC sentence of realistic expected results (reach/engagement range) for that budget in Libya.",
+    "message: 2-3 short ARABIC sentences to the advertiser explaining your full recommendation warmly.",
   ].join(" ");
 
-  let parsed: { ageMin?: number; ageMax?: number; gender?: string; cities?: string[]; interests?: string[]; summary?: string };
+  let parsed: { ageMin?: number; ageMax?: number; gender?: string; cities?: string[]; interests?: string[]; budgetUsd?: number; days?: number; expected?: string; message?: string; summary?: string };
   try {
-    const text = await aiComplete({ system, user: String(description).slice(0, 1000), maxTokens: 600, temperature: 0.5 });
+    const text = await aiComplete({ system, user: String(description).slice(0, 1000), maxTokens: 900, temperature: 0.5 });
     parsed = parseJsonReply(text);
   } catch {
     return NextResponse.json({ error: "تعذّر تفسير اقتراح المساعد، حاول بوصف أوضح" }, { status: 502 });
@@ -72,6 +74,10 @@ export async function POST(req: Request) {
     gender:  parsed.gender === "male" || parsed.gender === "female" ? parsed.gender : "all",
     cities,
     interests,
-    summary: typeof parsed.summary === "string" ? parsed.summary : "",
+    budgetUsd: Math.max(3, Math.min(100, Math.round(Number(parsed.budgetUsd) || 15))),
+    days:      Math.max(1, Math.min(30, Math.round(Number(parsed.days) || 7))),
+    expected:  typeof parsed.expected === "string" ? parsed.expected : "",
+    message:   typeof parsed.message === "string" ? parsed.message : (typeof parsed.summary === "string" ? parsed.summary : ""),
+    summary:   typeof parsed.summary === "string" ? parsed.summary : (typeof parsed.message === "string" ? parsed.message : ""),
   });
 }
