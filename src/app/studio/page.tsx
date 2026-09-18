@@ -6,7 +6,7 @@ import {
   ArrowLeft, ArrowRight, Loader2, Store, Package, CalendarDays, Plus, Trash2, X,
   Image as ImageIcon, Save, CheckCircle, Sparkles, ChevronDown, Bot,
   Copy, RefreshCw, Clock, Pencil, Search, CheckSquare, Square, CircleCheck, CircleX,
-  Brain, Globe,
+  Brain, Globe, DollarSign,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
@@ -45,6 +45,7 @@ interface Plan { id: string; posts_per_day: number; duration_days: number; start
 interface PlanPost {
   id: string; scheduled_for?: string; caption?: string; hashtags?: string; cta?: string;
   post_type?: string; image_url?: string; image_source?: string; image_prompt?: string; status?: string;
+  boost?: boolean; boost_budget_usd?: number | null; boost_days?: number | null;
 }
 
 // Module-scope so inputs keep focus across re-renders (an inline component would remount).
@@ -124,6 +125,11 @@ export default function StudioPage() {
   // Plan post multi-select
   const [postSelectMode, setPostSelectMode] = useState(false);
   const [selectedPlanPosts, setSelectedPlanPosts] = useState<Set<string>>(new Set());
+  // Bulk boost
+  const [showBulkBoost, setShowBulkBoost] = useState(false);
+  const [bbBudget, setBbBudget] = useState("5");
+  const [bbDays, setBbDays] = useState("3");
+  const [savingBoost, setSavingBoost] = useState(false);
   const [approving, setApproving] = useState(false);
   const [editPost, setEditPost] = useState<PlanPost | null>(null);
   const [savingPost, setSavingPost] = useState(false);
@@ -250,6 +256,15 @@ export default function StudioPage() {
       setPlanPosts((ps) => ps.map((p) => (selectedPlanPosts.has(p.id) ? { ...p, status: "approved" } : p)));
     }
     setSelectedPlanPosts(new Set()); setPostSelectMode(false);
+  }
+  async function applyBulkBoost() {
+    const ids = Array.from(selectedPlanPosts);
+    const budget = Number(bbBudget) || 0, days = Number(bbDays) || 0;
+    if (ids.length === 0 || budget < 1 || days < 1) return;
+    setSavingBoost(true);
+    await Promise.all(ids.map((id) => fetch("/api/studio/plan/post", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, boost: true, boost_budget_usd: budget, boost_days: days }) })));
+    setPlanPosts((ps) => ps.map((p) => (selectedPlanPosts.has(p.id) ? { ...p, boost: true, boost_budget_usd: budget, boost_days: days } : p)));
+    setSavingBoost(false); setShowBulkBoost(false); setSelectedPlanPosts(new Set()); setPostSelectMode(false);
   }
 
   async function uploadImage(file: File): Promise<string | null> {
@@ -615,7 +630,8 @@ export default function StudioPage() {
                       {postSelectMode && (
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 12, paddingTop: 12, borderTop: `1px solid ${c.border}` }}>
                           <span style={{ fontSize: 12.5, color: c.muted, fontWeight: 700 }}>{t(`محدّد: ${selectedPlanPosts.size}`, `Selected: ${selectedPlanPosts.size}`)}</span>
-                          <div style={{ marginInlineStart: "auto", display: "flex", gap: 6 }}>
+                          <div style={{ marginInlineStart: "auto", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button onClick={() => setShowBulkBoost(true)} disabled={selectedPlanPosts.size === 0} style={{ background: PINK_BG, border: `1px solid ${PINK}55`, borderRadius: 9, padding: "6px 11px", color: PINK, fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}><DollarSign size={13} /> {t("تمويل", "Boost")}</button>
                             <button onClick={() => bulkPostAction("approve")} disabled={selectedPlanPosts.size === 0} style={{ background: "rgba(34,197,94,0.14)", border: "1px solid #22c55e55", borderRadius: 9, padding: "6px 11px", color: "#22c55e", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}><CircleCheck size={13} /> {t("اعتماد", "Approve")}</button>
                             <button onClick={() => bulkPostAction("delete")} disabled={selectedPlanPosts.size === 0} style={{ background: "rgba(239,68,68,0.14)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 9, padding: "6px 11px", color: "#ef4444", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}><Trash2 size={13} /> {t("حذف", "Delete")}</button>
                           </div>
@@ -644,6 +660,7 @@ export default function StudioPage() {
                                   {p.post_type && <span style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "2px 8px", background: PINK_BG, color: PINK }}>{p.post_type}</span>}
                                   <span style={{ fontSize: 11, color: c.dim, display: "inline-flex", alignItems: "center", gap: 3 }}><Clock size={11} /> {p.scheduled_for ? new Date(p.scheduled_for).toLocaleTimeString(rtl ? "ar-LY" : "en-GB", { hour: "2-digit", minute: "2-digit" }) : ""}</span>
                                   {p.status === "approved" && <CheckCircle size={13} color="#22c55e" />}
+                                  {p.boost && <span style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "2px 8px", background: "rgba(240,180,41,0.16)", color: "#f0b429", display: "inline-flex", alignItems: "center", gap: 3 }}><DollarSign size={10} /> {t(`ممول $${p.boost_budget_usd}/يوم × ${p.boost_days}ي`, `Boost $${p.boost_budget_usd}/d × ${p.boost_days}d`)}</span>}
                                 </div>
                                 <div style={{ fontSize: 13, lineHeight: 1.6, color: c.text, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.caption}</div>
                                 {!postSelectMode && <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
@@ -805,12 +822,49 @@ export default function StudioPage() {
                 value={editPost.scheduled_for ? new Date(new Date(editPost.scheduled_for).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
                 onChange={(e) => { const v = e.target.value; setEditPost({ ...editPost, scheduled_for: v ? new Date(v).toISOString() : editPost.scheduled_for }); }} />
             </Field>
+            {/* Boost this post */}
+            <div style={{ background: editPost.boost ? "rgba(240,180,41,0.08)" : c.inputBg, border: `1px solid ${editPost.boost ? "rgba(240,180,41,0.4)" : c.border}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+              <button type="button" onClick={() => setEditPost({ ...editPost, boost: !editPost.boost, boost_budget_usd: editPost.boost_budget_usd || 5, boost_days: editPost.boost_days || 3 })}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: rtl ? "right" : "left", padding: 0 }}>
+                <div style={{ width: 30, height: 30, borderRadius: 9, background: editPost.boost ? "linear-gradient(135deg,#f0b429,#ff9d2f)" : c.surface, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><DollarSign size={15} color={editPost.boost ? "#1a1330" : c.muted} /></div>
+                <div style={{ flex: 1, fontSize: 13, fontWeight: 800, color: editPost.boost ? "#f0b429" : c.text }}>{t("تمويل هذا المنشور", "Boost this post")}</div>
+                <div style={{ width: 40, height: 23, borderRadius: 100, background: editPost.boost ? "#f0b429" : c.border, position: "relative", flexShrink: 0 }}><div style={{ position: "absolute", top: 3, insetInlineStart: editPost.boost ? 20 : 3, width: 17, height: 17, borderRadius: "50%", background: "#fff" }} /></div>
+              </button>
+              {editPost.boost && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
+                  <div><label style={{ fontSize: 11.5, color: c.muted, display: "block", marginBottom: 5 }}>{t("الميزانية اليومية ($)", "Daily budget ($)")}</label><input type="number" min={1} style={input} value={editPost.boost_budget_usd ?? 5} onChange={(e) => setEditPost({ ...editPost, boost_budget_usd: Number(e.target.value) || 0 })} /></div>
+                  <div><label style={{ fontSize: 11.5, color: c.muted, display: "block", marginBottom: 5 }}>{t("المدة (أيام)", "Days")}</label><input type="number" min={1} max={30} style={input} value={editPost.boost_days ?? 3} onChange={(e) => setEditPost({ ...editPost, boost_days: Number(e.target.value) || 0 })} /></div>
+                </div>
+              )}
+            </div>
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              <button onClick={() => savePost({ caption: editPost.caption, hashtags: editPost.hashtags, cta: editPost.cta, scheduled_for: editPost.scheduled_for })} disabled={savingPost} style={{ flex: 1, background: G_HERO, border: "none", borderRadius: 13, padding: "13px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", opacity: savingPost ? 0.7 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <button onClick={() => savePost({ caption: editPost.caption, hashtags: editPost.hashtags, cta: editPost.cta, scheduled_for: editPost.scheduled_for, boost: editPost.boost, boost_budget_usd: editPost.boost_budget_usd, boost_days: editPost.boost_days })} disabled={savingPost} style={{ flex: 1, background: G_HERO, border: "none", borderRadius: 13, padding: "13px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", opacity: savingPost ? 0.7 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                 {savingPost ? <Loader2 size={16} className="spin" /> : <Save size={16} />} {t("حفظ", "Save")}
               </button>
               <button onClick={() => deletePlanPost(editPost.id)} style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 13, padding: "13px 16px", color: "#ef4444", cursor: "pointer", fontFamily: "inherit" }}><Trash2 size={16} /></button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk boost modal */}
+      {showBulkBoost && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) setShowBulkBoost(false); }} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 12, direction: rtl ? "rtl" : "ltr" }}>
+          <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 440, borderRadius: 22, padding: 20, fontFamily: "Cairo,sans-serif" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <div style={{ fontWeight: 900, fontSize: 16, display: "inline-flex", alignItems: "center", gap: 8 }}><DollarSign size={18} color="#f0b429" /> {t(`تمويل ${selectedPlanPosts.size} منشوراً`, `Boost ${selectedPlanPosts.size} posts`)}</div>
+              <button onClick={() => setShowBulkBoost(false)} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer" }}><X size={20} /></button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
+              <Field muted={c.muted} label={t("الميزانية اليومية ($)", "Daily budget ($)")}><input type="number" min={1} style={input} value={bbBudget} onChange={(e) => setBbBudget(e.target.value)} /></Field>
+              <Field muted={c.muted} label={t("المدة (أيام)", "Days")}><input type="number" min={1} max={30} style={input} value={bbDays} onChange={(e) => setBbDays(e.target.value)} /></Field>
+            </div>
+            <p style={{ fontSize: 11.5, color: c.dim, lineHeight: 1.7, margin: "0 0 12px" }}>
+              {t("تُحفظ خطة التمويل على هذه المنشورات، ويُنفّذها الموظف تلقائياً بمجرد نشر المنشور (عند تفعيل النشر التلقائي). يمكنك أيضاً تمويلها يدوياً الآن من واجهة الإعلانات بعد نشرها.", "The boost plan is saved on these posts and runs automatically once the post is published (when auto-publish is enabled). You can also boost manually now from the Ads section after publishing.")}
+            </p>
+            <button onClick={applyBulkBoost} disabled={savingBoost} style={{ width: "100%", background: "linear-gradient(135deg,#f0b429,#ff9d2f)", border: "none", borderRadius: 13, padding: "13px 0", color: "#1a1330", fontWeight: 900, fontSize: 15, cursor: "pointer", opacity: savingBoost ? 0.7 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              {savingBoost ? <Loader2 size={16} className="spin" /> : <DollarSign size={16} />} {t("تفعيل التمويل", "Set boost")}
+            </button>
           </div>
         </div>
       )}
