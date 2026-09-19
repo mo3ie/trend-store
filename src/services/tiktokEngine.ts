@@ -18,6 +18,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { matchRule, type BotRule } from "@/services/botEngine";
 import { generateAiReply, aiAvailable } from "@/services/botAi";
 import { getValidAccessToken } from "@/lib/tiktokTokens";
+import { hasProduct } from "@/lib/entitlements";
 import { checkAppRateLimit, checkAccountRateLimit } from "@/lib/rateLimit";
 import { listComments, listVideos, replyToComment, businessIdFromOpenId, TikTokError } from "@/services/tiktok";
 
@@ -53,7 +54,9 @@ export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
     .maybeSingle();
   if (!config) return null;
 
-  // Same monthly-subscription gate as the Meta side.
+  // Same gate as the Meta side: entitlements v2 (new subscription) is the source of
+  // truth; the legacy bot_subscriptions row is kept as an OR-fallback for rollback.
+  const entitledV2 = await hasProduct(config.user_id, "bot", openId).catch(() => false);
   const { data: sub } = await supabaseAdmin
     .from("bot_subscriptions")
     .select("status, expires_at")
@@ -61,9 +64,9 @@ export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
     .eq("page_id", openId)
     .eq("platform", "tiktok")
     .maybeSingle();
-  const active = sub && sub.status === "active" &&
+  const legacyActive = sub && sub.status === "active" &&
     (!sub.expires_at || new Date(sub.expires_at).getTime() > Date.now());
-  if (!active) return null;
+  if (!entitledV2 && !legacyActive) return null;
 
   return {
     configId: config.id,

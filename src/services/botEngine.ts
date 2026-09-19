@@ -12,6 +12,7 @@ import {
   type BotAttachment,
 } from "@/services/meta";
 import { generateAiReply, aiAvailable } from "@/services/botAi";
+import { hasProduct } from "@/lib/entitlements";
 
 export interface BotRule {
   id:             string;
@@ -291,18 +292,22 @@ export async function processComment(ev: CommentEvent): Promise<string> {
     if (!targeted && !hasOverride) return "post_not_targeted";
   }
 
-  // Subscription gate — only run for pages with an active bot subscription.
+  // Subscription gate — the NEW subscription system (entitlements v2) is the source of
+  // truth: an active bot/all-access subscription covering THIS page. The LEGACY
+  // bot_subscriptions row is kept as an OR-fallback so no existing subscriber loses the
+  // bot and we can compare/roll back (rollback = drop the entitledV2 term).
+  const entitledV2 = await hasProduct(config.user_id, "bot", ev.pageId).catch(() => false);
   const { data: sub } = await supabaseAdmin
     .from("bot_subscriptions")
     .select("status, expires_at")
     .eq("user_id", config.user_id)
     .eq("page_id", ev.pageId)
     .maybeSingle();
-  const subActive =
+  const legacyActive =
     sub &&
     sub.status === "active" &&
     (!sub.expires_at || new Date(sub.expires_at).getTime() > Date.now());
-  if (!subActive) return "no_active_subscription";
+  if (!entitledV2 && !legacyActive) return "no_active_subscription";
 
   // Idempotency: claim this comment. Duplicate → someone already handled it.
   const { error: claimErr } = await supabaseAdmin.from("bot_reply_log").insert({

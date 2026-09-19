@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
 import { subscribePageToWebhook, getSystemPageToken } from "@/services/meta";
+import { hasProduct, activeSubscriptions, type ActiveSub } from "@/lib/entitlements";
+
+// The latest bot-covering v2 subscription expiry for a page ("" if not covered).
+function v2BotSub(v2: ActiveSub[], pageId: string): { status: string; expires_at: string | null; source: string } | null {
+  let best: number | null = null;
+  for (const s of v2) {
+    const covers =
+      (s.product === "bot" || (s.product === "studio" && s.features.includes("all_bots_access"))) &&
+      (s.page_limit >= 999 || s.page_ids.includes(pageId));
+    if (!covers) continue;
+    const t = s.expires_at ? new Date(s.expires_at).getTime() : Number.MAX_SAFE_INTEGER;
+    if (best === null || t > best) best = t;
+  }
+  if (best === null) return null;
+  return { status: "active", expires_at: best === Number.MAX_SAFE_INTEGER ? null : new Date(best).toISOString(), source: "v2" };
+}
 
 // Fields a user is allowed to change on their bot config.
 const EDITABLE = [
@@ -19,7 +35,7 @@ export async function GET() {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
 
-  const [{ data: pages }, { data: configs }, { data: subs }] = await Promise.all([
+  const [{ data: pages }, { data: configs }, { data: subs }, v2] = await Promise.all([
     supabaseAdmin.from("connected_pages")
       .select("page_id, page_name, page_picture")
       .eq("user_id", user.id).eq("platform", "meta"),
@@ -27,6 +43,7 @@ export async function GET() {
       .select("*").eq("user_id", user.id).eq("platform", "meta"),
     supabaseAdmin.from("bot_subscriptions")
       .select("*").eq("user_id", user.id).eq("platform", "meta"),
+    activeSubscriptions(user.id),
   ]);
 
   const cfgByPage = new Map((configs || []).map((c) => [c.page_id, c]));
@@ -43,7 +60,8 @@ export async function GET() {
     page_name:    p.page_name,
     page_picture: p.page_picture,
     config:       cfgByPage.get(p.page_id) ?? null,
-    subscription: subByPage.get(p.page_id) ?? null,
+    // v2 subscription is the source of truth; fall back to the legacy row for display.
+    subscription: v2BotSub(v2, p.page_id) ?? subByPage.get(p.page_id) ?? null,
   }));
 
   return NextResponse.json({ pages: merged });
@@ -123,12 +141,15 @@ export async function PATCH(req: NextRequest) {
   // Turning the bot ON: require an active subscription, then make sure the Page is
   // subscribed to our webhook so comment events start arriving.
   if (patch.enabled === true && !config.enabled) {
+    // entitlements v2 (new subscription) is the source of truth; legacy bot_subscriptions
+    // kept as an OR-fallback for rollback / no lockout of existing subscribers.
+    const entitledV2 = await hasProduct(user.id, "bot", config.page_id).catch(() => false);
     const { data: sub } = await supabaseAdmin
       .from("bot_subscriptions").select("status, expires_at")
       .eq("user_id", user.id).eq("page_id", config.page_id).maybeSingle();
-    const active = sub && sub.status === "active" &&
+    const legacyActive = sub && sub.status === "active" &&
       (!sub.expires_at || new Date(sub.expires_at).getTime() > Date.now());
-    if (!active) {
+    if (!entitledV2 && !legacyActive) {
       return NextResponse.json({ error: "no_subscription", message: "يلزم اشتراك فعّال لتشغيل البوت" }, { status: 402 });
     }
 
