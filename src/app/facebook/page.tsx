@@ -1,6 +1,6 @@
 "use client";
 
-import { Megaphone, MessageSquareReply, ArrowLeft, ArrowRight, Check, Bot } from "lucide-react";
+import { Megaphone, MessageSquareReply, ArrowLeft, ArrowRight, Check, Bot, CreditCard } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import LangToggle from "@/components/LangToggle";
 
@@ -143,6 +143,19 @@ export default function FacebookToolsPage() {
             </a>
           );
         })}
+
+        {/* Subscriptions & packages */}
+        <a href="/subscriptions"
+          className="flex items-center gap-4 rounded-2xl border border-purple-500/25 bg-gradient-to-l from-purple-600/15 to-blue-600/10 px-5 py-4 hover:border-purple-400/40 transition-all group">
+          <div className="w-11 h-11 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center shrink-0">
+            <CreditCard size={22} className="text-purple-300" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-black text-[var(--text)]">{t("الاشتراكات والباقات", "Subscriptions & Packages")}</h3>
+            <p className="text-xs text-[var(--muted)]">{t("اشترك في الأدوات، تابع فواتيرك وسجل دفعاتك.", "Subscribe to the tools, track your invoices and payment history.")}</p>
+          </div>
+          <Fwd size={18} className="text-[var(--muted-2)] group-hover:text-[var(--text)] transition-colors shrink-0" />
+        </a>
       </div>
     </div>
   );
