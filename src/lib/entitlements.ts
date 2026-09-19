@@ -42,6 +42,7 @@ export interface ActiveSub {
   starts_at: string;
   expires_at: string | null;
   price_lyd: number | null;
+  auto_renew: boolean;
   features: string[];
 }
 

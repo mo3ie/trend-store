@@ -3,6 +3,10 @@
     {
       "path": "/api/promo/campaigns/daily-debit",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/subscriptions/cron/maintain",
+      "schedule": "0 7 * * *"
     }
   ]
 }

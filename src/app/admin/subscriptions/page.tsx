@@ -19,15 +19,16 @@ interface Plan {
 interface Subscriber {
   id: string; user_id: string; full_name: string | null; phone: string | null; email: string | null;
   product: string; tier: string | null; page_scope: string | null; page_ids: string[];
-  status: string; active: boolean; starts_at: string; expires_at: string | null; price_lyd: number | null; created_at: string;
+  status: string; active: boolean; auto_renew: boolean; starts_at: string; expires_at: string | null; price_lyd: number | null; created_at: string;
 }
 interface PaymentRow {
   id: string; user_id: string; full_name: string | null; phone: string | null;
-  product: string; plan_id: string | null; amount_lyd: number; provider: string; status: string; created_at: string;
+  product: string; plan_id: string | null; amount_lyd: number; provider: string; status: string; kind?: string; created_at: string;
 }
 interface Stats {
   total_revenue: number; revenue_month: number; revenue_by_product: Record<string, number>;
   active_count: number; active_by_product: Record<string, number>; total_subscriptions: number; total_payments: number;
+  expiring_soon: number; expired_count: number; auto_renew_count: number; renewal_revenue: number;
 }
 
 const PRODUCT_LABEL: Record<string, string> = { bot: "بوت الرد الآلي", ads: "الإعلانات (VIP)", studio: "الموظف الذكي" };
@@ -231,6 +232,10 @@ function SubscribersView({ loading, stats, subscribers, payments, onReload }: {
     ["إيراد هذا الشهر", `${stats.revenue_month.toLocaleString()} د.ل`, "text-blue-400"],
     ["اشتراكات فعّالة", stats.active_count, "text-purple-400"],
     ["إجمالي الدفعات", stats.total_payments, "text-amber-400"],
+    ["تنتهي خلال ٧ أيام", stats.expiring_soon ?? 0, "text-amber-300"],
+    ["تجديد تلقائي مفعّل", stats.auto_renew_count ?? 0, "text-blue-300"],
+    ["منتهية", stats.expired_count ?? 0, "text-red-400"],
+    ["إيراد التجديدات", `${(stats.renewal_revenue ?? 0).toLocaleString()} د.ل`, "text-green-300"],
   ] as const : [];
 
   return (
@@ -274,6 +279,7 @@ function SubscribersView({ loading, stats, subscribers, payments, onReload }: {
                 <th className="px-3 py-2 font-medium">الفئة</th>
                 <th className="px-3 py-2 font-medium">السعر</th>
                 <th className="px-3 py-2 font-medium">ينتهي</th>
+                <th className="px-3 py-2 font-medium">تجديد تلقائي</th>
                 <th className="px-3 py-2 font-medium">الحالة</th>
               </tr>
             </thead>
@@ -287,13 +293,18 @@ function SubscribersView({ loading, stats, subscribers, payments, onReload }: {
                   <td className="px-3 py-2 whitespace-nowrap">{Number(s.price_lyd ?? 0).toLocaleString()} د.ل</td>
                   <td className="px-3 py-2 text-slate-400 whitespace-nowrap">{s.expires_at ? new Date(s.expires_at).toLocaleDateString("ar-LY") : "—"}</td>
                   <td className="px-3 py-2">
+                    <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${s.auto_renew ? "bg-blue-500/15 text-blue-300" : "bg-slate-500/15 text-slate-400"}`}>
+                      {s.auto_renew ? "مفعّل" : "—"}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2">
                     <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${s.active ? "bg-green-500/15 text-green-300" : "bg-slate-500/15 text-slate-400"}`}>
                       {s.active ? "فعّال" : "منتهٍ"}
                     </span>
                   </td>
                 </tr>
               ))}
-              {subscribers.length === 0 && <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-500">لا مشتركين بعد.</td></tr>}
+              {subscribers.length === 0 && <tr><td colSpan={8} className="px-3 py-6 text-center text-slate-500">لا مشتركين بعد.</td></tr>}
             </tbody>
           </table>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Loader2, Wallet, Check, CreditCard, X, ReceiptText, ShieldCheck } from "lucide-react";
+import { Loader2, Wallet, Check, CreditCard, X, ReceiptText, ShieldCheck, RefreshCw, AlertTriangle, RotateCw } from "lucide-react";
 
 interface Plan {
   id: string; product: "bot" | "ads" | "studio"; tier: string;
@@ -12,8 +12,9 @@ interface Plan {
 interface Sub {
   id: string; product: string; tier: string | null; page_scope: string | null;
   page_ids: string[]; expires_at: string | null; price_lyd: number | null; features: string[];
+  auto_renew?: boolean; status?: string;
 }
-interface Payment { id: string; product: string; amount_lyd: number; created_at: string; plan_id: string | null; }
+interface Payment { id: string; product: string; amount_lyd: number; created_at: string; plan_id: string | null; kind?: string; }
 interface Page { page_id: string; page_name: string | null; page_picture: string | null; }
 interface Access { admin: boolean; trial: boolean; trialEndsAt: string | null; full: boolean; }
 
@@ -43,6 +44,7 @@ const FEATURE_LABEL: Record<string, string> = {
 export default function SubscriptionsPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [subs, setSubs] = useState<Sub[]>([]);
+  const [expiredSubs, setExpiredSubs] = useState<Sub[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [balance, setBalance] = useState(0);
   const [pages, setPages] = useState<Page[]>([]);
@@ -58,10 +60,17 @@ export default function SubscriptionsPage() {
   const [buying, setBuying] = useState(false);
   const [invoice, setInvoice] = useState<{ amount: number; plan: string } | null>(null);
   const [err, setErr] = useState("");
+  // Auto-renew is opt-in at purchase time; `busyId` marks the row being renewed/toggled.
+  const [autoRenewNew, setAutoRenewNew] = useState(false);
+  const [busyId, setBusyId] = useState("");
+  const [rowMsg, setRowMsg] = useState("");
 
   const loadMine = useCallback(async () => {
     const m = await fetch("/api/subscriptions/mine").then((r) => r.json()).catch(() => null);
-    if (m && !m.error) { setSubs(m.subscriptions || []); setPayments(m.payments || []); setBalance(Number(m.balance || 0)); setAccess(m.access || null); }
+    if (m && !m.error) {
+      setSubs(m.subscriptions || []); setExpiredSubs(m.expired || []);
+      setPayments(m.payments || []); setBalance(Number(m.balance || 0)); setAccess(m.access || null);
+    }
   }, []);
 
   useEffect(() => {
@@ -110,7 +119,7 @@ export default function SubscriptionsPage() {
     setBuying(true); setErr("");
     const r = await fetch("/api/subscriptions/purchase", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId: plan.id, page_ids: pageIds }),
+      body: JSON.stringify({ planId: plan.id, page_ids: pageIds, auto_renew: autoRenewNew }),
     }).then((x) => x.json()).catch(() => ({ error: "network" }));
     setBuying(false);
     if (r.error) {
@@ -122,6 +131,34 @@ export default function SubscriptionsPage() {
     setInvoice({ amount: Number(r.invoice?.amount_lyd ?? plan.price_lyd), plan: `${PRODUCTS.find((x) => x.key === plan.product)?.label} — ${TIER_LABEL[plan.tier] ?? plan.tier}` });
     await loadMine();
   }
+
+  // Renew from the wallet. The server re-reads the current plan price and adds the new
+  // term on top of whatever is left, so renewing early never wastes paid days.
+  async function renewNow(sub: Sub) {
+    setBusyId(sub.id); setRowMsg("");
+    const r = await fetch("/api/subscriptions/renew", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscriptionId: sub.id }),
+    }).then((x) => x.json()).catch(() => ({ error: "network" }));
+    setBusyId("");
+    if (r.error) { setRowMsg(r.message || "تعذّر التجديد"); return; }
+    setBalance(Number(r.balance ?? balance));
+    setInvoice({ amount: Number(r.charged ?? 0), plan: `تجديد ${PRODUCTS.find((x) => x.key === sub.product)?.label ?? sub.product}` });
+    await loadMine();
+  }
+
+  async function toggleAutoRenew(sub: Sub, value: boolean) {
+    setBusyId(sub.id); setRowMsg("");
+    await fetch("/api/subscriptions/renew", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscriptionId: sub.id, auto_renew: value }),
+    }).catch(() => null);
+    setBusyId("");
+    await loadMine();
+  }
+
+  const daysLeft = (iso: string | null) =>
+    iso ? Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000) : null;
 
   if (loading) return <div className="min-h-screen bg-[#0b0f1a] flex justify-center items-center"><Loader2 className="animate-spin text-purple-400" size={34} /></div>;
 
@@ -191,6 +228,12 @@ export default function SubscriptionsPage() {
               </button>
             ))}
           </div>
+          <label className="flex items-center gap-2 bg-white/5 border border-purple-500/20 rounded-xl px-3 py-2 text-sm cursor-pointer select-none">
+            <input type="checkbox" checked={autoRenewNew} onChange={(e) => setAutoRenewNew(e.target.checked)}
+              className="accent-purple-500 w-4 h-4" />
+            <RefreshCw size={15} className="text-purple-300" />
+            <span className="text-slate-300">جدّد اشتراكي تلقائياً</span>
+          </label>
         </div>
 
         {/* Tier cards */}
@@ -221,18 +264,63 @@ export default function SubscriptionsPage() {
           {cards.length === 0 && <p className="text-slate-500 col-span-full">لا توجد باقات لهذا الخيار.</p>}
         </div>
 
-        {/* Active subscriptions */}
+        {/* Active subscriptions — expiry countdown, renew now, auto-renew switch */}
         {subs.length > 0 && (
           <section className="bg-white/5 border border-purple-500/20 rounded-2xl p-5">
             <h2 className="font-bold mb-3 flex items-center gap-2"><ShieldCheck size={18} className="text-green-400" /> اشتراكاتك الفعّالة</h2>
             <div className="space-y-2">
-              {subs.map((s) => (
+              {subs.map((s) => {
+                const left = daysLeft(s.expires_at);
+                const soon = left !== null && left <= 7;
+                return (
+                  <div key={s.id} className={`rounded-xl px-4 py-3 text-sm border ${soon ? "bg-amber-500/10 border-amber-500/30" : "bg-white/5 border-transparent"}`}>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <span className="font-semibold">{PRODUCTS.find((p) => p.key === s.product)?.label} — {TIER_LABEL[s.tier ?? ""] ?? s.tier} · {SCOPE_LABEL[s.page_scope ?? ""] ?? s.page_scope}</span>
+                      <span className={soon ? "text-amber-300 font-bold flex items-center gap-1" : "text-slate-400"}>
+                        {soon && <AlertTriangle size={14} />}
+                        ينتهي {s.expires_at ? new Date(s.expires_at).toLocaleDateString("ar-LY") : "—"}
+                        {left !== null && ` (${left > 0 ? `${left} يوم متبقٍّ` : "اليوم"})`}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between flex-wrap gap-3 mt-2.5">
+                      <label className="flex items-center gap-2 cursor-pointer select-none text-slate-300">
+                        <input type="checkbox" checked={!!s.auto_renew} disabled={busyId === s.id}
+                          onChange={(e) => toggleAutoRenew(s, e.target.checked)}
+                          className="accent-purple-500 w-4 h-4" />
+                        التجديد التلقائي من المحفظة
+                      </label>
+                      <button onClick={() => renewNow(s)} disabled={busyId === s.id}
+                        className="flex items-center gap-1.5 bg-gradient-to-l from-purple-600 to-blue-600 rounded-xl px-4 py-1.5 font-bold disabled:opacity-50">
+                        {busyId === s.id ? <Loader2 className="animate-spin" size={15} /> : <RotateCw size={15} />}
+                        جدّد الآن
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {rowMsg && <p className="text-red-400 text-sm mt-3">{rowMsg}</p>}
+          </section>
+        )}
+
+        {/* Lapsed subscriptions — one click brings them back on the same plan */}
+        {expiredSubs.length > 0 && (
+          <section className="bg-white/5 border border-red-500/20 rounded-2xl p-5">
+            <h2 className="font-bold mb-3 flex items-center gap-2"><AlertTriangle size={18} className="text-red-400" /> اشتراكات منتهية</h2>
+            <div className="space-y-2">
+              {expiredSubs.map((s) => (
                 <div key={s.id} className="flex items-center justify-between flex-wrap gap-2 bg-white/5 rounded-xl px-4 py-2.5 text-sm">
-                  <span className="font-semibold">{PRODUCTS.find((p) => p.key === s.product)?.label} — {TIER_LABEL[s.tier ?? ""] ?? s.tier} · {SCOPE_LABEL[s.page_scope ?? ""] ?? s.page_scope}</span>
-                  <span className="text-slate-400">ينتهي {s.expires_at ? new Date(s.expires_at).toLocaleDateString("ar-LY") : "—"}</span>
+                  <span className="font-semibold text-slate-300">{PRODUCTS.find((p) => p.key === s.product)?.label ?? s.product} — {TIER_LABEL[s.tier ?? ""] ?? s.tier}</span>
+                  <span className="text-slate-500">انتهى {s.expires_at ? new Date(s.expires_at).toLocaleDateString("ar-LY") : "—"}</span>
+                  <button onClick={() => renewNow(s)} disabled={busyId === s.id}
+                    className="flex items-center gap-1.5 bg-white/10 border border-purple-500/30 rounded-xl px-4 py-1.5 font-bold disabled:opacity-50">
+                    {busyId === s.id ? <Loader2 className="animate-spin" size={15} /> : <RotateCw size={15} />}
+                    إعادة التفعيل
+                  </button>
                 </div>
               ))}
             </div>
+            {rowMsg && <p className="text-red-400 text-sm mt-3">{rowMsg}</p>}
           </section>
         )}
 
@@ -245,7 +333,10 @@ export default function SubscriptionsPage() {
             <div className="space-y-2">
               {payments.map((p) => (
                 <div key={p.id} className="flex items-center justify-between flex-wrap gap-2 bg-white/5 rounded-xl px-4 py-2.5 text-sm">
-                  <span className="font-semibold">{PRODUCTS.find((x) => x.key === p.product)?.label ?? p.product}</span>
+                  <span className="font-semibold">
+                    {PRODUCTS.find((x) => x.key === p.product)?.label ?? p.product}
+                    {p.kind === "renewal" && <span className="mr-2 text-xs font-bold bg-purple-500/15 text-purple-300 rounded-full px-2 py-0.5">تجديد</span>}
+                  </span>
                   <span className="text-slate-400">{new Date(p.created_at).toLocaleString("ar-LY")}</span>
                   <span className="font-extrabold text-blue-300">{Number(p.amount_lyd).toLocaleString()} د.ل</span>
                 </div>

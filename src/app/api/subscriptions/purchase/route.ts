@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
 
-// POST { planId, page_ids?: string[] } — buy a subscription with the wallet.
+// POST { planId, page_ids?: string[], auto_renew?: boolean } — buy a subscription with the wallet.
 // Price is taken from the plan row (server-side, never the client). One purchase
 // creates one subscription row + one invoice (subscription_payments). Products stay
 // separate: a purchase only ever grants THIS product for the chosen page(s).
@@ -13,6 +13,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const planId = String(body.planId || "");
   const pageIds: string[] = Array.isArray(body.page_ids) ? body.page_ids.map(String).filter(Boolean) : [];
+  // Off unless the buyer ticks it — nobody's wallet gets charged again by surprise.
+  const autoRenew = Boolean(body.auto_renew);
   if (!planId) return NextResponse.json({ error: "planId مطلوب" }, { status: 400 });
 
   const { data: plan } = await supabaseAdmin
@@ -63,6 +65,7 @@ export async function POST(req: NextRequest) {
     expires_at: expiresAt,
     status:     "active",
     price_lyd:  price,
+    auto_renew: autoRenew,
   }).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
