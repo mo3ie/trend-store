@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Package, ShoppingBag, Users, Settings, LogOut, ChevronRight, Menu, X, Megaphone, Building2, Image as ImageIcon, Wrench, Bot } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, Users, Settings, LogOut, ChevronRight, Menu, X, Megaphone, Building2, Image as ImageIcon, Wrench, Bot, CreditCard } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -13,6 +13,7 @@ const allNavItems = [
   { label: "الصيانة",     icon: Wrench,            href: "/admin/maintenance", adminOnly: false },
   { label: "الإعلانات",   icon: Megaphone,        href: "/admin/ads",       adminOnly: false },
   { label: "بوت الرد",    icon: Bot,               href: "/admin/bot",       adminOnly: true  },
+  { label: "الاشتراكات",  icon: CreditCard,        href: "/admin/subscriptions", adminOnly: true  },
   { label: "المظهر والتواصل", icon: ImageIcon,    href: "/admin/appearance", adminOnly: false },
   { label: "الموظفون",    icon: Users,             href: "/admin/employees", adminOnly: true  },
   { label: "الإعدادات",   icon: Settings,          href: "/admin/settings",  adminOnly: true  },
