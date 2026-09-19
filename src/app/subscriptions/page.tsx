@@ -15,6 +15,7 @@ interface Sub {
 }
 interface Payment { id: string; product: string; amount_lyd: number; created_at: string; plan_id: string | null; }
 interface Page { page_id: string; page_name: string | null; page_picture: string | null; }
+interface Access { admin: boolean; trial: boolean; trialEndsAt: string | null; full: boolean; }
 
 const PRODUCTS = [
   { key: "bot", label: "بوت الرد الآلي" },
@@ -45,6 +46,7 @@ export default function SubscriptionsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [balance, setBalance] = useState(0);
   const [pages, setPages] = useState<Page[]>([]);
+  const [access, setAccess] = useState<Access | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [product, setProduct] = useState<"bot" | "ads" | "studio">("bot");
@@ -59,7 +61,7 @@ export default function SubscriptionsPage() {
 
   const loadMine = useCallback(async () => {
     const m = await fetch("/api/subscriptions/mine").then((r) => r.json()).catch(() => null);
-    if (m && !m.error) { setSubs(m.subscriptions || []); setPayments(m.payments || []); setBalance(Number(m.balance || 0)); }
+    if (m && !m.error) { setSubs(m.subscriptions || []); setPayments(m.payments || []); setBalance(Number(m.balance || 0)); setAccess(m.access || null); }
   }, []);
 
   useEffect(() => {
@@ -146,6 +148,24 @@ export default function SubscriptionsPage() {
             </button>
           ))}
         </div>
+
+        {access?.admin && (
+          <p className="text-sm bg-purple-500/10 border border-purple-500/30 text-purple-200 rounded-xl px-4 py-3">
+            حساب أدمن — كل الأدوات والمزايا مفتوحة لك للتجربة والاختبار دون اشتراك.
+          </p>
+        )}
+        {access && !access.admin && access.trial && (
+          <p className="text-sm bg-green-500/10 border border-green-500/30 text-green-200 rounded-xl px-4 py-3">
+            🎁 أنت في فترة التجربة المجانية — كل الأدوات مفتوحة
+            {access.trialEndsAt ? ` حتى ${new Date(access.trialEndsAt).toLocaleDateString("ar-LY")} (${Math.max(0, Math.ceil((new Date(access.trialEndsAt).getTime() - Date.now()) / 86400000))} يوم متبقٍّ)` : ""}.
+            بعدها يلزم الاشتراك للاستمرار.
+          </p>
+        )}
+        {access && !access.admin && !access.trial && subs.length === 0 && (
+          <p className="text-sm bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-xl px-4 py-3">
+            انتهت تجربتك المجانية — اشترك في الأداة التي تريدها للاستمرار.
+          </p>
+        )}
 
         {product === "ads" && (
           <p className="text-sm bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-xl px-4 py-3">

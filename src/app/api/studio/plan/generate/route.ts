@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
 import { aiComplete, hasAI, parseJsonReply } from "@/services/ai";
+import { hasProduct } from "@/lib/entitlements";
 
 // A full plan can take ~15s to generate — raise the function limit above the ~10s default.
 export const maxDuration = 60;
@@ -26,6 +27,11 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const pageId = String(body.pageId || "");
   if (!pageId) return NextResponse.json({ error: "pageId مطلوب" }, { status: 400 });
+
+  // Studio gate: admins + 3-day trial pass; afterwards a Studio subscription is required.
+  const entitled = await hasProduct(user.id, "studio", pageId).catch(() => false);
+  if (!entitled) return NextResponse.json({ error: "subscription_required", code: "subscribe", message: "انتهت التجربة المجانية — اشترك في «الموظف الذكي» للمتابعة" }, { status: 402 });
+
   const postsPerDay = Math.max(1, Math.min(10, Number(body.postsPerDay) || 3));
   const durationDays = Math.max(1, Math.min(30, Number(body.durationDays) || 7));
   const total = Math.min(postsPerDay * durationDays, 40); // cap to keep AI output + cost sane

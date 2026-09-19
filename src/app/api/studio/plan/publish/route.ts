@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
 import { publishPagePhoto, getSystemPageToken } from "@/services/meta";
+import { hasProduct } from "@/lib/entitlements";
 
 export const maxDuration = 60;
 
@@ -17,6 +18,10 @@ export async function POST(req: NextRequest) {
   const { data: plan } = await supabaseAdmin
     .from("studio_plans").select("*").eq("id", planId).eq("user_id", user.id).maybeSingle();
   if (!plan) return NextResponse.json({ error: "الخطة غير موجودة" }, { status: 404 });
+
+  // Studio gate: admins + 3-day trial pass; afterwards a Studio subscription is required.
+  const entitled = await hasProduct(user.id, "studio", plan.page_id).catch(() => false);
+  if (!entitled) return NextResponse.json({ error: "subscription_required", code: "subscribe", message: "انتهت التجربة المجانية — اشترك في «الموظف الذكي» للمتابعة" }, { status: 402 });
 
   const { data: page } = await supabaseAdmin
     .from("connected_pages").select("page_access_token").eq("user_id", user.id).eq("page_id", plan.page_id).maybeSingle();
