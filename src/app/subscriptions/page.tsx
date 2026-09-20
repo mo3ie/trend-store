@@ -8,6 +8,7 @@ interface Plan {
   page_scope: "single" | "triple" | "unlimited"; page_limit: number;
   duration: "monthly" | "quarterly" | "yearly"; months: number;
   price_lyd: number; features: string[];
+  ai_image_quota?: number; ai_video_quota?: number;
 }
 interface Sub {
   id: string; product: string; tier: string | null; page_scope: string | null;
@@ -257,6 +258,19 @@ export default function SubscriptionsPage() {
                   </li>
                 ))}
               </ul>
+              {/* The monthly allowance is the single most important number on a Studio
+                  plan, so it is stated on the card rather than discovered after paying. */}
+              {plan!.product === "studio" && ((plan!.ai_image_quota ?? 0) > 0 || (plan!.ai_video_quota ?? 0) > 0) && (
+                <div className="bg-purple-500/10 border border-purple-500/25 rounded-xl px-3 py-2.5 mb-4 text-xs leading-6">
+                  <div className="font-bold text-purple-200 mb-0.5">حصة الذكاء القوي شهرياً</div>
+                  <div className="text-slate-300">
+                    {(plan!.ai_image_quota ?? 0) > 0 && <>🖼️ {plan!.ai_image_quota} صورة عالية الجودة</>}
+                    {(plan!.ai_image_quota ?? 0) > 0 && (plan!.ai_video_quota ?? 0) > 0 && " · "}
+                    {(plan!.ai_video_quota ?? 0) > 0 && <>🎬 {plan!.ai_video_quota} فيديو</>}
+                  </div>
+                  <div className="text-slate-500 mt-0.5">التوليد المجاني وصور الإنترنت والكتالوج بلا حدود</div>
+                </div>
+              )}
               <button onClick={() => startBuy(plan!)}
                 className="w-full bg-gradient-to-l from-purple-600 to-blue-600 rounded-xl py-2.5 font-bold">
                 اشترك الآن

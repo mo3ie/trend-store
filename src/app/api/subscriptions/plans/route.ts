@@ -6,7 +6,7 @@ export async function GET(req: Request) {
   const product = new URL(req.url).searchParams.get("product");
   let q = supabaseAdmin
     .from("subscription_plans")
-    .select("id,product,tier,page_scope,page_limit,duration,months,price_lyd,features,sort")
+    .select("id,product,tier,page_scope,page_limit,duration,months,price_lyd,features,sort,ai_image_quota,ai_video_quota")
     .eq("active", true)
     .order("sort", { ascending: true });
   if (product) q = q.eq("product", product);

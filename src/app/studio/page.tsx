@@ -755,12 +755,18 @@ export default function StudioPage() {
             )}
 
             {/* Monthly allowance for the paid AI — what it is, what is left, how to extend it. */}
-            {tab === "plan" && quota && !quota.unlimited && (quota.images.limit > 0 || quota.videos.limit > 0) && (
+            {tab === "plan" && quota && (quota.unlimited || quota.images.limit > 0 || quota.videos.limit > 0) && (
               <div style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
                 <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 9, display: "flex", alignItems: "center", gap: 6 }}>
                   <Sparkles size={13} color={PINK} /> {t("حصة الذكاء القوي هذا الشهر", "This month's strong-AI allowance")}
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {quota.unlimited && (
+                  <div style={{ fontSize: 12, color: "#a855f7", lineHeight: 1.8, marginBottom: 4 }}>
+                    {t("حساب أدمن — بلا حدود. انتبه: توليدك يُحاسب على رصيد fal.ai الحقيقي مثل أي عميل.",
+                       "Admin account — unlimited. Note: your own generations bill the real fal.ai balance.")}
+                  </div>
+                )}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, opacity: quota.unlimited ? 0.55 : 1 }}>
                   {([["images", t("صور عالية الجودة", "High-quality images")], ["videos", t("فيديوهات", "Videos")]] as const).map(([k, label]) => {
                     const q = quota[k];
                     const total = q.limit + q.extra;
@@ -768,7 +774,7 @@ export default function StudioPage() {
                     return (
                       <div key={k}>
                         <div style={{ fontSize: 11.5, color: c.muted, marginBottom: 5 }}>{label}</div>
-                        <div style={{ fontSize: 15, fontWeight: 900 }}>{q.left}<span style={{ fontSize: 11, color: c.muted, fontWeight: 700 }}> / {total}</span></div>
+                        <div style={{ fontSize: 15, fontWeight: 900 }}>{quota.unlimited ? "∞" : <>{q.left}<span style={{ fontSize: 11, color: c.muted, fontWeight: 700 }}> / {total}</span></>}</div>
                         <div style={{ height: 5, borderRadius: 100, background: c.border, marginTop: 6, overflow: "hidden" }}>
                           <div style={{ width: `${pct}%`, height: "100%", background: pct >= 100 ? "#ef4444" : G_HERO }} />
                         </div>
