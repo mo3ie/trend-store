@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
 
-function pollinations(prompt: string): string {
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&model=flux&enhance=true&seed=${Math.floor(Math.random() * 1e6)}`;
-}
+import { featuresFor } from "@/lib/entitlements";
+import { generateImage, tierFor } from "@/services/studioImages";
 
 // PATCH — edit one planned post.
 // Body: { id, ...fields }  (caption, hashtags, cta, image_url, image_source, scheduled_for,
@@ -19,9 +18,15 @@ export async function PATCH(req: NextRequest) {
   const patch: Record<string, unknown> = {};
 
   if (b.regenerate) {
-    const { data: cur } = await supabaseAdmin.from("studio_posts").select("image_prompt").eq("id", b.id).eq("user_id", user.id).maybeSingle();
-    patch.image_url = pollinations(cur?.image_prompt || (typeof b.image_prompt === "string" ? b.image_prompt : "product photo"));
+    const { data: cur } = await supabaseAdmin.from("studio_posts")
+      .select("image_prompt, page_id").eq("id", b.id).eq("user_id", user.id).maybeSingle();
+    const prompt = cur?.image_prompt || (typeof b.image_prompt === "string" ? b.image_prompt : "product photo");
+    // A single, user-initiated regeneration always runs at the customer's full tier.
+    const tier = tierFor(await featuresFor(user.id, "studio", cur?.page_id).catch(() => new Set<string>()));
+    const { url, tier: used } = await generateImage(prompt, tier);
+    patch.image_url = url;
     patch.image_source = "ai";
+    patch.image_tier = used;
   }
   for (const k of ["caption", "hashtags", "cta", "image_url", "image_source", "scheduled_for", "status", "image_prompt", "post_type", "reply_config"]) {
     if (k in b) patch[k] = b[k];

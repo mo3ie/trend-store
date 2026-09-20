@@ -6,7 +6,7 @@ import {
   ArrowLeft, ArrowRight, Loader2, Store, Package, CalendarDays, Plus, Trash2, X,
   Image as ImageIcon, Save, CheckCircle, Sparkles, ChevronDown, Bot,
   Copy, RefreshCw, Clock, Pencil, Search, CheckSquare, Square, CircleCheck, CircleX,
-  Brain, Globe, DollarSign, Bell, AlertTriangle, AlertCircle, MessageSquareReply, ThumbsUp,
+  Brain, Globe, DollarSign, Bell, AlertTriangle, AlertCircle, MessageSquareReply, ThumbsUp, Upload,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
@@ -150,7 +150,19 @@ export default function StudioPage() {
   // Web image search (in edit modal)
   const [showImgSearch, setShowImgSearch] = useState(false);
   const [imgQuery, setImgQuery] = useState("");
-  const [imgResults, setImgResults] = useState<{ url: string; thumb: string }[]>([]);
+  const [imgResults, setImgResults] = useState<{ url: string; thumb: string; source?: string }[]>([]);
+  const [imgPage, setImgPage] = useState(1);
+  const [imgMore, setImgMore] = useState(false);
+  const [imgTranslated, setImgTranslated] = useState("");
+  // Catalog file import (every plan) + AI photo editing / video (top plan).
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
+  const [editImgPrompt, setEditImgPrompt] = useState("");
+  const [editingImg, setEditingImg] = useState(false);
+  const [videoPrompt, setVideoPrompt] = useState("");
+  const [videoState, setVideoState] = useState<"" | "pending" | "done" | "failed">("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [videoMsg, setVideoMsg] = useState("");
   const [imgSearching, setImgSearching] = useState(false);
   const [imgErr, setImgErr] = useState("");
 
@@ -200,15 +212,85 @@ export default function StudioPage() {
     if (r.ok) { setBrainSaved(true); setTimeout(() => setBrainSaved(false), 2200); }
   }
 
-  async function searchImages(q: string) {
-    setImgErr(""); setImgSearching(true); setImgResults([]);
+  // page 1 replaces the grid; later pages append, so "load more" keeps what is shown.
+  async function searchImages(q: string, page = 1) {
+    setImgErr(""); setImgSearching(true);
+    if (page === 1) { setImgResults([]); setImgTranslated(""); }
     try {
-      const r = await fetch(`/api/studio/images/search?q=${encodeURIComponent(q)}`);
+      const r = await fetch(`/api/studio/images/search?q=${encodeURIComponent(q)}&page=${page}`);
       const d = await r.json();
       if (!r.ok) setImgErr(d.message || t("بحث الصور غير متاح", "Image search unavailable"));
-      else setImgResults(d.images || []);
+      else {
+        setImgResults((prev) => {
+          const merged = page === 1 ? (d.images || []) : [...prev, ...(d.images || [])];
+          const seen = new Set<string>();
+          return merged.filter((x: { url: string }) => (seen.has(x.url) ? false : (seen.add(x.url), true)));
+        });
+        setImgPage(page);
+        setImgMore(Boolean(d.hasMore));
+        if (d.translated) setImgTranslated(String(d.translated));
+      }
     } catch { setImgErr(t("تعذّر البحث", "Search failed")); }
     setImgSearching(false);
+  }
+
+  // Bulk catalog import from a CSV / text file — available on every plan.
+  async function importCatalog(file: File, replace: boolean) {
+    if (!selectedPage) return;
+    setImporting(true); setImportMsg("");
+    const fd = new FormData();
+    fd.append("file", file); fd.append("pageId", selectedPage); fd.append("replace", String(replace));
+    try {
+      const r = await fetch("/api/studio/products/import", { method: "POST", body: fd });
+      const d = await r.json();
+      if (!r.ok) setImportMsg(d.message || d.error || t("تعذّر الاستيراد", "Import failed"));
+      else {
+        setImportMsg(t(`تم استيراد ${d.imported} منتج`, `Imported ${d.imported} products`));
+        const pr = await fetch(`/api/studio/products?pageId=${encodeURIComponent(selectedPage)}`).then((x) => x.json()).catch(() => null);
+        if (pr) setProducts(pr.products || []);
+      }
+    } catch { setImportMsg(t("تعذّر الاستيراد", "Import failed")); }
+    setImporting(false);
+  }
+
+  // Redraw the post's current image from an instruction, keeping the real product.
+  async function aiEditImage() {
+    const src = editPost?.image_url;
+    if (!src || !editImgPrompt.trim()) return;
+    setEditingImg(true); setImgErr("");
+    try {
+      const r = await fetch("/api/studio/images/edit", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: src, prompt: editImgPrompt.trim(), pageId: selectedPage }),
+      });
+      const d = await r.json();
+      if (!r.ok) setImgErr(d.message || t("تعذّر التعديل", "Edit failed"));
+      else { await savePost({ image_url: d.url, image_source: "ai_edit" }); setEditImgPrompt(""); }
+    } catch { setImgErr(t("تعذّر التعديل", "Edit failed")); }
+    setEditingImg(false);
+  }
+
+  // Video is queued and takes minutes, so submit then poll until it resolves.
+  async function makeVideo() {
+    if (!videoPrompt.trim()) return;
+    setVideoState("pending"); setVideoMsg(""); setVideoUrl("");
+    try {
+      const r = await fetch("/api/studio/video", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: videoPrompt.trim(), imageUrl: editPost?.image_url, pageId: selectedPage }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setVideoState("failed"); setVideoMsg(d.message || t("تعذّر التوليد", "Generation failed")); return; }
+      const id = d.requestId as string;
+      for (let i = 0; i < 60; i++) {                       // ~5 min ceiling
+        await new Promise((res) => setTimeout(res, 5000));
+        const sr = await fetch(`/api/studio/video?requestId=${encodeURIComponent(id)}&pageId=${selectedPage}`);
+        const sd = await sr.json();
+        if (sd.state === "done") { setVideoState("done"); setVideoUrl(sd.url); return; }
+        if (sd.state === "failed") { setVideoState("failed"); setVideoMsg(sd.message || "failed"); return; }
+      }
+      setVideoState("failed"); setVideoMsg(t("استغرق وقتاً أطول من المتوقع", "Timed out"));
+    } catch { setVideoState("failed"); setVideoMsg(t("تعذّر التوليد", "Generation failed")); }
   }
 
   async function generatePlan() {
@@ -525,6 +607,14 @@ export default function StudioPage() {
                       <button onClick={() => { setSelectMode((v) => !v); setSelectedProds(new Set()); }} style={{ background: selectMode ? PINK_BG : c.inputBg, border: `1px solid ${selectMode ? PINK + "55" : c.border}`, borderRadius: 11, padding: "9px 13px", color: selectMode ? PINK : c.text, fontWeight: 800, cursor: "pointer", fontSize: 12.5, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}><CheckSquare size={14} /> {selectMode ? t("إلغاء", "Cancel") : t("تحديد", "Select")}</button>
                     )}
                     <button onClick={() => { setBulkText(""); setBulkCategory(""); setShowBulk(true); }} style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 11, padding: "9px 13px", color: c.text, fontWeight: 800, cursor: "pointer", fontSize: 12.5, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}><Sparkles size={14} color={PINK} /> {t("قائمة سريعة", "Quick list")}</button>
+                    {/* Bulk catalog import — CSV/text, any column order, AR or EN headers. */}
+                    <label style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 11, padding: "9px 13px", color: c.text, fontWeight: 800, cursor: importing ? "wait" : "pointer", fontSize: 12.5, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit", opacity: importing ? 0.6 : 1 }}>
+                      {importing ? <Loader2 size={14} className="spin" /> : <Upload size={14} color={PINK} />}
+                      {t("رفع ملف", "Upload file")}
+                      <input type="file" accept=".csv,.tsv,.txt,text/csv,text/plain" disabled={importing} style={{ display: "none" }}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) importCatalog(f, false); e.target.value = ""; }} />
+                    </label>
+                    {importMsg && <span style={{ fontSize: 12, color: c.muted, alignSelf: "center" }}>{importMsg}</span>}
                     <button onClick={openAdd} style={{ background: G_HERO, border: "none", borderRadius: 11, padding: "9px 15px", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}><Plus size={15} /> {t("إضافة", "Add")}</button>
                   </div>
                 </div>
@@ -883,16 +973,76 @@ export default function StudioPage() {
                   <button onClick={() => searchImages(imgQuery)} disabled={imgSearching} style={{ background: G_HERO, border: "none", borderRadius: 10, padding: "0 14px", color: "#fff", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center" }}>{imgSearching ? <Loader2 size={16} className="spin" /> : <Search size={16} />}</button>
                 </div>
                 {imgErr && <div style={{ fontSize: 12, color: "#f59e0b", lineHeight: 1.6 }}>{imgErr}</div>}
-                {imgResults.length > 0 && (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(80px,1fr))", gap: 8, maxHeight: 240, overflowY: "auto" }}>
-                    {imgResults.map((im, i) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img key={i} src={im.thumb} alt="" onClick={() => { savePost({ image_url: im.url, image_source: "stock" }); setShowImgSearch(false); }} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 9, cursor: "pointer", border: `1px solid ${c.border}` }} />
-                    ))}
+                {imgTranslated && (
+                  <div style={{ fontSize: 11, color: c.muted, marginBottom: 8 }}>
+                    {t("بحثنا بالإنجليزية عن", "Searched in English for")}: <b>{imgTranslated}</b>
                   </div>
+                )}
+                {imgResults.length > 0 && (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(80px,1fr))", gap: 8, maxHeight: 240, overflowY: "auto" }}>
+                      {imgResults.map((im, i) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={i} src={im.thumb} alt="" onClick={() => { savePost({ image_url: im.url, image_source: "stock" }); setShowImgSearch(false); }} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 9, cursor: "pointer", border: `1px solid ${c.border}` }} />
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, gap: 8 }}>
+                      <span style={{ fontSize: 11, color: c.muted }}>{imgResults.length} {t("صورة", "images")}</span>
+                      {imgMore && (
+                        <button onClick={() => searchImages(imgQuery, imgPage + 1)} disabled={imgSearching}
+                          style={{ background: "none", border: `1px solid ${c.border}`, borderRadius: 9, padding: "6px 12px", color: c.muted, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit" }}>
+                          {imgSearching ? t("جارٍ…", "Loading…") : t("المزيد", "Load more")}
+                        </button>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             )}
+
+            {/* AI photo editing — keeps the real product, redraws everything around it. */}
+            {editPost?.image_url && (
+              <div style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Sparkles size={13} /> {t("تعديل الصورة بالذكاء الاصطناعي", "Edit image with AI")}
+                  <span style={{ fontSize: 10, fontWeight: 700, color: c.muted }}>VIP</span>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input value={editImgPrompt} onChange={(e) => setEditImgPrompt(e.target.value)}
+                    placeholder={t("مثال: خلفية بيضاء نظيفة وإضاءة استوديو", "e.g. clean white background, studio lighting")}
+                    style={{ ...input, background: c.bg }} />
+                  <button onClick={aiEditImage} disabled={editingImg || !editImgPrompt.trim()}
+                    style={{ background: G_HERO, border: "none", borderRadius: 10, padding: "0 14px", color: "#fff", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", opacity: editingImg || !editImgPrompt.trim() ? 0.5 : 1 }}>
+                    {editingImg ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: c.muted, marginTop: 7, lineHeight: 1.7 }}>
+                  {t("يحتفظ بمنتجك الحقيقي ويعيد رسم ما حوله.", "Keeps your real product and redraws everything around it.")}
+                </div>
+              </div>
+            )}
+
+            {/* Video generation — queued, so the button polls until the clip is ready. */}
+            <div style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <Sparkles size={13} /> {t("توليد فيديو من وصف", "Generate video from a prompt")}
+                <span style={{ fontSize: 10, fontWeight: 700, color: c.muted }}>VIP</span>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input value={videoPrompt} onChange={(e) => setVideoPrompt(e.target.value)}
+                  placeholder={t("صف المشهد الذي تريده…", "Describe the scene you want…")}
+                  style={{ ...input, background: c.bg }} />
+                <button onClick={makeVideo} disabled={videoState === "pending" || !videoPrompt.trim()}
+                  style={{ background: G_HERO, border: "none", borderRadius: 10, padding: "0 14px", color: "#fff", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", opacity: videoState === "pending" || !videoPrompt.trim() ? 0.5 : 1 }}>
+                  {videoState === "pending" ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+                </button>
+              </div>
+              {videoState === "pending" && <div style={{ fontSize: 11, color: c.muted, marginTop: 7 }}>{t("قد يستغرق دقيقتين إلى خمس…", "This can take two to five minutes…")}</div>}
+              {videoState === "failed" && <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 7, lineHeight: 1.6 }}>{videoMsg}</div>}
+              {videoState === "done" && videoUrl && (
+                <video src={videoUrl} controls style={{ width: "100%", borderRadius: 10, marginTop: 9 }} />
+              )}
+            </div>
             <Field muted={c.muted} label={t("نص المنشور", "Caption")}><textarea rows={5} style={{ ...input, resize: "vertical", lineHeight: 1.8 }} value={editPost.caption || ""} onChange={(e) => setEditPost({ ...editPost, caption: e.target.value })} /></Field>
             <Field muted={c.muted} label={t("الهاشتاقات", "Hashtags")}><input style={input} value={editPost.hashtags || ""} onChange={(e) => setEditPost({ ...editPost, hashtags: e.target.value })} /></Field>
             <Field muted={c.muted} label={t("دعوة لإجراء", "Call to action")}><input style={input} value={editPost.cta || ""} onChange={(e) => setEditPost({ ...editPost, cta: e.target.value })} /></Field>

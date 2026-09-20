@@ -10,6 +10,7 @@ const ALL_FEATURES = [
   "reply_keyword", "private_dm", "like", "post_targeting", "ai_reply", "price_reply", "priority",
   "ai_targeting", "auto_target", "support_247", "full_bot_features",
   "content_plan", "auto_publish", "web_images", "boosting", "brain_memory", "ai_images", "selective_boost", "all_bots_access",
+  "ai_images_max", "ai_image_edit", "ai_video", "catalog_import",
 ];
 
 export interface Access { admin: boolean; trial: boolean; trialEndsAt: string | null; full: boolean; }

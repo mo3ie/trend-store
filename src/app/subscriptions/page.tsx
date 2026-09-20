@@ -39,6 +39,8 @@ const FEATURE_LABEL: Record<string, string> = {
   content_plan: "خطة محتوى بالذكاء الاصطناعي", auto_publish: "النشر التلقائي والجدولة", web_images: "صور من الإنترنت",
   boosting: "ترويج المنشورات", brain_memory: "عقل وذاكرة لكل صفحة", ai_images: "توليد الصور بالذكاء الاصطناعي",
   selective_boost: "ترويج انتقائي", all_bots_access: "الوصول لكل البوتات",
+  ai_images_max: "أقوى مولّد صور (واقعية عالية)", ai_image_edit: "تعديل صور منتجاتك بالذكاء الاصطناعي",
+  ai_video: "توليد فيديو من وصف نصّي", catalog_import: "رفع الكتالوج من ملف",
 };
 
 export default function SubscriptionsPage() {
