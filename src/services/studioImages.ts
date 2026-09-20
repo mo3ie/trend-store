@@ -59,8 +59,25 @@ async function falRun<T>(model: string, body: Record<string, unknown>): Promise<
     body: JSON.stringify(body),
     cache: "no-store",
   });
-  if (!r.ok) throw new Error(`fal_${r.status}:${(await r.text()).slice(0, 200)}`);
+  if (!r.ok) throw await falError(r);
   return await r.json() as T;
+}
+
+// A locked account authenticates fine and then refuses every call. Without this it
+// surfaces as an opaque 403 and looks indistinguishable from a broken key.
+async function falError(r: Response): Promise<Error> {
+  const text = (await r.text()).slice(0, 300);
+  if (r.status === 403 && /TOP_UP|locked/i.test(text)) return new Error("fal_no_credit");
+  return new Error(`fal_${r.status}:${text}`);
+}
+
+// Turn a thrown provider error into something a shop owner can act on.
+export function falErrorMessage(e: unknown): string {
+  const msg = e instanceof Error ? e.message : "";
+  if (msg === "fal_no_credit") return "رصيد مزوّد الصور (fal.ai) نفد — اشحن الحساب لتفعيل الجودة العالية.";
+  if (msg === "fal_not_configured") return "مولّد الصور المدفوع غير مُفعّل.";
+  if (msg.startsWith("fal_401") || msg.startsWith("fal_403")) return "مفتاح مزوّد الصور غير صالح.";
+  return "تعذّر توليد الصورة — حاول مرة أخرى.";
 }
 
 type FalImages = { images?: Array<{ url?: string }> };
@@ -110,7 +127,7 @@ export async function submitVideo(prompt: string, imageUrl?: string): Promise<st
     body: JSON.stringify(body),
     cache: "no-store",
   });
-  if (!r.ok) throw new Error(`fal_${r.status}:${(await r.text()).slice(0, 200)}`);
+  if (!r.ok) throw await falError(r);
   const d = await r.json() as { request_id?: string };
   if (!d.request_id) throw new Error("fal_no_request_id");
   return d.request_id;

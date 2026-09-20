@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/authUser";
 import { featuresFor } from "@/lib/entitlements";
-import { UNIT_COST_USD, editImage, hasFal } from "@/services/studioImages";
+import { UNIT_COST_USD, editImage, falErrorMessage, hasFal } from "@/services/studioImages";
 
 export const maxDuration = 60;
 
@@ -41,7 +41,6 @@ export async function POST(req: NextRequest) {
     const url = await editImage(imageUrl, prompt);
     return NextResponse.json({ url, cost_usd: UNIT_COST_USD.edit });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "edit_failed";
-    return NextResponse.json({ error: "edit_failed", message: msg.slice(0, 200) }, { status: 502 });
+    return NextResponse.json({ error: "edit_failed", message: falErrorMessage(e) }, { status: 502 });
   }
 }

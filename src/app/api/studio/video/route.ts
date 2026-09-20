@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/authUser";
 import { featuresFor } from "@/lib/entitlements";
-import { UNIT_COST_USD, hasFal, submitVideo, videoStatus } from "@/services/studioImages";
+import { UNIT_COST_USD, falErrorMessage, hasFal, submitVideo, videoStatus } from "@/services/studioImages";
 
 /**
  * Video generation for the top plan (`ai_video`).
@@ -44,8 +44,7 @@ export async function POST(req: NextRequest) {
     const requestId = await submitVideo(prompt, imageUrl);
     return NextResponse.json({ requestId, cost_usd: UNIT_COST_USD.video });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "submit_failed";
-    return NextResponse.json({ error: "submit_failed", message: msg.slice(0, 200) }, { status: 502 });
+    return NextResponse.json({ error: "submit_failed", message: falErrorMessage(e) }, { status: 502 });
   }
 }
 
