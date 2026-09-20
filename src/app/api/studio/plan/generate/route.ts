@@ -1,8 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
-import { featuresFor } from "@/lib/entitlements";
-import { generateImage, pollinations as freeImage, tierFor } from "@/services/studioImages";
+import { pollinations as freeImage } from "@/services/studioImages";
+
+/**
+ * Every post ships with a working auto-reply already filled in, built from the
+ * product it advertises. The owner opens the post and edits, disables or clears
+ * it — rather than facing an empty form and leaving the bot silent by default.
+ */
+function defaultReply(prod: { name?: string; price_text?: string | null } | null, cta?: string) {
+  const name = prod?.name?.trim();
+  const price = prod?.price_text?.trim();
+  const detail = name
+    ? `${name}${price ? ` — السعر: ${price}` : ""}.`
+    : "شكراً لاهتمامك!";
+  return {
+    enabled: true,
+    public_replies: [
+      "راسلناك على الخاص ✅",
+      "تم إرسال التفاصيل لك في الخاص 🌸",
+      "شكراً لتفاعلك — التفاصيل وصلتك خاص ✅",
+    ],
+    private_reply: `${detail} ${cta?.trim() || "للطلب أو الاستفسار راسلنا هنا مباشرة."}`.trim(),
+    like: true,
+  };
+}
 import { aiComplete, hasAI, parseJsonReply } from "@/services/ai";
 import { hasProduct } from "@/lib/entitlements";
 
@@ -14,25 +36,7 @@ export const maxDuration = 60;
 // Re-exported for older callers; the tiered generator lives in services/studioImages.
 export { pollinations } from "@/services/studioImages";
 
-// How many images one plan may generate on the PAID tier. Drafts are throwaway, so
-// the rest of a long plan starts on the free generator and the owner upgrades the
-// posts they keep, one tap each, from the post editor.
-const PAID_IMAGES_PER_PLAN = Math.max(0, Number(process.env.STUDIO_PAID_IMAGES_PER_PLAN || 20));
 
-// Bounded-concurrency map — a 40-post plan must not open 40 sockets at once, and
-// must still finish inside the 60s function budget.
-async function mapLimit<T, R>(items: T[], limit: number, fn: (x: T, i: number) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length);
-  let next = 0;
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
-    for (;;) {
-      const i = next++;
-      if (i >= items.length) return;
-      out[i] = await fn(items[i], i);
-    }
-  }));
-  return out;
-}
 
 interface AIPost {
   day?: number; slot?: number; product?: string; type?: string;
@@ -151,20 +155,14 @@ export async function POST(req: NextRequest) {
       image_prompt: prompt,
       image_url: productImg || "",          // filled below at the customer's tier
       image_source: productImg ? "product" : "ai",
+      reply_config: defaultReply(prod, ap.cta),
       status: "draft",
     };
   });
 
-  // Images: real catalog photos win outright. Everything else is generated at the
-  // tier this customer's plan entitles them to, newest posts first, up to the cap.
-  const tier = tierFor(await featuresFor(user.id, "studio", pageId).catch(() => new Set<string>()));
-  const needsImage = rows.map((r, i) => ({ r, i })).filter(({ r }) => !r.image_url);
-  await mapLimit(needsImage, 6, async ({ r }, n) => {
-    const useTier = n < PAID_IMAGES_PER_PLAN ? tier : "free";
-    const { url } = await generateImage(r.image_prompt, useTier);
-    r.image_url = url;
-  });
-  // Belt and braces: never insert a row with an empty image.
+  // Images: a real catalog photo wins outright; everything else starts on the FREE
+  // generator. Nothing here spends the month's paid allowance — the owner decides
+  // which posts deserve it afterwards, from the plan view.
   for (const r of rows) if (!r.image_url) r.image_url = freeImage(r.image_prompt);
   const { data: posts, error: postsErr } = await supabaseAdmin.from("studio_posts").insert(rows).select();
   if (postsErr) return NextResponse.json({ error: postsErr.message }, { status: 500 });

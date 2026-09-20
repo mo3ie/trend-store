@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/authUser";
 import { featuresFor } from "@/lib/entitlements";
 import { UNIT_COST_USD, editImage, falErrorMessage, hasFal } from "@/services/studioImages";
+import { claim, getQuota, refund } from "@/lib/studioQuota";
 
 export const maxDuration = 60;
 
@@ -37,10 +38,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "not_configured", message: "مولّد الصور المدفوع غير مُفعّل" }, { status: 503 });
   }
 
+  // An edit costs the same as a high-quality image, so it draws on that allowance.
+  const { granted, state } = await claim(user.id, "images", 1);
+  if (granted <= 0) {
+    return NextResponse.json({
+      error: "quota_exceeded", quota: state,
+      message: "انتهت حصة الصور عالية الجودة لهذا الشهر — اشترِ باقة إضافية.",
+    }, { status: 402 });
+  }
+
   try {
     const url = await editImage(imageUrl, prompt);
-    return NextResponse.json({ url, cost_usd: UNIT_COST_USD.edit });
+    return NextResponse.json({ url, cost_usd: UNIT_COST_USD.edit, quota: await getQuota(user.id) });
   } catch (e) {
+    await refund(user.id, "images", 1);
     return NextResponse.json({ error: "edit_failed", message: falErrorMessage(e) }, { status: 502 });
   }
 }

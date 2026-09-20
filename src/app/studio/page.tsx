@@ -163,6 +163,11 @@ export default function StudioPage() {
   const [videoState, setVideoState] = useState<"" | "pending" | "done" | "failed">("");
   const [videoUrl, setVideoUrl] = useState("");
   const [videoMsg, setVideoMsg] = useState("");
+  // Monthly allowance for the paid ("strong") AI.
+  const [quota, setQuota] = useState<{ unlimited: boolean; images: { limit: number; used: number; extra: number; left: number }; videos: { limit: number; used: number; extra: number; left: number }; periodEnd: string } | null>(null);
+  const [topup, setTopup] = useState<{ images: { price_lyd: number; amount: number }; videos: { price_lyd: number; amount: number } } | null>(null);
+  const [upgrading, setUpgrading] = useState(false);
+  const [quotaMsg, setQuotaMsg] = useState("");
   const [imgSearching, setImgSearching] = useState(false);
   const [imgErr, setImgErr] = useState("");
 
@@ -198,6 +203,7 @@ export default function StudioPage() {
     }).catch(() => {});
     fetch(`/api/studio/alerts?pageId=${encodeURIComponent(selectedPage)}`).then((r) => r.json()).then((d) => setAlerts(d.alerts || [])).catch(() => setAlerts([]));
     fetch(`/api/studio/bot-info?pageId=${encodeURIComponent(selectedPage)}`).then((r) => r.json()).then((d) => setBotInfo(d)).catch(() => setBotInfo(null));
+    loadQuota();
   }, [selectedPage]);
 
   async function setActiveToken(tokenId: string) {
@@ -286,11 +292,51 @@ export default function StudioPage() {
         await new Promise((res) => setTimeout(res, 5000));
         const sr = await fetch(`/api/studio/video?requestId=${encodeURIComponent(id)}&pageId=${selectedPage}`);
         const sd = await sr.json();
-        if (sd.state === "done") { setVideoState("done"); setVideoUrl(sd.url); return; }
-        if (sd.state === "failed") { setVideoState("failed"); setVideoMsg(sd.message || "failed"); return; }
+        if (sd.state === "done") { setVideoState("done"); setVideoUrl(sd.url); loadQuota(); return; }
+        if (sd.state === "failed") { setVideoState("failed"); setVideoMsg(sd.message || "failed"); loadQuota(); return; }
       }
       setVideoState("failed"); setVideoMsg(t("استغرق وقتاً أطول من المتوقع", "Timed out"));
     } catch { setVideoState("failed"); setVideoMsg(t("تعذّر التوليد", "Generation failed")); }
+  }
+
+  async function loadQuota() {
+    const d = await fetch("/api/studio/quota").then((r) => r.json()).catch(() => null);
+    if (d && !d.error) { setQuota(d.quota); setTopup(d.topup); }
+  }
+
+  // Spend part of the month's allowance on the posts the owner actually picked.
+  async function upgradeSelected() {
+    if (selectedPlanPosts.size === 0) return;
+    setUpgrading(true); setQuotaMsg("");
+    try {
+      const r = await fetch("/api/studio/plan/upgrade-images", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postIds: [...selectedPlanPosts] }),
+      });
+      const d = await r.json();
+      if (!r.ok) setQuotaMsg(d.message || t("تعذّرت الترقية", "Upgrade failed"));
+      else {
+        setQuota(d.quota);
+        setQuotaMsg(t(
+          `تم تحسين ${d.upgraded} صورة${d.skipped ? ` — ${d.skipped} تجاوزت حصة الشهر` : ""}`,
+          `Upgraded ${d.upgraded}${d.skipped ? ` — ${d.skipped} beyond this month's allowance` : ""}`));
+        setSelectedPlanPosts(new Set());
+        const pl = await fetch(`/api/studio/plan?pageId=${encodeURIComponent(selectedPage)}`).then((x) => x.json()).catch(() => null);
+        if (pl?.posts) setPlanPosts(pl.posts);
+      }
+    } catch { setQuotaMsg(t("تعذّرت الترقية", "Upgrade failed")); }
+    setUpgrading(false);
+  }
+
+  async function buyTopup(kind: "images" | "videos") {
+    setQuotaMsg("");
+    const r = await fetch("/api/studio/quota", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind }),
+    });
+    const d = await r.json();
+    if (!r.ok) setQuotaMsg(d.message || t("تعذّر الشراء", "Purchase failed"));
+    else { setQuota(d.quota); setQuotaMsg(t(`تمت إضافة ${d.added} — خُصم ${d.charged} د.ل`, `Added ${d.added} — charged ${d.charged} LYD`)); }
   }
 
   async function generatePlan() {
@@ -667,6 +713,41 @@ export default function StudioPage() {
               </div>
             )}
 
+            {/* Monthly allowance for the paid AI — what it is, what is left, how to extend it. */}
+            {tab === "plan" && quota && !quota.unlimited && (quota.images.limit > 0 || quota.videos.limit > 0) && (
+              <div style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 9, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Sparkles size={13} color={PINK} /> {t("حصة الذكاء القوي هذا الشهر", "This month's strong-AI allowance")}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {([["images", t("صور عالية الجودة", "High-quality images")], ["videos", t("فيديوهات", "Videos")]] as const).map(([k, label]) => {
+                    const q = quota[k];
+                    const total = q.limit + q.extra;
+                    const pct = total > 0 ? Math.min(100, Math.round((q.used / total) * 100)) : 0;
+                    return (
+                      <div key={k}>
+                        <div style={{ fontSize: 11.5, color: c.muted, marginBottom: 5 }}>{label}</div>
+                        <div style={{ fontSize: 15, fontWeight: 900 }}>{q.left}<span style={{ fontSize: 11, color: c.muted, fontWeight: 700 }}> / {total}</span></div>
+                        <div style={{ height: 5, borderRadius: 100, background: c.border, marginTop: 6, overflow: "hidden" }}>
+                          <div style={{ width: `${pct}%`, height: "100%", background: pct >= 100 ? "#ef4444" : G_HERO }} />
+                        </div>
+                        {topup && total > 0 && (
+                          <button onClick={() => buyTopup(k)} style={{ marginTop: 7, background: "none", border: `1px solid ${c.border}`, borderRadius: 8, padding: "4px 9px", color: c.muted, cursor: "pointer", fontSize: 11, fontWeight: 700, fontFamily: "inherit" }}>
+                            +{topup[k].amount} · {topup[k].price_lyd} {t("د.ل", "LYD")}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 11, color: c.muted, marginTop: 9, lineHeight: 1.7 }}>
+                  {t("تتجدّد مع تجديد الاشتراك. التوليد المجاني وصور الإنترنت والكتالوج بلا حدود.",
+                     "Resets when your subscription renews. The free generator, web images and catalog photos stay unlimited.")}
+                </div>
+                {quotaMsg && <div style={{ fontSize: 12, color: PINK, marginTop: 8, lineHeight: 1.6 }}>{quotaMsg}</div>}
+              </div>
+            )}
+
             {/* PLAN TAB */}
             {tab === "plan" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -753,6 +834,10 @@ export default function StudioPage() {
                           <div style={{ marginInlineStart: "auto", display: "flex", gap: 6, flexWrap: "wrap" }}>
                             <button onClick={() => setShowBulkBoost(true)} disabled={selectedPlanPosts.size === 0} style={{ background: PINK_BG, border: `1px solid ${PINK}55`, borderRadius: 9, padding: "6px 11px", color: PINK, fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}><DollarSign size={13} /> {t("تمويل", "Boost")}</button>
                             <button onClick={() => bulkPostAction("approve")} disabled={selectedPlanPosts.size === 0} style={{ background: "rgba(34,197,94,0.14)", border: "1px solid #22c55e55", borderRadius: 9, padding: "6px 11px", color: "#22c55e", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}><CircleCheck size={13} /> {t("اعتماد", "Approve")}</button>
+                            {/* Spend the month's paid-AI allowance on the selected posts only. */}
+                            <button onClick={upgradeSelected} disabled={selectedPlanPosts.size === 0 || upgrading} style={{ background: "rgba(168,85,247,0.14)", border: "1px solid rgba(168,85,247,0.35)", borderRadius: 9, padding: "6px 11px", color: "#a855f7", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 || upgrading ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                              {upgrading ? <Loader2 size={13} className="spin" /> : <Sparkles size={13} />} {t("صور بجودة عالية", "High-quality images")}
+                            </button>
                             <button onClick={() => bulkPostAction("delete")} disabled={selectedPlanPosts.size === 0} style={{ background: "rgba(239,68,68,0.14)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 9, padding: "6px 11px", color: "#ef4444", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}><Trash2 size={13} /> {t("حذف", "Delete")}</button>
                           </div>
                         </div>

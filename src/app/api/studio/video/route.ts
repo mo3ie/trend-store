@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/authUser";
 import { featuresFor } from "@/lib/entitlements";
 import { UNIT_COST_USD, falErrorMessage, hasFal, submitVideo, videoStatus } from "@/services/studioImages";
+import { claim, getQuota, refund } from "@/lib/studioQuota";
 
 /**
  * Video generation for the top plan (`ai_video`).
@@ -40,10 +41,21 @@ export async function POST(req: NextRequest) {
   const denied = await gate(user.id, pageId);
   if (denied) return denied;
 
+  // A clip is the single most expensive action in the product, so it is claimed
+  // before submission and handed back if the provider refuses the job.
+  const { granted, state } = await claim(user.id, "videos", 1);
+  if (granted <= 0) {
+    return NextResponse.json({
+      error: "quota_exceeded", quota: state,
+      message: "انتهت حصة الفيديوهات لهذا الشهر — اشترِ باقة إضافية أو انتظر تجديد الاشتراك.",
+    }, { status: 402 });
+  }
+
   try {
     const requestId = await submitVideo(prompt, imageUrl);
-    return NextResponse.json({ requestId, cost_usd: UNIT_COST_USD.video });
+    return NextResponse.json({ requestId, cost_usd: UNIT_COST_USD.video, quota: await getQuota(user.id) });
   } catch (e) {
+    await refund(user.id, "videos", 1);
     return NextResponse.json({ error: "submit_failed", message: falErrorMessage(e) }, { status: 502 });
   }
 }
