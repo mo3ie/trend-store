@@ -28,7 +28,7 @@ export async function PATCH(req: NextRequest) {
     patch.image_source = "ai";
     patch.image_tier = used;
   }
-  for (const k of ["caption", "hashtags", "cta", "image_url", "image_source", "scheduled_for", "status", "image_prompt", "post_type", "reply_config"]) {
+  for (const k of ["caption", "hashtags", "cta", "image_url", "image_source", "scheduled_for", "status", "image_prompt", "post_type", "reply_config", "video_url"]) {
     if (k in b) patch[k] = b[k];
   }
   if ("boost" in b) patch.boost = !!b.boost;

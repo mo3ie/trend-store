@@ -206,6 +206,26 @@ export async function publishPagePhoto(
   return { postId: data.post_id ?? null, photoId: data.id };
 }
 
+// Publishes (or schedules) a VIDEO post on a Page from a public file URL. Same
+// permission as a photo post (pages_manage_posts). Facebook fetches the file
+// itself, which is why an uploaded clip must be publicly reachable.
+// The video id doubles as the post id for scheduling and boosting purposes.
+export async function publishPageVideo(
+  pageId: string,
+  pageToken: string,
+  opts: { message: string; videoUrl: string; scheduledUnix?: number }
+): Promise<{ postId: string | null; videoId: string }> {
+  const body: Record<string, unknown> = { file_url: opts.videoUrl, description: opts.message };
+  if (opts.scheduledUnix && opts.scheduledUnix > Math.floor(Date.now() / 1000) + 300) {
+    body.published = false;
+    body.scheduled_publish_time = opts.scheduledUnix;
+  } else {
+    body.published = true;
+  }
+  const data = await graph<{ id: string; post_id?: string }>(`${pageId}/videos`, "POST", body, pageToken);
+  return { postId: data.post_id ?? null, videoId: data.id };
+}
+
 // Large profile picture URL for a Page — used as the image on a Page-likes ad.
 export async function getPagePicture(pageId: string, pageToken?: string): Promise<string | null> {
   try {

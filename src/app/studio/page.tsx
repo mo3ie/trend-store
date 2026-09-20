@@ -48,6 +48,13 @@ interface PlanPost {
   post_type?: string; image_url?: string; image_source?: string; image_prompt?: string; status?: string;
   boost?: boolean; boost_budget_usd?: number | null; boost_days?: number | null;
   reply_config?: ReplyConfig | null;
+  video_url?: string | null;
+  boost_targeting?: Targeting | null; boost_targeting_note?: string | null;
+}
+interface Targeting {
+  ageMin?: number; ageMax?: number; gender?: string;
+  cities?: { key: string; name: string }[]; interests?: { id: string; name: string }[];
+  citiesFromOwner?: boolean; budgetUsd?: number; days?: number;
 }
 interface BotInfo { hasConfig: boolean; enabled: boolean; subscribed: boolean; aiEnabled: boolean; likeComments: boolean; activeTokenId: string | null; configId: string | null; tokens: { id: string; label: string }[] }
 
@@ -168,6 +175,10 @@ export default function StudioPage() {
   const [topup, setTopup] = useState<{ images: { price_lyd: number; amount: number }; videos: { price_lyd: number; amount: number } } | null>(null);
   const [upgrading, setUpgrading] = useState(false);
   const [quotaMsg, setQuotaMsg] = useState("");
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [targeting, setTargeting] = useState(false);
+  const [targetCities, setTargetCities] = useState("");
+  const [targetMsg, setTargetMsg] = useState("");
   const [imgSearching, setImgSearching] = useState(false);
   const [imgErr, setImgErr] = useState("");
 
@@ -326,6 +337,36 @@ export default function StudioPage() {
       }
     } catch { setQuotaMsg(t("تعذّرت الترقية", "Upgrade failed")); }
     setUpgrading(false);
+  }
+
+  // The owner's own clip, straight from their device — no AI, no allowance spent.
+  async function uploadVideo(file: File) {
+    setUploadingVideo(true);
+    const fd = new FormData(); fd.append("file", file);
+    try {
+      const r = await fetch("/api/studio/upload", { method: "POST", body: fd });
+      const d = await r.json();
+      if (!r.ok) setImgErr(d.error || t("تعذّر رفع الفيديو", "Video upload failed"));
+      else await savePost({ video_url: d.url });
+    } catch { setImgErr(t("تعذّر رفع الفيديو", "Video upload failed")); }
+    setUploadingVideo(false);
+  }
+
+  // Let the AI read the post and decide the audience. Cities typed by the owner win.
+  async function autoTarget() {
+    if (!editPost) return;
+    setTargeting(true); setTargetMsg("");
+    const cities = targetCities.split(",").map((x) => x.trim()).filter(Boolean);
+    try {
+      const r = await fetch("/api/studio/plan/targeting", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: editPost.id, cities }),
+      });
+      const d = await r.json();
+      if (!r.ok) setTargetMsg(d.error || t("تعذّر تحديد الاستهداف", "Targeting failed"));
+      else setEditPost({ ...editPost, boost_targeting: d.targeting, boost_targeting_note: d.note });
+    } catch { setTargetMsg(t("تعذّر تحديد الاستهداف", "Targeting failed")); }
+    setTargeting(false);
   }
 
   async function buyTopup(kind: "images" | "videos") {
@@ -1128,6 +1169,32 @@ export default function StudioPage() {
                 <video src={videoUrl} controls style={{ width: "100%", borderRadius: 10, marginTop: 9 }} />
               )}
             </div>
+
+            {/* The owner's own clip — free on every plan, published as a Page video. */}
+            <div style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <Upload size={13} color={PINK} /> {t("رفع فيديو من جهازك", "Upload a video from your device")}
+              </div>
+              {editPost?.video_url ? (
+                <>
+                  <video src={editPost.video_url} controls style={{ width: "100%", borderRadius: 10 }} />
+                  <button onClick={() => savePost({ video_url: null })} style={{ marginTop: 8, background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 9, padding: "6px 12px", color: "#ef4444", fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                    {t("إزالة الفيديو", "Remove video")}
+                  </button>
+                </>
+              ) : (
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "9px 13px", color: c.text, fontWeight: 800, fontSize: 12.5, cursor: uploadingVideo ? "wait" : "pointer", opacity: uploadingVideo ? 0.6 : 1 }}>
+                  {uploadingVideo ? <Loader2 size={14} className="spin" /> : <Upload size={14} />}
+                  {t("اختر فيديو", "Choose a video")}
+                  <input type="file" accept="video/mp4,video/quicktime,video/webm" disabled={uploadingVideo} style={{ display: "none" }}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVideo(f); e.target.value = ""; }} />
+                </label>
+              )}
+              <div style={{ fontSize: 11, color: c.muted, marginTop: 7, lineHeight: 1.7 }}>
+                {t("MP4 أو MOV أو WebM، حتى ٩٠ ميغابايت. عند وجود فيديو يُنشر بدل الصورة.",
+                   "MP4, MOV or WebM up to 90 MB. When a video is set it is published instead of the image.")}
+              </div>
+            </div>
             <Field muted={c.muted} label={t("نص المنشور", "Caption")}><textarea rows={5} style={{ ...input, resize: "vertical", lineHeight: 1.8 }} value={editPost.caption || ""} onChange={(e) => setEditPost({ ...editPost, caption: e.target.value })} /></Field>
             <Field muted={c.muted} label={t("الهاشتاقات", "Hashtags")}><input style={input} value={editPost.hashtags || ""} onChange={(e) => setEditPost({ ...editPost, hashtags: e.target.value })} /></Field>
             <Field muted={c.muted} label={t("دعوة لإجراء", "Call to action")}><input style={input} value={editPost.cta || ""} onChange={(e) => setEditPost({ ...editPost, cta: e.target.value })} /></Field>
@@ -1148,6 +1215,44 @@ export default function StudioPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
                   <div><label style={{ fontSize: 11.5, color: c.muted, display: "block", marginBottom: 5 }}>{t("الميزانية اليومية ($)", "Daily budget ($)")}</label><input type="number" min={1} style={input} value={editPost.boost_budget_usd ?? 5} onChange={(e) => setEditPost({ ...editPost, boost_budget_usd: Number(e.target.value) || 0 })} /></div>
                   <div><label style={{ fontSize: 11.5, color: c.muted, display: "block", marginBottom: 5 }}>{t("المدة (أيام)", "Days")}</label><input type="number" min={1} max={30} style={input} value={editPost.boost_days ?? 3} onChange={(e) => setEditPost({ ...editPost, boost_days: Number(e.target.value) || 0 })} /></div>
+                </div>
+              )}
+              {/* Targeting: the AI reads the post and picks the audience. Cities stay
+                  the owner's call, because they know their delivery range. */}
+              {editPost.boost && (
+                <div style={{ marginTop: 12, borderTop: `1px solid ${c.border}`, paddingTop: 12 }}>
+                  <label style={{ fontSize: 11.5, color: c.muted, display: "block", marginBottom: 5 }}>
+                    {t("المدن التي تريدها (اختياري — افصل بفاصلة)", "Cities you want (optional — comma separated)")}
+                  </label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input style={input} value={targetCities} onChange={(e) => setTargetCities(e.target.value)}
+                      placeholder={t("طرابلس، بنغازي — اتركه فارغاً ليختار الذكاء", "Tripoli, Benghazi — leave empty to let AI choose")} />
+                    <button onClick={autoTarget} disabled={targeting}
+                      style={{ background: G_HERO, border: "none", borderRadius: 10, padding: "0 14px", color: "#fff", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", opacity: targeting ? 0.6 : 1 }}>
+                      {targeting ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+                    </button>
+                  </div>
+
+                  {editPost.boost_targeting_note && (
+                    <div style={{ marginTop: 10, background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.3)", borderRadius: 10, padding: 10 }}>
+                      <div style={{ fontSize: 12, color: "#a855f7", fontWeight: 800, marginBottom: 5, display: "flex", alignItems: "center", gap: 5 }}>
+                        <Sparkles size={12} /> {t("اختار الذكاء الاصطناعي هذا الاستهداف", "The AI chose this targeting")}
+                      </div>
+                      <div style={{ fontSize: 12, lineHeight: 1.8, color: c.text }}>{editPost.boost_targeting_note}</div>
+                      {editPost.boost_targeting && (
+                        <div style={{ fontSize: 11, color: c.muted, marginTop: 7, lineHeight: 1.8 }}>
+                          {t("العمر", "Age")}: {editPost.boost_targeting.ageMin}–{editPost.boost_targeting.ageMax}
+                          {" · "}{t("الجنس", "Gender")}: {editPost.boost_targeting.gender === "female" ? t("إناث", "Women") : editPost.boost_targeting.gender === "male" ? t("ذكور", "Men") : t("الجميع", "All")}
+                          <br />
+                          {t("المدن", "Cities")}: {(editPost.boost_targeting.cities || []).map((x) => x.name).join("، ") || t("كل ليبيا", "All Libya")}
+                          {editPost.boost_targeting.citiesFromOwner ? ` (${t("اخترتها أنت", "your choice")})` : ""}
+                          <br />
+                          {t("الاهتمامات", "Interests")}: {(editPost.boost_targeting.interests || []).map((x) => x.name).join("، ") || "—"}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {targetMsg && <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 8, lineHeight: 1.6 }}>{targetMsg}</div>}
                 </div>
               )}
             </div>

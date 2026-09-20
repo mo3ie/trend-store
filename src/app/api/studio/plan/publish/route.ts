@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
-import { publishPagePhoto, getSystemPageToken } from "@/services/meta";
+import { publishPagePhoto, publishPageVideo, boostPost, getSystemPageToken } from "@/services/meta";
 import { hasProduct } from "@/lib/entitlements";
 
 export const maxDuration = 60;
@@ -50,9 +50,14 @@ export async function POST(req: NextRequest) {
     const caption = [p.caption, p.hashtags].filter(Boolean).join("\n\n");
     const whenUnix = p.scheduled_for ? Math.floor(new Date(p.scheduled_for).getTime() / 1000) : now;
     try {
-      const res = await publishPagePhoto(plan.page_id, token, { message: caption, imageUrl: p.image_url, scheduledUnix: whenUnix });
+      // A clip the owner uploaded is published as a Page video; otherwise a photo.
+      const res = p.video_url
+        ? await publishPageVideo(plan.page_id, token, { message: caption, videoUrl: p.video_url, scheduledUnix: whenUnix })
+          .then((r) => ({ postId: r.postId, mediaId: r.videoId }))
+        : await publishPagePhoto(plan.page_id, token, { message: caption, imageUrl: p.image_url, scheduledUnix: whenUnix })
+          .then((r) => ({ postId: r.postId, mediaId: r.photoId }));
       const isScheduled = whenUnix > now + 300;
-      const externalId = res.postId || res.photoId;
+      const externalId = res.postId || res.mediaId;
       await supabaseAdmin.from("studio_posts").update({
         status: isScheduled ? "scheduled" : "published",
         external_post_id: externalId,
@@ -60,6 +65,48 @@ export async function POST(req: NextRequest) {
         error: null,
       }).eq("id", p.id);
       if (isScheduled) scheduled++; else published++;
+
+      // Boosting: only for posts that are live now (a scheduled post is boosted when
+      // it publishes, not before) and only when the owner turned it on. Failure here
+      // must never mark the post itself failed — it published fine.
+      if (p.boost && !isScheduled && externalId) {
+        try {
+          const tg = (p.boost_targeting || {}) as {
+            ageMin?: number; ageMax?: number; gender?: string;
+            cities?: Array<{ key: string }>; interests?: Array<{ id: string }>;
+            budgetUsd?: number; days?: number;
+          };
+          const cityKeys = (tg.cities || []).map((x) => x.key).filter(Boolean);
+          const targeting: Record<string, unknown> = {
+            geo_locations: cityKeys.length
+              ? { cities: cityKeys.map((key) => ({ key, radius: 25, distance_unit: "kilometer" })) }
+              : { countries: ["LY"] },
+            age_min: tg.ageMin ?? 18,
+            age_max: tg.ageMax ?? 45,
+          };
+          if (tg.gender === "male") targeting.genders = [1];
+          if (tg.gender === "female") targeting.genders = [2];
+          if ((tg.interests || []).length) {
+            targeting.flexible_spec = [{ interests: (tg.interests || []).map((i) => ({ id: i.id })) }];
+          }
+
+          const boost = await boostPost({
+            pageId: plan.page_id,
+            postId: externalId,
+            pageToken: token,
+            budgetUsd: Number(p.boost_budget_usd) || tg.budgetUsd || 5,
+            durationDays: Number(p.boost_days) || tg.days || 3,
+            campaignName: `Studio — ${String(p.caption || "post").slice(0, 40)}`,
+            targeting,
+          });
+          await supabaseAdmin.from("studio_posts")
+            .update({ boost_campaign_id: boost.campaignId }).eq("id", p.id);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "boost failed";
+          await supabaseAdmin.from("studio_posts")
+            .update({ error: `نُشر بنجاح لكن تعذّر الترويج: ${msg.slice(0, 200)}` }).eq("id", p.id);
+        }
+      }
 
       // Bind this post's reply settings to the bot (keyed by the numeric post id).
       const rc = p.reply_config as { enabled?: boolean; public_replies?: string[]; private_reply?: string; like?: boolean } | null;
