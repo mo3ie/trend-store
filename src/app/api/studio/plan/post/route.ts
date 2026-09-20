@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/authUser";
 
 import { featuresFor } from "@/lib/entitlements";
 import { generateImage, tierFor } from "@/services/studioImages";
+import { claim, refund } from "@/lib/studioQuota";
 
 // PATCH — edit one planned post.
 // Body: { id, ...fields }  (caption, hashtags, cta, image_url, image_source, scheduled_for,
@@ -21,9 +22,20 @@ export async function PATCH(req: NextRequest) {
     const { data: cur } = await supabaseAdmin.from("studio_posts")
       .select("image_prompt, page_id").eq("id", b.id).eq("user_id", user.id).maybeSingle();
     const prompt = cur?.image_prompt || (typeof b.image_prompt === "string" ? b.image_prompt : "product photo");
-    // A single, user-initiated regeneration always runs at the customer's full tier.
-    const tier = tierFor(await featuresFor(user.id, "studio", cur?.page_id).catch(() => new Set<string>()));
+    // A regeneration runs at the customer's tier — and therefore draws on the
+    // monthly allowance exactly like the bulk upgrade does. When the allowance is
+    // spent this quietly produces a free image rather than refusing the click:
+    // the owner keeps working, and the response says which tier they actually got.
+    let tier = tierFor(await featuresFor(user.id, "studio", cur?.page_id).catch(() => new Set<string>()));
+    let claimed = 0;
+    if (tier !== "free") {
+      const { granted } = await claim(user.id, "images", 1);
+      claimed = granted;
+      if (granted <= 0) tier = "free";
+    }
     const { url, tier: used } = await generateImage(prompt, tier);
+    // The paid call fell through to the free generator — hand the unit back.
+    if (claimed > 0 && used === "free") await refund(user.id, "images", claimed);
     patch.image_url = url;
     patch.image_source = "ai";
     patch.image_tier = used;
