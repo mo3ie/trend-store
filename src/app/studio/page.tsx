@@ -171,8 +171,13 @@ export default function StudioPage() {
   const [videoUrl, setVideoUrl] = useState("");
   const [videoMsg, setVideoMsg] = useState("");
   // Monthly allowance for the paid ("strong") AI.
-  const [quota, setQuota] = useState<{ unlimited: boolean; images: { limit: number; used: number; extra: number; left: number }; videos: { limit: number; used: number; extra: number; left: number }; periodEnd: string } | null>(null);
-  const [topup, setTopup] = useState<{ images: { price_lyd: number; amount: number }; videos: { price_lyd: number; amount: number } } | null>(null);
+  const [quota, setQuota] = useState<{
+    unlimited: boolean; periodEnd: string;
+    pack: { price_lyd: number; images: number; videos: number; available: boolean };
+    images: { limit: number; used: number; extra: number; left: number };
+    videos: { limit: number; used: number; extra: number; left: number };
+  } | null>(null);
+  const [topupQty, setTopupQty] = useState(1);
   const [upgrading, setUpgrading] = useState(false);
   const [quotaMsg, setQuotaMsg] = useState("");
   const [uploadingVideo, setUploadingVideo] = useState(false);
@@ -312,7 +317,7 @@ export default function StudioPage() {
 
   async function loadQuota() {
     const d = await fetch("/api/studio/quota").then((r) => r.json()).catch(() => null);
-    if (d && !d.error) { setQuota(d.quota); setTopup(d.topup); }
+    if (d && !d.error) setQuota(d.quota);
   }
 
   // Spend part of the month's allowance on the posts the owner actually picked.
@@ -369,15 +374,20 @@ export default function StudioPage() {
     setTargeting(false);
   }
 
-  async function buyTopup(kind: "images" | "videos") {
+  async function buyTopup() {
     setQuotaMsg("");
     const r = await fetch("/api/studio/quota", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind }),
+      body: JSON.stringify({ qty: topupQty }),
     });
     const d = await r.json();
-    if (!r.ok) setQuotaMsg(d.message || t("تعذّر الشراء", "Purchase failed"));
-    else { setQuota(d.quota); setQuotaMsg(t(`تمت إضافة ${d.added} — خُصم ${d.charged} د.ل`, `Added ${d.added} — charged ${d.charged} LYD`)); }
+    if (!r.ok) { setQuotaMsg(d.message || t("تعذّر الشراء", "Purchase failed")); return; }
+    setQuota(d.quota);
+    const parts = [
+      d.addedImages ? t(`${d.addedImages} صورة`, `${d.addedImages} images`) : "",
+      d.addedVideos ? t(`${d.addedVideos} فيديو`, `${d.addedVideos} videos`) : "",
+    ].filter(Boolean).join(t(" و", " and "));
+    setQuotaMsg(t(`تمت إضافة ${parts} — خُصم ${d.charged} د.ل`, `Added ${parts} — charged ${d.charged} LYD`));
   }
 
   async function generatePlan() {
@@ -778,15 +788,42 @@ export default function StudioPage() {
                         <div style={{ height: 5, borderRadius: 100, background: c.border, marginTop: 6, overflow: "hidden" }}>
                           <div style={{ width: `${pct}%`, height: "100%", background: pct >= 100 ? "#ef4444" : G_HERO }} />
                         </div>
-                        {topup && total > 0 && (
-                          <button onClick={() => buyTopup(k)} style={{ marginTop: 7, background: "none", border: `1px solid ${c.border}`, borderRadius: 8, padding: "4px 9px", color: c.muted, cursor: "pointer", fontSize: 11, fontWeight: 700, fontFamily: "inherit" }}>
-                            +{topup[k].amount} · {topup[k].price_lyd} {t("د.ل", "LYD")}
-                          </button>
-                        )}
                       </div>
                     );
                   })}
                 </div>
+
+                {/* Buy more. Only appears for plans that sell a pack, and the pack
+                    carries exactly what the buyer's own plan carries. */}
+                {!quota.unlimited && quota.pack.available && (
+                  <div style={{ marginTop: 12, borderTop: `1px solid ${c.border}`, paddingTop: 12 }}>
+                    {quota.images.left === 0 && quota.videos.left === 0 && (
+                      <div style={{ fontSize: 12, color: "#f59e0b", marginBottom: 9, lineHeight: 1.7 }}>
+                        {t("انتهت حصتك لهذا الشهر. اشترِ كمية إضافية للمتابعة بالجودة العالية.",
+                           "Your allowance for this month is used up. Buy more to keep generating at high quality.")}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11.5, color: c.muted, marginBottom: 7 }}>
+                      {t("شراء كمية إضافية", "Buy more")} — {t("الباقة الواحدة", "one pack")}: {quota.pack.images} {t("صورة", "images")}
+                      {quota.pack.videos > 0 ? ` + ${quota.pack.videos} ${t("فيديو", "videos")}` : ""} · {quota.pack.price_lyd} {t("د.ل", "LYD")}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 0, border: `1px solid ${c.border}`, borderRadius: 10, overflow: "hidden" }}>
+                        <button onClick={() => setTopupQty((q) => Math.max(1, q - 1))} style={{ background: c.surface, border: "none", padding: "8px 13px", color: c.text, cursor: "pointer", fontWeight: 900, fontSize: 15, fontFamily: "inherit" }}>−</button>
+                        <div style={{ minWidth: 40, textAlign: "center", fontWeight: 900, fontSize: 15 }}>{topupQty}</div>
+                        <button onClick={() => setTopupQty((q) => Math.min(10, q + 1))} style={{ background: c.surface, border: "none", padding: "8px 13px", color: c.text, cursor: "pointer", fontWeight: 900, fontSize: 15, fontFamily: "inherit" }}>+</button>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 150, fontSize: 12.5, lineHeight: 1.7 }}>
+                        <b style={{ color: PINK }}>{quota.pack.images * topupQty}</b> {t("صورة", "images")}
+                        {quota.pack.videos > 0 && <> + <b style={{ color: PINK }}>{quota.pack.videos * topupQty}</b> {t("فيديو", "videos")}</>}
+                        <div style={{ color: c.muted, fontSize: 11.5 }}>{t("تُضاف لهذا الشهر فقط", "Added to this month only")}</div>
+                      </div>
+                      <button onClick={buyTopup} style={{ background: G_HERO, border: "none", borderRadius: 11, padding: "10px 16px", color: "#fff", fontWeight: 900, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 7 }}>
+                        <DollarSign size={15} /> {t("شراء بـ", "Buy for")} {quota.pack.price_lyd * topupQty} {t("د.ل", "LYD")}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div style={{ fontSize: 11, color: c.muted, marginTop: 9, lineHeight: 1.7 }}>
                   {t("تتجدّد مع تجديد الاشتراك. التوليد المجاني وصور الإنترنت والكتالوج بلا حدود.",
                      "Resets when your subscription renews. The free generator, web images and catalog photos stay unlimited.")}

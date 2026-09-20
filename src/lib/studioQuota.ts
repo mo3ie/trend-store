@@ -15,11 +15,12 @@ import { getAccess } from "@/lib/entitlements";
 
 export type QuotaKind = "images" | "videos";
 
-// Top-up packs, bought from the wallet, valid only inside the current window.
-export const TOPUP = {
-  images: { price_lyd: Number(process.env.STUDIO_TOPUP_IMAGE_PRICE || 100), amount: Number(process.env.STUDIO_TOPUP_IMAGE_AMOUNT || 100) },
-  videos: { price_lyd: Number(process.env.STUDIO_TOPUP_VIDEO_PRICE || 100), amount: Number(process.env.STUDIO_TOPUP_VIDEO_AMOUNT || 10) },
-};
+// The most packs a customer may buy in one purchase.
+export const MAX_TOPUP_QTY = 10;
+
+// A top-up pack mirrors the buyer's own plan: a VIP pack carries images and video,
+// a medium pack images only, and basic has no pack (all zeros, so no button).
+export interface TopupPack { price_lyd: number; images: number; videos: number; available: boolean; }
 
 // A free trial must not be a free pass to the paid models, so it gets a token
 // allowance — enough to see the quality difference, not enough to be farmed.
@@ -28,6 +29,7 @@ const TRIAL_QUOTA = { images: 10, videos: 1 };
 const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface QuotaState {
+  pack: TopupPack;                       // what one extra pack costs and contains
   unlimited: boolean;                    // admins only
   subscriptionId: string | null;
   periodStart: string;
@@ -63,12 +65,22 @@ export async function getQuota(userId: string): Promise<QuotaState> {
   const { start, end } = windowFor(sub?.starts_at ?? null);
 
   let imageLimit = 0, videoLimit = 0;
+  let pack: TopupPack = { price_lyd: 0, images: 0, videos: 0, available: false };
   if (sub?.plan_id) {
     const { data: plan } = await supabaseAdmin
-      .from("subscription_plans").select("ai_image_quota, ai_video_quota")
+      .from("subscription_plans")
+      .select("ai_image_quota, ai_video_quota, topup_price_lyd, topup_image_amount, topup_video_amount")
       .eq("id", sub.plan_id).maybeSingle();
     imageLimit = Number(plan?.ai_image_quota ?? 0);
     videoLimit = Number(plan?.ai_video_quota ?? 0);
+    const images = Number(plan?.topup_image_amount ?? 0);
+    const videos = Number(plan?.topup_video_amount ?? 0);
+    pack = {
+      price_lyd: Number(plan?.topup_price_lyd ?? 0),
+      images, videos,
+      // basic plans carry zero amounts, so the offer simply never appears for them.
+      available: images > 0 || videos > 0,
+    };
   } else if (access.trial) {
     imageLimit = TRIAL_QUOTA.images;
     videoLimit = TRIAL_QUOTA.videos;
@@ -95,6 +107,7 @@ export async function getQuota(userId: string): Promise<QuotaState> {
   });
 
   return {
+    pack,
     unlimited: access.admin,
     subscriptionId: sub?.id ?? null,
     periodStart: startIso,
@@ -135,12 +148,17 @@ export async function refund(userId: string, kind: QuotaKind, n = 1): Promise<vo
     .eq("user_id", userId).eq("period_start", state.periodStart);
 }
 
-/** Add a bought pack to the CURRENT window only. */
-export async function addExtra(userId: string, kind: QuotaKind, amount: number): Promise<QuotaState> {
+/**
+ * Add bought packs to the CURRENT window only. One purchase tops up both kinds
+ * together, in whatever amounts the buyer's plan sells them.
+ */
+export async function addExtra(userId: string, images: number, videos: number): Promise<QuotaState> {
   const state = await getQuota(userId);
-  const col = kind === "images" ? "images_extra" : "videos_extra";
   await supabaseAdmin.from("studio_usage")
-    .update({ [col]: state[kind].extra + amount })
+    .update({
+      images_extra: state.images.extra + Math.max(0, images),
+      videos_extra: state.videos.extra + Math.max(0, videos),
+    })
     .eq("user_id", userId).eq("period_start", state.periodStart);
   return await getQuota(userId);
 }
