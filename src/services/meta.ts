@@ -60,12 +60,13 @@ export function buildOAuthUrl(redirectUri: string, state: string): string {
   if (configId) {
     params.set("config_id", configId);
   } else {
-    // pages_manage_engagement + pages_messaging power the comment auto-reply bot
-    // (public reply + private DM); pages_manage_metadata subscribes the Page to the
-    // webhook (subscribed_apps) without which no comment is ever delivered. In
-    // production the config_id (Login for Business) carries the permission set —
-    // keep the dashboard config in sync with this list.
-    params.set("scope", "pages_manage_ads,pages_read_engagement,pages_show_list,ads_management,pages_manage_engagement,pages_messaging,pages_manage_metadata");
+    // The bot's four, all approved 2026-09-21: pages_manage_engagement +
+    // pages_messaging do the replying (public reply + private DM),
+    // pages_manage_metadata subscribes the Page to the webhook (subscribed_apps)
+    // without which no comment is ever delivered, and pages_read_user_content reads
+    // the visitor comments themselves. In production the config_id (Login for
+    // Business) carries the permission set — keep the dashboard config in sync.
+    params.set("scope", "pages_manage_ads,pages_read_engagement,pages_show_list,ads_management,pages_manage_engagement,pages_messaging,pages_manage_metadata,pages_read_user_content");
   }
 
   return `https://www.facebook.com/dialog/oauth?${params}`;
