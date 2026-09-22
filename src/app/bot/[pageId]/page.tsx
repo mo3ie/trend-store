@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import LangToggle from "@/components/LangToggle";
+import WalletModal from "@/components/WalletModal";
 
 const GRADIENT = "linear-gradient(135deg, #0f0f1a 0%, #0d1b2a 100%)";
 const BLUE = "#1877f2", GREEN = "#22c55e", CARD = "rgba(255,255,255,0.04)", BORDER = "rgba(255,255,255,0.08)";
@@ -53,6 +54,7 @@ export default function BotManage() {
   const [tab, setTab] = useState<"settings" | "rules" | "posts" | "accounts" | "activity">("rules");
   const [toast, setToast] = useState("");
   const [subscribing, setSubscribing] = useState(false);
+  const [pay, setPay] = useState<{ amount: number; label: string } | null>(null);
 
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2600); };
 
@@ -102,7 +104,16 @@ export default function BotManage() {
     });
     const data = await res.json();
     setSubscribing(false);
-    if (!res.ok) { flash(data.message || t("فشل الاشتراك", "Subscription failed")); return; }
+    if (!res.ok) {
+      if (data.error === "insufficient_balance") {
+        // Pay the shortfall inline, then subscribe automatically.
+        const need = Math.max(0, Number(data.price ?? 0) - Number(data.balance ?? 0));
+        setPay({ amount: Math.ceil(need), label: t("اشتراك بوت الرد الآلي", "Auto-reply bot subscription") });
+        return;
+      }
+      flash(data.message || t("فشل الاشتراك", "Subscription failed"));
+      return;
+    }
     setSub(data.subscription);
     flash(t("تم الاشتراك بنجاح ✅", "Subscribed ✅"));
   }
@@ -183,6 +194,15 @@ export default function BotManage() {
 
       {toast && (
         <div style={{ position: "fixed", bottom: 24, insetInlineStart: "50%", transform: "translateX(-50%)", background: "#1e293b", border: `1px solid ${BLUE}55`, borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 700, zIndex: 50, boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>{toast}</div>
+      )}
+
+      {pay && (
+        <WalletModal
+          payAmount={pay.amount}
+          payLabel={pay.label}
+          onPaid={() => { setPay(null); subscribe(); }}
+          onClose={() => setPay(null)}
+        />
       )}
       <style>{`@keyframes spin-anim { to { transform: rotate(360deg); } } .spin { animation: spin-anim 1s linear infinite; } input, textarea, select { font-family: inherit; }`}</style>
     </div>
@@ -840,6 +860,7 @@ function ActivityTab({ configId, t }: { configId: string; t: TF }) {
           ))}
         </div>
       )}
+
     </div>
   );
 }

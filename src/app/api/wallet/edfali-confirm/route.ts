@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { onlineConfTrans } from "@/lib/adfali";
+import { creditWallet } from "@/lib/wallet";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -56,18 +57,8 @@ export async function POST(req: Request) {
     .update({ status: "completed", reference: sessionId })
     .eq("id", txId);
 
-  // Credit wallet balance
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("wallet_balance")
-    .eq("id", user.id)
-    .single();
-
-  const newBalance = (profile?.wallet_balance || 0) + tx.amount;
-  await supabaseAdmin
-    .from("profiles")
-    .update({ wallet_balance: newBalance })
-    .eq("id", user.id);
+  // Credit the wallet the products actually debit (see lib/wallet).
+  const newBalance = await creditWallet(user.id, tx.amount);
 
   return NextResponse.json({ success: true, newBalance });
 }

@@ -50,7 +50,14 @@ export async function POST(req: Request) {
       .single();
 
     if (!wallet || wallet.balance < campaign.total_price) {
-      return NextResponse.json({ error: "رصيد المحفظة غير كافٍ" }, { status: 400 });
+      // Machine-readable so the checkout can open the payment sheet for exactly
+      // the shortfall instead of dead-ending on "top up your wallet".
+      return NextResponse.json({
+        error: "insufficient_balance",
+        message: "رصيد المحفظة غير كافٍ",
+        balance: Number(wallet?.balance ?? 0),
+        price: Number(campaign.total_price),
+      }, { status: 402 });
     }
 
     // Deduct from wallet

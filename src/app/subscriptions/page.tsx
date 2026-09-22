@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Loader2, Wallet, Check, CreditCard, X, ReceiptText, ShieldCheck, RefreshCw, AlertTriangle, RotateCw } from "lucide-react";
+import WalletModal from "@/components/WalletModal";
 
 interface Plan {
   id: string; product: "bot" | "ads" | "studio"; tier: string;
@@ -67,6 +68,9 @@ export default function SubscriptionsPage() {
   const [autoRenewNew, setAutoRenewNew] = useState(false);
   const [busyId, setBusyId] = useState("");
   const [rowMsg, setRowMsg] = useState("");
+  // Direct payment: when the wallet is short, the payment sheet opens on the spot
+  // and the action that triggered it is retried the moment the money lands.
+  const [pay, setPay] = useState<{ amount: number; label: string; retry: () => void } | null>(null);
 
   const loadMine = useCallback(async () => {
     const m = await fetch("/api/subscriptions/mine").then((r) => r.json()).catch(() => null);
@@ -126,7 +130,16 @@ export default function SubscriptionsPage() {
     }).then((x) => x.json()).catch(() => ({ error: "network" }));
     setBuying(false);
     if (r.error) {
-      setErr(r.message || (r.error === "insufficient_balance" ? "رصيد المحفظة غير كافٍ" : "تعذّر إتمام العملية"));
+      if (r.error === "insufficient_balance") {
+        const need = Math.max(0, Number(r.price ?? plan.price_lyd) - Number(r.balance ?? balance));
+        setPay({
+          amount: Math.ceil(need),
+          label: `${PRODUCTS.find((x) => x.key === plan.product)?.label} — ${TIER_LABEL[plan.tier] ?? plan.tier}`,
+          retry: () => doBuy(plan, pageIds),
+        });
+        return;
+      }
+      setErr(r.message || "تعذّر إتمام العملية");
       return;
     }
     setPicker(null);
@@ -144,7 +157,19 @@ export default function SubscriptionsPage() {
       body: JSON.stringify({ subscriptionId: sub.id }),
     }).then((x) => x.json()).catch(() => ({ error: "network" }));
     setBusyId("");
-    if (r.error) { setRowMsg(r.message || "تعذّر التجديد"); return; }
+    if (r.error) {
+      if (r.error === "insufficient_balance") {
+        const need = Math.max(0, Number(r.price ?? 0) - Number(r.balance ?? balance));
+        setPay({
+          amount: Math.ceil(need),
+          label: `تجديد ${PRODUCTS.find((x) => x.key === sub.product)?.label ?? sub.product}`,
+          retry: () => renewNow(sub),
+        });
+        return;
+      }
+      setRowMsg(r.message || "تعذّر التجديد");
+      return;
+    }
     setBalance(Number(r.balance ?? balance));
     setInvoice({ amount: Number(r.charged ?? 0), plan: `تجديد ${PRODUCTS.find((x) => x.key === sub.product)?.label ?? sub.product}` });
     await loadMine();
@@ -399,6 +424,22 @@ export default function SubscriptionsPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Direct payment — pay the shortfall with any method, then the purchase
+          completes by itself. No trip to the wallet page. */}
+      {pay && (
+        <WalletModal
+          payAmount={pay.amount}
+          payLabel={pay.label}
+          onPaid={async () => {
+            const retry = pay.retry;
+            setPay(null);
+            await loadMine();
+            retry();
+          }}
+          onClose={() => setPay(null)}
+        />
       )}
 
       {/* Invoice confirmation */}

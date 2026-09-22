@@ -12,6 +12,7 @@ import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
 import AdsBottomNav from "@/components/AdsBottomNav";
+import WalletModal from "@/components/WalletModal";
 
 const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
 const PINK    = "#d6409f";
@@ -178,6 +179,8 @@ export default function StudioPage() {
     videos: { limit: number; used: number; extra: number; left: number };
   } | null>(null);
   const [topupQty, setTopupQty] = useState(1);
+  // Pay the shortfall inline, then finish the purchase that triggered it.
+  const [pay, setPay] = useState<{ amount: number; label: string; retry: () => void } | null>(null);
   const [upgrading, setUpgrading] = useState(false);
   const [quotaMsg, setQuotaMsg] = useState("");
   const [uploadingVideo, setUploadingVideo] = useState(false);
@@ -381,7 +384,19 @@ export default function StudioPage() {
       body: JSON.stringify({ qty: topupQty }),
     });
     const d = await r.json();
-    if (!r.ok) { setQuotaMsg(d.message || t("تعذّر الشراء", "Purchase failed")); return; }
+    if (!r.ok) {
+      if (d.error === "insufficient_balance") {
+        const need = Math.max(0, Number(d.price ?? 0) - Number(d.balance ?? 0));
+        setPay({
+          amount: Math.ceil(need),
+          label: t("كمية إضافية للموظف الذكي", "Extra Studio allowance"),
+          retry: buyTopup,
+        });
+        return;
+      }
+      setQuotaMsg(d.message || t("تعذّر الشراء", "Purchase failed"));
+      return;
+    }
     setQuota(d.quota);
     const parts = [
       d.addedImages ? t(`${d.addedImages} صورة`, `${d.addedImages} images`) : "",
@@ -1025,6 +1040,17 @@ export default function StudioPage() {
           </>
         )}
       </div>
+
+      {/* Direct payment — pay the shortfall with any method, then the purchase
+          that triggered it completes by itself. */}
+      {pay && (
+        <WalletModal
+          payAmount={pay.amount}
+          payLabel={pay.label}
+          onPaid={() => { const retry = pay.retry; setPay(null); retry(); }}
+          onClose={() => setPay(null)}
+        />
+      )}
 
       {/* Add product modal */}
       {showAdd && (

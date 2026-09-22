@@ -31,16 +31,31 @@ function timeStr(iso: string) {
   return new Date(iso).toLocaleDateString("ar-LY", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-interface Props { onClose: () => void; }
+interface Props {
+  onClose: () => void;
+  /**
+   * Direct-payment mode. Pass the exact price and the modal becomes a checkout
+   * sheet: it opens straight on the payment methods, locks the amount, and calls
+   * `onPaid` once the money has actually landed — the caller then completes the
+   * purchase it was in the middle of.
+   *
+   * All three are optional, so every existing `<WalletModal onClose=... />` in
+   * the store keeps behaving exactly as before.
+   */
+  payAmount?: number;
+  payLabel?: string;
+  onPaid?: (newBalance: number) => void;
+}
 
-export default function WalletModal({ onClose }: Props) {
+export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Props) {
+  const payMode = typeof payAmount === "number" && payAmount > 0;
   const [balance,      setBalance]      = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading,      setLoading]      = useState(true);
-  const [tab,          setTab]          = useState<"overview" | "recharge">("overview");
+  const [tab,          setTab]          = useState<"overview" | "recharge">(payMode ? "recharge" : "overview");
 
   const [method,      setMethod]      = useState("");
-  const [amount,      setAmount]      = useState("");
+  const [amount,      setAmount]      = useState(payMode ? String(payAmount) : "");
   const [phone,       setPhone]       = useState("");
   const [reference,   setReference]   = useState("");
   const [recharging,  setRecharging]  = useState(false);
@@ -177,6 +192,11 @@ export default function WalletModal({ onClose }: Props) {
             const fresh = await fetch("/api/wallet").then(r => r.json());
             setBalance(fresh.balance || 0);
             setTransactions(fresh.transactions || []);
+            if (payMode) {
+              setRechMsg("✅ تم الدفع بنجاح — جارٍ إتمام العملية…");
+              onPaid?.(fresh.balance || 0);
+              return;
+            }
             setRechMsg("✅ تم شحن المحفظة بنجاح!");
             setAmount(""); setMethod("");
             setTimeout(() => setTab("overview"), 1500);
@@ -236,9 +256,15 @@ export default function WalletModal({ onClose }: Props) {
       setBalance(d.newBalance);
       const fresh = await fetch("/api/wallet").then(r => r.json());
       setTransactions(fresh.transactions || []);
+      resetOtp();
+      if (payMode) {
+        // The payment succeeded; the caller finishes the purchase it started.
+        setRechMsg("✅ تم الدفع بنجاح — جارٍ إتمام العملية…");
+        onPaid?.(d.newBalance);
+        return;
+      }
       setRechMsg("✅ تم شحن المحفظة بنجاح!");
       setAmount(""); setPhone(""); setCardNumber(""); setMethod("");
-      resetOtp();
       setTimeout(() => setTab("overview"), 1500);
     } catch {
       setRechMsg("خطأ في تأكيد الدفع");
@@ -279,7 +305,7 @@ export default function WalletModal({ onClose }: Props) {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 px-5 mt-4 shrink-0">
+        <div className={`flex gap-2 px-5 mt-4 shrink-0 ${payMode ? "hidden" : ""}`}>
           {(["overview", "recharge"] as const).map(t => (
             <button
               key={t}
@@ -343,7 +369,14 @@ export default function WalletModal({ onClose }: Props) {
 
           {tab === "recharge" && !otpStep && (
             <div className="space-y-4">
-              {/* Amount */}
+              {/* Amount — fixed and unchangeable when paying for something specific,
+                  so the price shown at checkout is exactly what gets charged. */}
+              {payMode ? (
+                <div className="rounded-xl bg-purple-500/10 border border-purple-500/30 px-4 py-3">
+                  <div className="text-[var(--muted)] text-xs mb-1">{payLabel || "المبلغ المطلوب"}</div>
+                  <div className="text-2xl font-black text-purple-300">{payAmount} د.ل</div>
+                </div>
+              ) : (
               <div>
                 <label className="text-[var(--muted)] text-xs mb-2 block">المبلغ (د.ل)</label>
                 <input
@@ -365,10 +398,11 @@ export default function WalletModal({ onClose }: Props) {
                   ))}
                 </div>
               </div>
+              )}
 
               {/* Method */}
               <div>
-                <label className="text-[var(--muted)] text-xs mb-2 block">طريقة الشحن</label>
+                <label className="text-[var(--muted)] text-xs mb-2 block">{payMode ? "اختر طريقة الدفع" : "طريقة الشحن"}</label>
                 <div className="grid grid-cols-2 gap-2">
                   {PAYMENT_METHODS.map(m => (
                     <button key={m.id} type="button"

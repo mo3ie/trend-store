@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { getBalance } from "@/lib/wallet";
 
 async function makeServiceClient() {
   const cookieStore = await cookies();
@@ -27,14 +28,16 @@ export async function GET() {
   if (!user) return NextResponse.json({ balance: 0, transactions: [] });
 
   const supabase = await makeServiceClient();
-  const [{ data: profile }, { data: transactions }] = await Promise.all([
-    supabase.from("profiles").select("wallet_balance").eq("id", user.id).single(),
+  // Read the balance the products actually spend, not the profiles mirror —
+  // a purchase debits `wallets` only, so the mirror drifts after every spend.
+  const [balance, { data: transactions }] = await Promise.all([
+    getBalance(user.id),
     supabase.from("wallet_transactions").select("*").eq("user_id", user.id)
       .order("created_at", { ascending: false }).limit(20),
   ]);
 
   return NextResponse.json({
-    balance: profile?.wallet_balance || 0,
+    balance,
     transactions: transactions || [],
   });
 }

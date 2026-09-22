@@ -32,7 +32,10 @@ export async function POST(req: NextRequest) {
   const { data: wallet } = await supabaseAdmin
     .from("wallets").select("balance").eq("user_id", user.id).maybeSingle();
   if (!wallet || Number(wallet.balance) < price) {
-    return NextResponse.json({ error: "insufficient_balance", message: "رصيد المحفظة غير كافٍ" }, { status: 402 });
+    return NextResponse.json({
+      error: "insufficient_balance", message: "رصيد المحفظة غير كافٍ",
+      balance: Number(wallet?.balance ?? 0), price,
+    }, { status: 402 });
   }
   await supabaseAdmin.from("wallets")
     .update({ balance: Number(wallet.balance) - price, updated_at: new Date().toISOString() })

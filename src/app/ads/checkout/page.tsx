@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, Wallet, Loader2, AlertCircle, CheckCircle, Phone
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
+import WalletModal from "@/components/WalletModal";
 
 const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
 const METHOD_GRADS: Record<string, string> = {
@@ -58,6 +59,7 @@ function CheckoutInner() {
   const [loading, setLoading]   = useState(true);
   const [paying, setPaying]     = useState(false);
   const [error, setError]       = useState("");
+  const [payNeed, setPayNeed]   = useState<{ amount: number; label: string } | null>(null);
 
   useEffect(() => {
     if (!campaignId) { router.push("/ads/create"); return; }
@@ -84,7 +86,18 @@ function CheckoutInner() {
     });
     const data = await res.json();
 
-    if (!res.ok) { setError(data.error || t("حدث خطأ في الدفع", "A payment error occurred")); setPaying(false); return; }
+    if (!res.ok) {
+      if (data.error === "insufficient_balance") {
+        // Pay the shortfall right here, then the checkout runs itself again.
+        const need = Math.max(0, Number(data.price ?? 0) - Number(data.balance ?? 0));
+        setPayNeed({ amount: Math.ceil(need), label: t("دفع قيمة الحملة", "Campaign payment") });
+        setPaying(false);
+        return;
+      }
+      setError(data.message || data.error || t("حدث خطأ في الدفع", "A payment error occurred"));
+      setPaying(false);
+      return;
+    }
     if (data.mobicash) { setOtpStep(true); setPaying(false); return; }
     if (data.redirect) { router.push(data.redirect); }
     else if (data.paymentLink) { window.location.href = data.paymentLink; }
@@ -235,6 +248,16 @@ function CheckoutInner() {
       </div>
 
       <style>{`@keyframes spin-anim{to{transform:rotate(360deg)}} .spin{animation:spin-anim 1s linear infinite}`}</style>
+
+      {payNeed && (
+        <WalletModal
+          payAmount={payNeed.amount}
+          payLabel={payNeed.label}
+          onPaid={() => { setPayNeed(null); pay(); }}
+          onClose={() => setPayNeed(null)}
+        />
+      )}
+
     </div>
   );
 }
