@@ -625,8 +625,14 @@ export default function StudioPage() {
           </div>
         ) : (
           <>
-            {/* Page selector */}
-            <div style={{ position: "relative" }}>
+            {/* Page selector + a way back to Facebook.
+                Re-authorising is not a one-off: every time the app gains a Meta
+                permission, existing Page tokens keep the OLD scopes — a token never
+                gains one retroactively — so the owner has to reconnect. This used to
+                be reachable only when no Page was linked at all, which meant anyone
+                who already had one could never do it. */}
+            <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+            <div style={{ position: "relative", flex: 1 }}>
               <button type="button" onClick={() => setPageMenu((o) => !o)} style={{ ...input, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", textAlign: rtl ? "right" : "left" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 9, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
                   {selPage && (
@@ -657,6 +663,12 @@ export default function StudioPage() {
                   </div>
                 </div>
               )}
+            </div>
+              <button type="button" onClick={() => router.push("/ads/connect")}
+                title={t("ربط صفحة جديدة أو إعادة تفويض صفحة موجودة", "Connect a new Page, or re-authorise an existing one")}
+                style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: "0 14px", color: c.text, fontWeight: 800, cursor: "pointer", fontSize: 13, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", flexShrink: 0 }}>
+                <Plus size={15} color={PINK} /> {t("ربط صفحة", "Connect")}
+              </button>
             </div>
 
             {/* Tabs */}
