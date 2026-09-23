@@ -10,6 +10,7 @@ import {
 import { useLang } from "@/hooks/useLang";
 import LangToggle from "@/components/LangToggle";
 import WalletModal from "@/components/WalletModal";
+import { startPageConnect } from "@/lib/connectPage";
 
 const GRADIENT = "linear-gradient(135deg, #0f0f1a 0%, #0d1b2a 100%)";
 const BLUE = "#1877f2", GREEN = "#22c55e", CARD = "rgba(255,255,255,0.04)", BORDER = "rgba(255,255,255,0.08)";
@@ -550,7 +551,7 @@ function AccountsTab({ config, patch, flash, t }: { config: Config; patch: (p: P
         )}
       </div>
 
-      <button onClick={() => { window.location.href = "/ads/connect"; }}
+      <button onClick={() => { startPageConnect("/bot") }}
         style={{ width: "100%", background: `linear-gradient(135deg, ${BLUE}, #1565c0)`, border: "none", borderRadius: 12, padding: "13px 0", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
         <Plus size={17} /> {t("ربط حساب فيسبوك إضافي", "Link another Facebook account")}
       </button>

@@ -22,8 +22,11 @@ export async function GET(req: Request) {
   const base = process.env.NEXT_PUBLIC_BASE_URL || "https://trendstore-ly.com";
   const redirectUri = `${base}/api/promo/pages/callback`;
 
-  // state = base64(userId) for verification
-  const state = Buffer.from(user.id).toString("base64");
+  // Where to land after Facebook. Connecting is reachable from the ads section,
+  // the Studio and the bot, and each should get the user back where they were
+  // instead of dumping everyone in the ads section.
+  const next = new URL(req.url).searchParams.get("next") || "";
+  const state = Buffer.from(next ? `${user.id}|${next}` : user.id).toString("base64");
   const oauthUrl = buildOAuthUrl(redirectUri, state);
 
   return NextResponse.json({ url: oauthUrl });

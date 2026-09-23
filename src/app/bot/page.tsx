@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import LangToggle from "@/components/LangToggle";
+import { startPageConnect } from "@/lib/connectPage";
 
 const GRADIENT = "linear-gradient(135deg, #0f0f1a 0%, #0d1b2a 100%)";
 const BLUE     = "#1877f2";
@@ -113,7 +114,7 @@ export default function BotDashboard() {
             <p style={{ color: "#94a3b8", margin: "0 0 18px", fontSize: 14 }}>
               {t("اربط صفحة فيسبوك أولاً لتفعيل البوت عليها", "Connect a Facebook Page first to enable the bot on it")}
             </p>
-            <button onClick={() => router.push("/ads/connect")}
+            <button onClick={() => startPageConnect("/bot")}
               style={{ background: `linear-gradient(135deg, ${BLUE}, #1565c0)`, border: "none", borderRadius: 12, padding: "13px 26px", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
               <Plus size={18} /> {t("ربط صفحة", "Connect a Page")}
             </button>
@@ -124,7 +125,7 @@ export default function BotDashboard() {
               <h3 style={{ fontSize: 15, fontWeight: 700, color: "#cbd5e1", margin: 0 }}>
                 {t("صفحاتك", "Your Pages")} ({pages.length})
               </h3>
-              <button onClick={() => router.push("/ads/connect")}
+              <button onClick={() => startPageConnect("/bot")}
                 style={{ marginInlineStart: "auto", background: `${BLUE}1f`, border: `1px solid ${BLUE}55`, borderRadius: 10, padding: "8px 14px", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7 }}>
                 <Plus size={15} /> {t("ربط صفحة", "Connect a Page")}
               </button>

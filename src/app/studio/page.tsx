@@ -13,6 +13,7 @@ import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
 import AdsBottomNav from "@/components/AdsBottomNav";
 import WalletModal from "@/components/WalletModal";
+import { startPageConnect } from "@/lib/connectPage";
 
 const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
 const PINK    = "#d6409f";
@@ -621,7 +622,7 @@ export default function StudioPage() {
         {pages.length === 0 ? (
           <div style={{ ...card, textAlign: "center", padding: 34 }}>
             <p style={{ color: c.muted, fontSize: 14, marginBottom: 18 }}>{t("اربط صفحة فيسبوك أولاً ليعمل الموظف الذكي عليها.", "Connect a Facebook Page first for the AI Employee to work on.")}</p>
-            <button onClick={() => router.push("/ads/connect")} style={{ background: G_HERO, border: "none", borderRadius: 13, padding: "12px 26px", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>{t("ربط صفحة", "Connect a Page")}</button>
+            <button onClick={() => startPageConnect("/studio")} style={{ background: G_HERO, border: "none", borderRadius: 13, padding: "12px 26px", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>{t("ربط صفحة", "Connect a Page")}</button>
           </div>
         ) : (
           <>
@@ -664,7 +665,7 @@ export default function StudioPage() {
                 </div>
               )}
             </div>
-              <button type="button" onClick={() => router.push("/ads/connect")}
+              <button type="button" onClick={() => startPageConnect("/studio")}
                 title={t("ربط صفحة جديدة أو إعادة تفويض صفحة موجودة", "Connect a new Page, or re-authorise an existing one")}
                 style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: "0 14px", color: c.text, fontWeight: 800, cursor: "pointer", fontSize: 13, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", flexShrink: 0 }}>
                 <Plus size={15} color={PINK} /> {t("ربط صفحة", "Connect")}

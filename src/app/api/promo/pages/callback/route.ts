@@ -30,7 +30,9 @@ async function appendPoolTokens(userId: string, pages: MetaPage[]): Promise<void
 }
 
 // GET — Meta OAuth callback
-// Saves connected pages to DB then redirects to /ads/connect
+const ALLOWED_RETURNS = ["/ads/connect", "/studio", "/bot", "/tiktok-bot"];
+
+// Saves connected pages to DB then returns the user to wherever they started
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const code  = searchParams.get("code");
@@ -44,8 +46,14 @@ export async function GET(req: NextRequest) {
   }
 
   let userId: string;
+  let back = "/ads/connect";
   try {
-    userId = Buffer.from(state, "base64").toString("utf-8");
+    const decoded = Buffer.from(state, "base64").toString("utf-8");
+    const [id, next] = decoded.split("|");
+    userId = id;
+    // Allowlisted destinations only — state travels through the browser, so an
+    // arbitrary `next` would turn this callback into an open redirect.
+    if (next && ALLOWED_RETURNS.includes(next)) back = next;
   } catch {
     return NextResponse.redirect(`${base}/ads/connect?error=invalid_state`);
   }
@@ -56,7 +64,7 @@ export async function GET(req: NextRequest) {
     const pages       = await getUserPages(userToken);
 
     if (!pages.length) {
-      return NextResponse.redirect(`${base}/ads/connect?error=no_pages`);
+      return NextResponse.redirect(`${base}${back}?error=no_pages`);
     }
 
     // Upsert each page
@@ -82,12 +90,12 @@ export async function GET(req: NextRequest) {
     // Diagnostic: how many Pages Facebook returned this login (so we can tell if a
     // Page whose token is dead was actually re-granted). Shown on /ads/connect.
     console.log("OAuth callback OK: user", userId, "pages", pages.length, pages.map((p) => p.id).join(","));
-    return NextResponse.redirect(`${base}/ads/connect?success=1&connected=${pages.length}`);
+    return NextResponse.redirect(`${base}${back}?success=1&connected=${pages.length}`);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "error";
     console.error("Meta OAuth callback error:", msg);
     // Surface the real Graph error in the URL so failures are diagnosable
     const reason = encodeURIComponent(msg.slice(0, 180));
-    return NextResponse.redirect(`${base}/ads/connect?error=oauth_failed&reason=${reason}`);
+    return NextResponse.redirect(`${base}${back}?error=oauth_failed&reason=${reason}`);
   }
 }
