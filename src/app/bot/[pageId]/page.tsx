@@ -8,12 +8,13 @@ import {
   Sparkles, CreditCard, Power, Clock, Newspaper, Star, CheckCircle2, RefreshCw, Pencil,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
+import { useTheme } from "@/hooks/useTheme";
+import { botColors } from "@/lib/botTheme";
 import LangToggle from "@/components/LangToggle";
 import WalletModal from "@/components/WalletModal";
 import { startPageConnect } from "@/lib/connectPage";
 
-const GRADIENT = "linear-gradient(135deg, #0f0f1a 0%, #0d1b2a 100%)";
-const BLUE = "#1877f2", GREEN = "#22c55e", CARD = "rgba(255,255,255,0.04)", BORDER = "rgba(255,255,255,0.08)";
+const BLUE = "#1877f2", GREEN = "#22c55e";
 
 interface Attachment { type: "image" | "file"; url: string; }
 interface PostOverride { public_replies: string[]; private_reply: string; attachments: Attachment[]; }
@@ -41,6 +42,12 @@ function subActive(s: Sub | null): boolean {
 }
 
 export default function BotManage() {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const GRADIENT = c.gradient;
+  const CARD_BG = c.card;
+  const CARD = c.card;
+  const BORDER = c.border;
   const router = useRouter();
   const params = useParams();
   const pageId = String(params.pageId);
@@ -127,9 +134,9 @@ export default function BotManage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: GRADIENT, color: "#fff", fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80 }}>
+    <div style={{ minHeight: "100vh", background: GRADIENT, color: c.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80 }}>
       <div style={{ padding: "18px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 12 }}>
-        <button onClick={() => router.push("/bot")} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+        <button onClick={() => router.push("/bot")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
           <Back size={18} /> {t("رجوع", "Back")}
         </button>
         <h1 style={{ fontSize: 16, fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -146,7 +153,7 @@ export default function BotManage() {
             <div style={{ fontWeight: 700, fontSize: 14 }}>
               {running ? t("البوت يعمل الآن", "Bot is running") : active ? t("مشترك — البوت متوقف", "Subscribed — bot is off") : t("غير مشترك", "Not subscribed")}
             </div>
-            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>
+            <div style={{ fontSize: 12, color: c.muted, marginTop: 3 }}>
               {active && sub?.expires_at
                 ? t(`ينتهي الاشتراك: ${new Date(sub.expires_at).toLocaleDateString("ar-LY")}`, `Renews/expires: ${new Date(sub.expires_at).toLocaleDateString("en-GB")}`)
                 : t(`${price} د.ل شهرياً`, `${price} LYD / month`)}
@@ -154,7 +161,7 @@ export default function BotManage() {
           </div>
           {!active ? (
             <button onClick={subscribe} disabled={subscribing}
-              style={{ background: `linear-gradient(135deg, ${BLUE}, #6b46c1)`, border: "none", borderRadius: 11, padding: "11px 20px", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+              style={{ background: `linear-gradient(135deg, ${BLUE}, #6b46c1)`, border: "none", borderRadius: 11, padding: "11px 20px", color: c.text, fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
               {subscribing ? <Loader2 size={16} className="spin" /> : <CreditCard size={16} />}
               {t(`اشترك — ${price} د.ل`, `Subscribe — ${price} LYD`)}
             </button>
@@ -194,7 +201,7 @@ export default function BotManage() {
       </div>
 
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, insetInlineStart: "50%", transform: "translateX(-50%)", background: "#1e293b", border: `1px solid ${BLUE}55`, borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 700, zIndex: 50, boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>{toast}</div>
+        <div style={{ position: "fixed", bottom: 24, insetInlineStart: "50%", transform: "translateX(-50%)", background: c.toast, border: `1px solid ${BLUE}55`, borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 700, zIndex: 50, boxShadow: c.shadow }}>{toast}</div>
       )}
 
       {pay && (
@@ -223,11 +230,14 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 // ── Settings tab ─────────────────────────────────────────────────────────────
 type TF = (ar: string, en: string) => string;
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const BORDER = c.border;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 0", borderBottom: `1px solid ${BORDER}` }}>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>{label}</div>
-        {hint && <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>{hint}</div>}
+        {hint && <div style={{ fontSize: 12, color: c.muted, marginTop: 3 }}>{hint}</div>}
       </div>
       {children}
     </div>
@@ -235,6 +245,10 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 }
 
 function SettingsTab({ config, patch, t }: { config: Config; patch: (p: Partial<Config>) => Promise<boolean>; t: TF }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const CARD = c.card;
+  const BORDER = c.border;
   // Public-reply variants: one per line. Seeded from the array, or the legacy single value.
   const [pubVariants, setPubVariants] = useState(
     (config.public_replies?.length ? config.public_replies : (config.default_public_reply ? [config.default_public_reply] : [])).join("\n")
@@ -245,7 +259,7 @@ function SettingsTab({ config, patch, t }: { config: Config; patch: (p: Partial<
   const [minD, setMinD] = useState(config.min_delay_sec ?? 2);
   const [maxD, setMaxD] = useState(config.max_delay_sec ?? 6);
 
-  const numInput: React.CSSProperties = { width: 64, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 9, padding: "8px 10px", color: "#fff", textAlign: "center" };
+  const numInput: React.CSSProperties = { width: 64, background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 9, padding: "8px 10px", color: c.text, textAlign: "center" };
   const box: React.CSSProperties = { background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: "6px 20px" };
 
   function saveVariants() {
@@ -293,27 +307,27 @@ function SettingsTab({ config, patch, t }: { config: Config; patch: (p: Partial<
         <label style={{ fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
           <RefreshCw size={14} color={BLUE} /> {t("نصوص الرد العلني (تنويع)", "Public reply texts (variety)")}
         </label>
-        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: c.muted, marginBottom: 8 }}>
           {t("سطر لكل نص — يختار البوت واحداً عشوائياً في كل مرة كي لا تتكرّر الردود.", "One text per line — the bot picks one at random each time so replies don't repeat.")}
         </div>
         <textarea value={pubVariants} onChange={(e) => setPubVariants(e.target.value)} onBlur={saveVariants} rows={4}
           placeholder={t("تمّت مراسلتك في الخاص ✅\nراسلناك على الخاص 📩\nتفقّد رسائلك 💬", "We've DMed you ✅\nCheck your inbox 📩\nSent you a private message 💬")}
-          style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 9, padding: "11px 14px", color: "#fff", boxSizing: "border-box", resize: "vertical" }} />
+          style={{ width: "100%", background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 9, padding: "11px 14px", color: c.text, boxSizing: "border-box", resize: "vertical" }} />
       </div>
 
       <div style={{ ...box, padding: 20 }}>
         <label style={{ fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
           <MessageSquare size={14} color={BLUE} /> {t("الرسالة الخاصة الافتراضية", "Default private message")}
         </label>
-        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: c.muted, marginBottom: 8 }}>
           {t("تُرسل في الخاص عندما لا تحدّد القاعدة رسالة خاصة خاصة بها.", "Sent privately when a matched rule has no private message of its own.")}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <textarea value={priv} onChange={(e) => setPriv(e.target.value)} rows={3}
             placeholder={t("شكراً لتواصلك! أرسل لنا استفسارك وسنردّ فوراً 🌟", "Thanks for reaching out! Send us your question and we'll reply right away 🌟")}
-            style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 9, padding: "11px 14px", color: "#fff", boxSizing: "border-box", resize: "vertical" }} />
+            style={{ flex: 1, background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 9, padding: "11px 14px", color: c.text, boxSizing: "border-box", resize: "vertical" }} />
           <button onClick={() => patch({ default_private_reply: priv })}
-            style={{ background: `${BLUE}22`, border: `1px solid ${BLUE}55`, borderRadius: 9, padding: "0 16px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontWeight: 700, alignSelf: "stretch" }}>
+            style={{ background: `${BLUE}22`, border: `1px solid ${BLUE}55`, borderRadius: 9, padding: "0 16px", color: c.text, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontWeight: 700, alignSelf: "stretch" }}>
             <Save size={15} /> {t("حفظ", "Save")}
           </button>
         </div>
@@ -325,7 +339,7 @@ function SettingsTab({ config, patch, t }: { config: Config; patch: (p: Partial<
           <textarea value={persona} onChange={(e) => setPersona(e.target.value)}
             onBlur={() => persona !== (config.ai_persona || "") && patch({ ai_persona: persona })}
             rows={4} placeholder={t("مثال: أنت مساعد مبيعات لمتجر إلكترونيات، ردودك مختصرة وودّية بالعربية.", "e.g. You are a sales assistant for an electronics store; keep replies short and friendly.")}
-            style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 9, padding: "11px 14px", color: "#fff", boxSizing: "border-box", resize: "vertical" }} />
+            style={{ width: "100%", background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 9, padding: "11px 14px", color: c.text, boxSizing: "border-box", resize: "vertical" }} />
         </div>
       )}
     </div>
@@ -342,6 +356,10 @@ const MATCH_LABELS = (t: TF): [string, string][] => [
 ];
 
 function RulesTab({ configId, flash, t }: { configId: string; flash: (m: string) => void; t: TF }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const CARD = c.card;
+  const BORDER = c.border;
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Rule | null>(null);
@@ -369,13 +387,13 @@ function RulesTab({ configId, flash, t }: { configId: string; flash: (m: string)
   return (
     <div>
       <button onClick={newRule}
-        style={{ width: "100%", background: `linear-gradient(135deg, ${BLUE}, #6b46c1)`, border: "none", borderRadius: 12, padding: "13px 0", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
+        style={{ width: "100%", background: `linear-gradient(135deg, ${BLUE}, #6b46c1)`, border: "none", borderRadius: 12, padding: "13px 0", color: c.text, fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
         <Plus size={17} /> {t("قاعدة جديدة", "New rule")}
       </button>
 
-      {loading ? <div style={{ textAlign: "center", padding: 30, color: "#64748b" }}><Loader2 size={24} className="spin" /></div>
+      {loading ? <div style={{ textAlign: "center", padding: 30, color: c.dim }}><Loader2 size={24} className="spin" /></div>
         : rules.length === 0 ? (
-          <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 28, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+          <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 28, textAlign: "center", color: c.muted, fontSize: 14 }}>
             {t("لا قواعد بعد. أنشئ قاعدة: مثلاً كلمة \"السعر\" → رد بالسعر في الخاص.", "No rules yet. Create one: e.g. keyword \"price\" → reply with the price privately.")}
           </div>
         ) : (
@@ -385,13 +403,13 @@ function RulesTab({ configId, flash, t }: { configId: string; flash: (m: string)
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 14 }}>{r.name || (r.keywords[0] ?? t("قاعدة", "Rule"))}</div>
-                    <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div style={{ fontSize: 12, color: c.muted, marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {r.match_type === "catch_all" ? t("كل التعليقات", "All comments") : (r.keywords.join("، ") || "—")}
                     </div>
                   </div>
-                  {!r.enabled && <span style={{ fontSize: 11, color: "#94a3b8", background: "rgba(255,255,255,0.06)", padding: "3px 8px", borderRadius: 6 }}>{t("متوقفة", "Off")}</span>}
+                  {!r.enabled && <span style={{ fontSize: 11, color: c.muted, background: c.surface, padding: "3px 8px", borderRadius: 6 }}>{t("متوقفة", "Off")}</span>}
                   {r.attachments?.length > 0 && <span style={{ fontSize: 11, color: BLUE }}>{r.attachments.length} 📎</span>}
-                  <button onClick={() => setEditing(r)} style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "6px 10px", color: "#cbd5e1", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>{t("تعديل", "Edit")}</button>
+                  <button onClick={() => setEditing(r)} style={{ background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "6px 10px", color: "#cbd5e1", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>{t("تعديل", "Edit")}</button>
                   <button onClick={() => del(r.id)} style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, padding: "6px 8px", color: "#f87171", cursor: "pointer" }}><Trash2 size={14} /></button>
                 </div>
               </div>
@@ -403,6 +421,10 @@ function RulesTab({ configId, flash, t }: { configId: string; flash: (m: string)
 }
 
 function RuleEditor({ rule, configId, t, onClose, onSaved }: { rule: Rule; configId: string; t: TF; onClose: () => void; onSaved: () => void }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const CARD = c.card;
+  const BORDER = c.border;
   const [name, setName] = useState(rule.name || "");
   const [kwText, setKwText] = useState(rule.keywords.join("، "));
   const [matchType, setMatchType] = useState(rule.match_type);
@@ -439,14 +461,14 @@ function RuleEditor({ rule, configId, t, onClose, onSaved }: { rule: Rule; confi
     onSaved();
   }
 
-  const inp: React.CSSProperties = { width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 9, padding: "11px 14px", color: "#fff", boxSizing: "border-box" };
+  const inp: React.CSSProperties = { width: "100%", background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 9, padding: "11px 14px", color: c.text, boxSizing: "border-box" };
   const lbl: React.CSSProperties = { fontSize: 13, fontWeight: 600, display: "block", marginBottom: 7, marginTop: 16 };
 
   return (
     <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: 22 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{rule.id ? t("تعديل القاعدة", "Edit rule") : t("قاعدة جديدة", "New rule")}</h3>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}><X size={20} /></button>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer" }}><X size={20} /></button>
       </div>
 
       <label style={lbl}>{t("اسم القاعدة (اختياري)", "Rule name (optional)")}</label>
@@ -478,13 +500,13 @@ function RuleEditor({ rule, configId, t, onClose, onSaved }: { rule: Rule; confi
               // eslint-disable-next-line @next/next/no-img-element
               <img src={a.url} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: "cover", border: `1px solid ${BORDER}` }} />
             ) : (
-              <div style={{ width: 60, height: 60, borderRadius: 10, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#94a3b8" }}>PDF</div>
+              <div style={{ width: 60, height: 60, borderRadius: 10, background: c.surface, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: c.muted }}>PDF</div>
             )}
             <button onClick={() => setAtts((x) => x.filter((_, j) => j !== i))}
-              style={{ position: "absolute", top: -6, insetInlineEnd: -6, background: "#ef4444", border: "none", borderRadius: "50%", width: 20, height: 20, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={12} /></button>
+              style={{ position: "absolute", top: -6, insetInlineEnd: -6, background: "#ef4444", border: "none", borderRadius: "50%", width: 20, height: 20, color: c.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={12} /></button>
           </div>
         ))}
-        <label style={{ width: 60, height: 60, borderRadius: 10, border: `1px dashed ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#94a3b8" }}>
+        <label style={{ width: 60, height: 60, borderRadius: 10, border: `1px dashed ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: c.muted }}>
           {uploading ? <Loader2 size={18} className="spin" /> : <Upload size={18} />}
           <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
         </label>
@@ -501,7 +523,7 @@ function RuleEditor({ rule, configId, t, onClose, onSaved }: { rule: Rule; confi
       </div>
 
       <button onClick={save} disabled={saving}
-        style={{ width: "100%", marginTop: 20, background: `linear-gradient(135deg, ${GREEN}, #16a34a)`, border: "none", borderRadius: 11, padding: "13px 0", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        style={{ width: "100%", marginTop: 20, background: `linear-gradient(135deg, ${GREEN}, #16a34a)`, border: "none", borderRadius: 11, padding: "13px 0", color: c.text, fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
         {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />} {t("حفظ القاعدة", "Save rule")}
       </button>
     </div>
@@ -510,6 +532,10 @@ function RuleEditor({ rule, configId, t, onClose, onSaved }: { rule: Rule; confi
 
 // ── Accounts (rotation pool) tab ─────────────────────────────────────────────
 function AccountsTab({ config, patch, flash, t }: { config: Config; patch: (p: Partial<Config>) => Promise<boolean>; flash: (m: string) => void; t: TF }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const CARD = c.card;
+  const BORDER = c.border;
   const configId = config.id;
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
@@ -552,19 +578,19 @@ function AccountsTab({ config, patch, flash, t }: { config: Config; patch: (p: P
       </div>
 
       <button onClick={() => { startPageConnect("/bot") }}
-        style={{ width: "100%", background: `linear-gradient(135deg, ${BLUE}, #1565c0)`, border: "none", borderRadius: 12, padding: "13px 0", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
+        style={{ width: "100%", background: `linear-gradient(135deg, ${BLUE}, #1565c0)`, border: "none", borderRadius: 12, padding: "13px 0", color: c.text, fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
         <Plus size={17} /> {t("ربط حساب فيسبوك إضافي", "Link another Facebook account")}
       </button>
 
       {!loading && tokens.length <= 1 && tokens.length > 0 && (
-        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14, textAlign: "center", lineHeight: 1.7 }}>
+        <div style={{ fontSize: 12, color: c.muted, marginBottom: 14, textAlign: "center", lineHeight: 1.7 }}>
           {t("لديك حساب واحد (وهو النشط ⭐). اربط حساباً آخر بالزرّ أعلاه، وعندها يظهر زرّ «اجعله النشط» للتبديل بينهما.", "You have one account (it's active ⭐). Link another with the button above, then a “Set active” button appears to switch between them.")}
         </div>
       )}
 
-      {loading ? <div style={{ textAlign: "center", padding: 30, color: "#64748b" }}><Loader2 size={24} className="spin" /></div>
+      {loading ? <div style={{ textAlign: "center", padding: 30, color: c.dim }}><Loader2 size={24} className="spin" /></div>
         : tokens.length === 0 ? (
-          <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+          <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 24, textAlign: "center", color: c.muted, fontSize: 14 }}>
             {t("لا حسابات في المجموعة بعد", "No accounts in the pool yet")}
           </div>
         ) : (
@@ -589,7 +615,7 @@ function AccountsTab({ config, patch, flash, t }: { config: Config; patch: (p: P
                     <Star size={13} /> {t("اجعله النشط", "Set active")}
                   </button>
                 )}
-                <button onClick={() => toggle(tk)} style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "6px 12px", color: "#cbd5e1", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                <button onClick={() => toggle(tk)} style={{ background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "6px 12px", color: "#cbd5e1", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
                   {tk.status === "dead" ? t("تفعيل", "Enable") : t("إيقاف", "Disable")}
                 </button>
                 <button onClick={() => remove(tk.id)} style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, padding: "6px 8px", color: "#f87171", cursor: "pointer" }}><Trash2 size={14} /></button>
@@ -608,6 +634,10 @@ function hasOverride(o?: PostOverride): boolean {
 }
 
 function PostsTab({ config, pageId, patch, flash, t }: { config: Config; pageId: string; patch: (p: Partial<Config>) => Promise<boolean>; flash: (m: string) => void; t: TF }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const CARD = c.card;
+  const BORDER = c.border;
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -670,16 +700,16 @@ function PostsTab({ config, pageId, patch, flash, t }: { config: Config; pageId:
         </Row>
       </div>
 
-      <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.7 }}>
+      <div style={{ fontSize: 13, color: c.muted, lineHeight: 1.7 }}>
         {targeted
           ? t("اختر المنشورات (المربّع) التي يردّ عليها البوت، واضغط على أي منشور لتخصيص ردّ خاص به.", "Tick the posts the bot replies on, and tap any post to set a custom reply for it.")
           : t("اضغط على أي منشور لتخصيص ردّ خاص به (اختياري).", "Tap any post to give it its own custom reply (optional).")}
         {targeted && selected.size > 0 && <span style={{ color: BLUE, fontWeight: 700 }}> · {selected.size}</span>}
       </div>
 
-      {loading ? <div style={{ textAlign: "center", padding: 30, color: "#64748b" }}><Loader2 size={24} className="spin" /></div>
+      {loading ? <div style={{ textAlign: "center", padding: 30, color: c.dim }}><Loader2 size={24} className="spin" /></div>
         : err ? <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 20, textAlign: "center", color: "#f87171", fontSize: 13 }}>{err}</div>
-        : posts.length === 0 ? <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>{t("لا منشورات على هذه الصفحة", "No posts on this Page")}</div>
+        : posts.length === 0 ? <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 24, textAlign: "center", color: c.muted, fontSize: 14 }}>{t("لا منشورات على هذه الصفحة", "No posts on this Page")}</div>
         : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {posts.map((p) => {
@@ -687,22 +717,22 @@ function PostsTab({ config, pageId, patch, flash, t }: { config: Config; pageId:
               const custom = hasOverride(overrides[p.id]);
               return (
                 <div key={p.id} onClick={() => setEditing(p)}
-                  style={{ background: custom ? `${GREEN}10` : CARD, border: `1px solid ${custom ? `${GREEN}44` : (on ? `${BLUE}55` : BORDER)}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", color: "#fff" }}>
+                  style={{ background: custom ? `${GREEN}10` : CARD, border: `1px solid ${custom ? `${GREEN}44` : (on ? `${BLUE}55` : BORDER)}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", color: c.text }}>
                   {p.picture ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={p.picture} alt="" style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
                   ) : (
-                    <div style={{ width: 48, height: 48, borderRadius: 10, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Newspaper size={20} color="#64748b" /></div>
+                    <div style={{ width: 48, height: 48, borderRadius: 10, background: c.surface, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Newspaper size={20} color="#64748b" /></div>
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.message || t("(منشور بدون نص)", "(post with no text)")}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                      <span style={{ fontSize: 11, color: "#64748b" }}>{new Date(p.createdTime).toLocaleDateString(t("ar-LY", "en-GB"))}</span>
+                      <span style={{ fontSize: 11, color: c.dim }}>{new Date(p.createdTime).toLocaleDateString(t("ar-LY", "en-GB"))}</span>
                       {custom && <span style={{ fontSize: 11, color: GREEN, display: "inline-flex", alignItems: "center", gap: 3 }}><MessageSquare size={11} /> {t("ردّ مخصّص", "Custom reply")}</span>}
                     </div>
                   </div>
                   <button onClick={(e) => { e.stopPropagation(); setEditing(p); }} title={t("تعديل الرد", "Edit reply")}
-                    style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "7px 9px", color: "#cbd5e1", cursor: "pointer", flexShrink: 0 }}>
+                    style={{ background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "7px 9px", color: "#cbd5e1", cursor: "pointer", flexShrink: 0 }}>
                     <Pencil size={14} />
                   </button>
                   {targeted && (
@@ -719,7 +749,7 @@ function PostsTab({ config, pageId, patch, flash, t }: { config: Config; pageId:
 
       {targeted && (
         <button onClick={saveSelection} disabled={saving}
-          style={{ background: `linear-gradient(135deg, ${GREEN}, #16a34a)`, border: "none", borderRadius: 11, padding: "12px 0", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          style={{ background: `linear-gradient(135deg, ${GREEN}, #16a34a)`, border: "none", borderRadius: 11, padding: "12px 0", color: c.text, fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
           {saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />} {t("حفظ المنشورات المختارة", "Save selected posts")}
         </button>
       )}
@@ -729,6 +759,10 @@ function PostsTab({ config, pageId, patch, flash, t }: { config: Config; pageId:
 
 // Editor for a single post's custom public/private reply + attachments.
 function PostReplyEditor({ post, initial, t, onClose, onSave }: { post: Post; initial?: PostOverride; t: TF; onClose: () => void; onSave: (ov: PostOverride) => void }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const CARD = c.card;
+  const BORDER = c.border;
   const [pubVariants, setPubVariants] = useState((initial?.public_replies || []).join("\n"));
   const [priv, setPriv] = useState(initial?.private_reply || "");
   const [atts, setAtts] = useState<Attachment[]>(initial?.attachments || []);
@@ -754,25 +788,25 @@ function PostReplyEditor({ post, initial, t, onClose, onSave }: { post: Post; in
     setSaving(false);
   }
 
-  const inp: React.CSSProperties = { width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 9, padding: "11px 14px", color: "#fff", boxSizing: "border-box" };
+  const inp: React.CSSProperties = { width: "100%", background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 9, padding: "11px 14px", color: c.text, boxSizing: "border-box" };
   const lbl: React.CSSProperties = { fontSize: 13, fontWeight: 600, display: "block", marginBottom: 7, marginTop: 16 };
 
   return (
     <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: 22 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{t("ردّ خاص بهذا المنشور", "Custom reply for this post")}</h3>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}><X size={20} /></button>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer" }}><X size={20} /></button>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,0.04)", borderRadius: 12, padding: 10, marginTop: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, background: c.card, borderRadius: 12, padding: 10, marginTop: 8 }}>
         {post.picture ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={post.picture} alt="" style={{ width: 44, height: 44, borderRadius: 9, objectFit: "cover" }} />
-        ) : <div style={{ width: 44, height: 44, borderRadius: 9, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}><Newspaper size={18} color="#64748b" /></div>}
+        ) : <div style={{ width: 44, height: 44, borderRadius: 9, background: c.surface, display: "flex", alignItems: "center", justifyContent: "center" }}><Newspaper size={18} color="#64748b" /></div>}
         <div style={{ fontSize: 12, color: "#cbd5e1", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{post.message || t("(منشور بدون نص)", "(post with no text)")}</div>
       </div>
 
-      <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 12, lineHeight: 1.7 }}>
+      <div style={{ fontSize: 12, color: c.muted, marginTop: 12, lineHeight: 1.7 }}>
         {t("يُستخدم هذا الردّ لكل تعليق على هذا المنشور تحديداً — ويتقدّم على القواعد العامة.", "This reply is used for every comment on this specific post — and takes priority over the general rules.")}
       </div>
 
@@ -790,20 +824,20 @@ function PostReplyEditor({ post, initial, t, onClose, onSave }: { post: Post; in
               // eslint-disable-next-line @next/next/no-img-element
               <img src={a.url} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: "cover", border: `1px solid ${BORDER}` }} />
             ) : (
-              <div style={{ width: 60, height: 60, borderRadius: 10, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#94a3b8" }}>PDF</div>
+              <div style={{ width: 60, height: 60, borderRadius: 10, background: c.surface, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: c.muted }}>PDF</div>
             )}
             <button onClick={() => setAtts((x) => x.filter((_, j) => j !== i))}
-              style={{ position: "absolute", top: -6, insetInlineEnd: -6, background: "#ef4444", border: "none", borderRadius: "50%", width: 20, height: 20, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={12} /></button>
+              style={{ position: "absolute", top: -6, insetInlineEnd: -6, background: "#ef4444", border: "none", borderRadius: "50%", width: 20, height: 20, color: c.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={12} /></button>
           </div>
         ))}
-        <label style={{ width: 60, height: 60, borderRadius: 10, border: `1px dashed ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#94a3b8" }}>
+        <label style={{ width: 60, height: 60, borderRadius: 10, border: `1px dashed ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: c.muted }}>
           {uploading ? <Loader2 size={18} className="spin" /> : <Upload size={18} />}
           <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
         </label>
       </div>
 
       <button onClick={save} disabled={saving}
-        style={{ width: "100%", marginTop: 20, background: `linear-gradient(135deg, ${GREEN}, #16a34a)`, border: "none", borderRadius: 11, padding: "13px 0", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        style={{ width: "100%", marginTop: 20, background: `linear-gradient(135deg, ${GREEN}, #16a34a)`, border: "none", borderRadius: 11, padding: "13px 0", color: c.text, fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
         {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />} {t("حفظ ردّ المنشور", "Save post reply")}
       </button>
     </div>
@@ -812,6 +846,10 @@ function PostReplyEditor({ post, initial, t, onClose, onSave }: { post: Post; in
 
 // ── Activity tab ─────────────────────────────────────────────────────────────
 function ActivityTab({ configId, t }: { configId: string; t: TF }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const CARD = c.card;
+  const BORDER = c.border;
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [stats, setStats] = useState<{ total: number; public_sent: number; private_sent: number; failed: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -828,22 +866,22 @@ function ActivityTab({ configId, t }: { configId: string; t: TF }) {
     return <span style={{ fontSize: 11, color: c, background: `${c}18`, padding: "2px 7px", borderRadius: 6 }}>{l}</span>;
   };
 
-  if (loading) return <div style={{ textAlign: "center", padding: 30, color: "#64748b" }}><Loader2 size={24} className="spin" /></div>;
+  if (loading) return <div style={{ textAlign: "center", padding: 30, color: c.dim }}><Loader2 size={24} className="spin" /></div>;
 
   return (
     <div>
       {stats && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
-          {[[t("ردود خاصة", "DMs sent"), stats.private_sent, GREEN], [t("ردود علنية", "Public replies"), stats.public_sent, BLUE], [t("إخفاقات", "Failures"), stats.failed, "#ef4444"]].map(([l, v, c], i) => (
+          {[[t("ردود خاصة", "DMs sent"), stats.private_sent, GREEN], [t("ردود علنية", "Public replies"), stats.public_sent, BLUE], [t("إخفاقات", "Failures"), stats.failed, "#ef4444"]].map(([l, v, hue], i) => (
             <div key={i} style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: c as string }}>{v as number}</div>
-              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{l as string}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: hue as string }}>{v as number}</div>
+              <div style={{ fontSize: 11, color: c.muted, marginTop: 3 }}>{l as string}</div>
             </div>
           ))}
         </div>
       )}
       {logs.length === 0 ? (
-        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 24, textAlign: "center", color: c.muted, fontSize: 14 }}>
           {t("لا نشاط بعد — سيظهر هنا كل تعليق يرد عليه البوت", "No activity yet — every comment the bot replies to will appear here")}
         </div>
       ) : (
@@ -856,7 +894,7 @@ function ActivityTab({ configId, t }: { configId: string; t: TF }) {
               </div>
               <div style={{ fontSize: 13, color: "#cbd5e1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.comment_message || "—"}</div>
               {l.error && <div style={{ fontSize: 11, color: "#f87171", marginTop: 4 }}>{l.error}</div>}
-              <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{new Date(l.created_at).toLocaleString(t("ar-LY", "en-GB"))}</div>
+              <div style={{ fontSize: 11, color: c.dim, marginTop: 4 }}>{new Date(l.created_at).toLocaleString(t("ar-LY", "en-GB"))}</div>
             </div>
           ))}
         </div>

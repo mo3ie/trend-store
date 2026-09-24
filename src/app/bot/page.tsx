@@ -7,13 +7,13 @@ import {
   CheckCircle, Zap, ShieldCheck, Sparkles, Search,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
+import { useTheme } from "@/hooks/useTheme";
+import { botColors } from "@/lib/botTheme";
 import LangToggle from "@/components/LangToggle";
 import { startPageConnect } from "@/lib/connectPage";
 
-const GRADIENT = "linear-gradient(135deg, #0f0f1a 0%, #0d1b2a 100%)";
 const BLUE     = "#1877f2";
 const GREEN    = "#22c55e";
-const CARD_BG  = "rgba(255,255,255,0.04)";
 
 interface Sub { status: string; expires_at: string | null; }
 interface Config { id: string; enabled: boolean; }
@@ -30,6 +30,10 @@ function subActive(s: Sub | null): boolean {
 }
 
 export default function BotDashboard() {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const GRADIENT = c.gradient;
+  const CARD_BG = c.card;
   const router = useRouter();
   const { t, rtl } = useLang();
   const Back = rtl ? ArrowLeft : ArrowRight;
@@ -65,9 +69,9 @@ export default function BotDashboard() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: GRADIENT, color: "#fff", fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80 }}>
-      <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 12 }}>
-        <button onClick={() => router.push("/")} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+    <div style={{ minHeight: "100vh", background: GRADIENT, color: c.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80 }}>
+      <div style={{ padding: "20px 24px", borderBottom: `1px solid ${c.borderSoft}`, display: "flex", alignItems: "center", gap: 12 }}>
+        <button onClick={() => router.push("/")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
           <Back size={18} /> {t("رجوع", "Back")}
         </button>
         <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
@@ -101,21 +105,21 @@ export default function BotDashboard() {
               </div>
             ))}
           </div>
-          <div style={{ marginTop: 18, fontSize: 15, fontWeight: 700, color: "#fff" }}>
+          <div style={{ marginTop: 18, fontSize: 15, fontWeight: 700, color: c.text }}>
             {price} {t("د.ل / شهرياً لكل صفحة", "LYD / month per Page")}
           </div>
         </div>
 
         {loading ? (
-          <div style={{ textAlign: "center", padding: 50, color: "#64748b" }}><Loader2 size={30} className="spin" /></div>
+          <div style={{ textAlign: "center", padding: 50, color: c.dim }}><Loader2 size={30} className="spin" /></div>
         ) : pages.length === 0 ? (
-          <div style={{ background: CARD_BG, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 34, textAlign: "center" }}>
+          <div style={{ background: CARD_BG, border: `1px solid ${c.borderSoft}`, borderRadius: 16, padding: 34, textAlign: "center" }}>
             <Bot size={40} color="#475569" style={{ marginBottom: 14 }} />
-            <p style={{ color: "#94a3b8", margin: "0 0 18px", fontSize: 14 }}>
+            <p style={{ color: c.muted, margin: "0 0 18px", fontSize: 14 }}>
               {t("اربط صفحة فيسبوك أولاً لتفعيل البوت عليها", "Connect a Facebook Page first to enable the bot on it")}
             </p>
             <button onClick={() => startPageConnect("/bot")}
-              style={{ background: `linear-gradient(135deg, ${BLUE}, #1565c0)`, border: "none", borderRadius: 12, padding: "13px 26px", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
+              style={{ background: `linear-gradient(135deg, ${BLUE}, #1565c0)`, border: "none", borderRadius: 12, padding: "13px 26px", color: c.text, fontWeight: 700, fontSize: 15, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
               <Plus size={18} /> {t("ربط صفحة", "Connect a Page")}
             </button>
           </div>
@@ -126,17 +130,17 @@ export default function BotDashboard() {
                 {t("صفحاتك", "Your Pages")} ({pages.length})
               </h3>
               <button onClick={() => startPageConnect("/bot")}
-                style={{ marginInlineStart: "auto", background: `${BLUE}1f`, border: `1px solid ${BLUE}55`, borderRadius: 10, padding: "8px 14px", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7 }}>
+                style={{ marginInlineStart: "auto", background: `${BLUE}1f`, border: `1px solid ${BLUE}55`, borderRadius: 10, padding: "8px 14px", color: c.text, fontWeight: 700, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7 }}>
                 <Plus size={15} /> {t("ربط صفحة", "Connect a Page")}
               </button>
             </div>
 
             {/* Search */}
             <div style={{ position: "relative", marginBottom: 14 }}>
-              <Search size={16} style={{ position: "absolute", insetInlineStart: 14, top: "50%", transform: "translateY(-50%)", color: "#64748b" }} />
+              <Search size={16} style={{ position: "absolute", insetInlineStart: 14, top: "50%", transform: "translateY(-50%)", color: c.dim }} />
               <input value={q} onChange={(e) => setQ(e.target.value)}
                 placeholder={t("ابحث عن صفحة…", "Search for a Page…")}
-                style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, paddingBlock: 11, paddingInlineStart: 40, paddingInlineEnd: 14, color: "#fff", fontSize: 14 }} />
+                style={{ width: "100%", boxSizing: "border-box", background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, paddingBlock: 11, paddingInlineStart: 40, paddingInlineEnd: 14, color: c.text, fontSize: 14 }} />
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -144,7 +148,7 @@ export default function BotDashboard() {
                 const active = subActive(p.subscription);
                 const on = p.config?.enabled && active;
                 return (
-                  <div key={p.page_id} style={{ background: CARD_BG, border: `1px solid ${on ? `${GREEN}44` : "rgba(255,255,255,0.08)"}`, borderRadius: 16, padding: "16px 20px", display: "flex", alignItems: "center", gap: 14 }}>
+                  <div key={p.page_id} style={{ background: CARD_BG, border: `1px solid ${on ? `${GREEN}44` : c.border}`, borderRadius: 16, padding: "16px 20px", display: "flex", alignItems: "center", gap: 14 }}>
                     {p.page_picture ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={p.page_picture} alt="" style={{ width: 46, height: 46, borderRadius: "50%", objectFit: "cover" }} />
@@ -161,12 +165,12 @@ export default function BotDashboard() {
                         ) : active ? (
                           <span style={{ fontSize: 12, color: "#fbbf24" }}>{t("مشترك — متوقف", "Subscribed — off")}</span>
                         ) : (
-                          <span style={{ fontSize: 12, color: "#94a3b8" }}>{t("غير مشترك", "Not subscribed")}</span>
+                          <span style={{ fontSize: 12, color: c.muted }}>{t("غير مشترك", "Not subscribed")}</span>
                         )}
                       </div>
                     </div>
                     <button onClick={() => manage(p)} disabled={busy === p.page_id}
-                      style={{ background: `${BLUE}22`, border: `1px solid ${BLUE}55`, borderRadius: 10, padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 7 }}>
+                      style={{ background: `${BLUE}22`, border: `1px solid ${BLUE}55`, borderRadius: 10, padding: "9px 16px", color: c.text, cursor: "pointer", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 7 }}>
                       {busy === p.page_id ? <Loader2 size={15} className="spin" /> : <Settings2 size={15} />}
                       {t("إدارة", "Manage")}
                     </button>
