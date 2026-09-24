@@ -43,6 +43,30 @@ in an earlier round.
 
 ---
 
+## 1b. The account you connect with decides everything
+
+`pages_manage_posts` sits at **Standard Access** until review, which means it works
+only for a Facebook account that **has a role on the app** (admin, developer or
+tester). Connecting with an ordinary account fails with:
+
+```
+(#200) The permission(s) pages_manage_posts are not available.
+It could because either they are deprecated or need to be approved by App Review.
+```
+
+That message reads like an app-level block and sends you back to the dashboard
+hunting for a config problem. It is not: it is the wrong Facebook account.
+
+Verified 2026-09-24 — connecting as a non-role account failed with exactly the
+message above; reconnecting as an app-admin account published and scheduled six
+posts to Page 113560053726849, each with a real post id.
+
+**This is also precisely why the submission matters.** Customers have no role on
+the app, so Standard Access never covers them. Until advanced access is granted,
+auto-publish works for the app's own admins and nobody else.
+
+---
+
 ## 2. Screen recording script
 
 **Language:** press **EN** in the header first. The whole video must be in English —
