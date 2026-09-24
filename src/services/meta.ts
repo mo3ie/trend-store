@@ -263,6 +263,21 @@ export async function likeComment(commentId: string, pageToken: string): Promise
   await graph(`${commentId}/likes`, "POST", {}, pageToken);
 }
 
+// ── Comment moderation (pages_manage_engagement) ──────────────────────────────
+
+// Hides a comment: it stays visible to its author and their friends, but nobody
+// else sees it. Preferred over deleting — the author is not provoked into
+// re-posting, and nothing is destroyed.
+export async function hideComment(commentId: string, pageToken: string): Promise<void> {
+  await graph(commentId, "POST", { is_hidden: true }, pageToken);
+}
+
+// Deletes a comment outright. Irreversible, so the bot only does this when the
+// Page owner explicitly chose "delete" for banned words.
+export async function deleteComment(commentId: string, pageToken: string): Promise<void> {
+  await graph(commentId, "DELETE", undefined, pageToken);
+}
+
 // Sends a PRIVATE reply (DM) to whoever wrote a comment, via the Send API using
 // `recipient: { comment_id }`. This form supports attachments (images/files) and
 // works outside the 24h window because commenting opens the messaging window.

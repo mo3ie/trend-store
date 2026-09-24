@@ -8,11 +8,13 @@ import {
   replyToComment,
   sendPrivateReply,
   likeComment,
+  hideComment,
+  deleteComment,
   getSystemPageToken,
   type BotAttachment,
 } from "@/services/meta";
 import { generateAiReply, aiAvailable } from "@/services/botAi";
-import { hasProduct } from "@/lib/entitlements";
+import { featuresFor, hasProduct } from "@/lib/entitlements";
 
 export interface BotRule {
   id:             string;
@@ -37,12 +39,38 @@ function pickVariant(pool: string[] | null | undefined, fallback: string | null)
 }
 
 // A per-post custom reply, keyed by numeric post id in bot_configs.post_overrides.
+/**
+ * One keyword group inside a post's custom reply: "price" comments get the price,
+ * "phone" comments get the contact numbers. The first group whose keywords appear
+ * in the comment answers it.
+ */
+export interface ReplyGroup {
+  id?:             string;
+  label?:          string;
+  keywords:        string[];
+  public_replies?: string[];
+  private_reply?:  string;
+  attachments?:    BotAttachment[];
+  like?:           boolean;   // like comments this group answers
+}
+
 export interface PostOverride {
+  // Legacy flat shape — one reply for every comment on the post. Still honoured,
+  // and still what `mode: "all"` means.
   public_replies?: string[];
   private_reply?:  string;
   attachments?:    BotAttachment[];
   disabled?:       boolean;   // per-post kill switch (skip auto-reply on this post)
   like?:           boolean;   // per-post override of like_comments
+
+  mode?:           "all" | "groups";
+  groups?:         ReplyGroup[];
+  inherit_groups?: boolean;   // also try the Page-level groups (default true)
+  ai?:             boolean;   // let AI answer comments no group matched
+  banned_words?:   string[];
+  banned_action?:  "delete" | "hide" | "ignore";
+  mention?:        boolean;
+  once_per_user?:  boolean;
 }
 
 // Finds the override for a post. Webhook post ids are "{pageId}_{postId}" while the
@@ -54,7 +82,30 @@ function getOverride(overrides: Record<string, PostOverride> | null | undefined,
 }
 
 function overrideHasContent(o: PostOverride | null): boolean {
-  return !!o && ((o.public_replies?.some((s) => (s || "").trim()) ?? false) || !!(o.private_reply || "").trim() || (o.attachments?.length ?? 0) > 0);
+  if (!o) return false;
+  const flat = (o.public_replies?.some((s) => (s || "").trim()) ?? false)
+    || !!(o.private_reply || "").trim()
+    || (o.attachments?.length ?? 0) > 0;
+  const grouped = (o.groups?.length ?? 0) > 0;
+  return flat || grouped || !!o.ai;
+}
+
+/** The first group whose keywords appear in the comment. */
+export function matchGroup(message: string, groups: ReplyGroup[] | null | undefined): ReplyGroup | null {
+  const text = normalize(message);
+  if (!text) return null;
+  for (const g of groups || []) {
+    const kws = (g.keywords || []).map(normalize).filter(Boolean);
+    if (kws.length && kws.some((k) => text.includes(k))) return g;
+  }
+  return null;
+}
+
+/** True when the comment contains any banned word. */
+export function hitsBanned(message: string, words: string[] | null | undefined): boolean {
+  const text = normalize(message);
+  if (!text) return false;
+  return (words || []).map(normalize).filter(Boolean).some((w) => text.includes(w));
 }
 
 export interface CommentEvent {
@@ -272,7 +323,7 @@ export async function processComment(ev: CommentEvent): Promise<string> {
   // Load an active config for this page.
   const { data: config } = await supabaseAdmin
     .from("bot_configs")
-    .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, public_replies, default_private_reply, like_comments, min_delay_sec, max_delay_sec, active_token_id, post_filter, post_filter_enabled, post_overrides, ai_enabled, ai_persona, page_name, throttle_per_min")
+    .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, public_replies, default_private_reply, like_comments, min_delay_sec, max_delay_sec, active_token_id, post_filter, post_filter_enabled, post_overrides, ai_enabled, ai_persona, page_name, throttle_per_min, reply_groups, banned_words, banned_action, mention_author, once_per_user")
     .eq("page_id", ev.pageId)
     .eq("platform", "meta")
     .eq("enabled", true)
@@ -332,6 +383,11 @@ export interface BotConfig {
   default_public_reply:  string | null;
   public_replies:        string[] | null;
   default_private_reply: string | null;
+  reply_groups:          ReplyGroup[] | null;
+  banned_words:          string[] | null;
+  banned_action:         string | null;
+  mention_author:        boolean | null;
+  once_per_user:         boolean | null;
   like_comments:         boolean;
   min_delay_sec:         number;
   max_delay_sec:         number;
@@ -366,12 +422,59 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
   if (override?.disabled) return "post_reply_disabled";
   const useOverride = overrideHasContent(override);
 
+  // ── Moderation, before anything is written back ───────────────────────────
+  // Banned words are checked against the post's list AND the Page's, so an owner
+  // sets the obvious ones once and adds post-specific ones where needed.
+  const bannedWords = [...(override?.banned_words || []), ...(config.banned_words || [])];
+  if (bannedWords.length && hitsBanned(ev.message, bannedWords)) {
+    const action = override?.banned_action || config.banned_action || "hide";
+    if (action !== "ignore") {
+      await withRotation(config.id, (tok) =>
+        action === "delete" ? deleteComment(ev.commentId, tok) : hideComment(ev.commentId, tok),
+        config.active_token_id, ev.pageId);
+    }
+    await supabaseAdmin.from("bot_reply_log").update({
+      public_status: "skipped", private_status: "skipped",
+      sent_at: new Date().toISOString(), moderation: action, error: "banned_word",
+    }).eq("comment_id", ev.commentId);
+    return "banned_word";
+  }
+
+  // One reply per person per post: someone who comments five times gets one answer,
+  // not five private messages. The claim row for THIS comment already exists, so an
+  // earlier answered comment from the same author is what we are looking for.
+  const oncePerUser = override?.once_per_user ?? config.once_per_user ?? true;
+  if (oncePerUser && ev.fromId) {
+    const { data: prior } = await supabaseAdmin
+      .from("bot_reply_log")
+      .select("id")
+      .eq("config_id", config.id).eq("post_id", ev.postId).eq("commenter_id", ev.fromId)
+      .neq("comment_id", ev.commentId)
+      .in("public_status", ["sent", "failed"])
+      .limit(1);
+    if (prior && prior.length) {
+      await supabaseAdmin.from("bot_reply_log").update({
+        public_status: "skipped", private_status: "skipped",
+        sent_at: new Date().toISOString(), error: "already_replied_to_user",
+      }).eq("comment_id", ev.commentId);
+      return "already_replied_to_user";
+    }
+  }
+
+  // Which keyword group answers this comment. The post's own groups win; the Page's
+  // groups are tried next unless the post opted out of inheriting them.
+  const groupMode = (override?.mode ?? "groups") === "groups";
+  const group = groupMode
+    ? (matchGroup(ev.message, override?.groups)
+       ?? ((override?.inherit_groups ?? true) ? matchGroup(ev.message, config.reply_groups) : null))
+    : null;
+
   // Match a rule (unless a post override is answering this comment).
   const { data: rules } = await supabaseAdmin
     .from("bot_rules")
     .select("id, keywords, match_type, public_reply, public_replies, private_reply, attachments, enabled, priority")
     .eq("config_id", config.id);
-  const rule = useOverride ? null : matchRule(ev.message, (rules || []) as BotRule[]);
+  const rule = (useOverride || group) ? null : matchRule(ev.message, (rules || []) as BotRule[]);
 
   // Seed both statuses to 'skipped' and stamp sent_at NOW: this row has consumed a
   // throttle slot, and — critically — it must not stay 'deferred' when a reply type is
@@ -388,8 +491,11 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
   // configured). The AI text becomes the private reply; the public reply falls back to
   // the page default. Without AI we stay silent rather than guess.
   let aiPrivate: string | null = null;
-  if (!rule && !useOverride) {
-    if (config.ai_enabled && aiAvailable()) {
+  // AI answers only what the groups and rules did not. Keeping it last is what stops
+  // a model inventing a price the owner already wrote down.
+  const aiWanted = (override?.ai ?? config.ai_enabled) === true;
+  if (!rule && !group && !useOverride) {
+    if (aiWanted && aiAvailable() && (await featuresFor(config.user_id, "bot", ev.pageId).catch(() => new Set<string>())).has("ai_reply")) {
       // Feed the AI the store's live catalog (from the AI Employee) so it can quote
       // exact, always-up-to-date prices/availability without inventing them.
       let catalog: string | null = null;
@@ -406,13 +512,14 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
     if (!aiPrivate) {
       update.public_status = "skipped";
       update.private_status = "skipped";
-      update.error = config.ai_enabled ? "ai_unavailable" : "no_rule_match";
+      update.error = aiWanted ? "ai_unavailable" : "no_rule_match";
       await supabaseAdmin.from("bot_reply_log").update(update).eq("comment_id", ev.commentId);
       return "no_rule_match";
     }
     update.error = "ai_reply";
   }
-  if (useOverride) update.error = "post_override";
+  if (group) update.error = `group:${group.label || group.keywords?.[0] || "match"}`;
+  else if (useOverride) update.error = "post_override";
 
   const errors: string[] = [];
 
@@ -420,13 +527,23 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
 
   // 1) Public reply — a random variant of the post-override's, rule's, or page-default wording.
   if (config.reply_public) {
-    const text = useOverride
-      ? pickVariant(override!.public_replies, null)
-      : rule
-        ? pickVariant(rule.public_replies, rule.public_reply)
-        : pickVariant(config.public_replies, config.default_public_reply);
+    const text = group
+      ? pickVariant(group.public_replies, null)
+      : useOverride
+        ? pickVariant(override!.public_replies, null)
+        : rule
+          ? pickVariant(rule.public_replies, rule.public_reply)
+          : pickVariant(config.public_replies, config.default_public_reply);
     // Fall back to the page default when the chosen source has no public text of its own.
-    const finalText = text ?? pickVariant(config.public_replies, config.default_public_reply);
+    let finalText = text ?? pickVariant(config.public_replies, config.default_public_reply);
+    // Open with the commenter's name so the reply reads as addressed to them. The
+    // plain name is used rather than an @mention tag, which Facebook silently drops
+    // for Pages replying to people who are not connected to them.
+    const wantMention = override?.mention ?? config.mention_author ?? true;
+    if (finalText && wantMention && ev.fromName) {
+      const first = ev.fromName.trim().split(/\s+/)[0];
+      if (first && !finalText.includes(first)) finalText = `${first}، ${finalText}`;
+    }
     if (finalText) {
       const res = await withRotation(config.id, (tok) =>
         replyToComment(ev.commentId, finalText, tok), preferId, ev.pageId
@@ -440,12 +557,16 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
 
   // 2) Private reply (DM) with attachments. Body comes from the matched rule (or the
   // page-default DM), or from the AI when no rule matched. Attachments only from a rule.
-  const privateBody = useOverride
-    ? (override!.private_reply || config.default_private_reply || "")
-    : rule
-      ? (rule.private_reply || config.default_private_reply || "")
-      : (aiPrivate || "");
-  const privateAtts = useOverride ? (override!.attachments || []) : (rule?.attachments || []);
+  const privateBody = group
+    ? (group.private_reply || config.default_private_reply || "")
+    : useOverride
+      ? (override!.private_reply || config.default_private_reply || "")
+      : rule
+        ? (rule.private_reply || config.default_private_reply || "")
+        : (aiPrivate || "");
+  const privateAtts = group
+    ? (group.attachments || [])
+    : useOverride ? (override!.attachments || []) : (rule?.attachments || []);
 
   if (config.reply_private && (privateBody || privateAtts.length)) {
     const res = await withRotation(config.id, (tok) =>
@@ -458,7 +579,7 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
   }
 
   // 3) Like the comment (best-effort — never fails the delivery).
-  if (override?.like ?? config.like_comments) {
+  if (group?.like ?? override?.like ?? config.like_comments) {
     await withRotation(config.id, (tok) => likeComment(ev.commentId, tok), preferId, ev.pageId);
   }
 
@@ -488,7 +609,7 @@ export async function drainDeferred(limit = 50): Promise<{ processed: number; se
     if (!configs.has(row.config_id)) {
       const { data } = await supabaseAdmin
         .from("bot_configs")
-        .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, public_replies, default_private_reply, like_comments, min_delay_sec, max_delay_sec, active_token_id, post_filter, post_filter_enabled, post_overrides, ai_enabled, ai_persona, page_name, throttle_per_min")
+        .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, public_replies, default_private_reply, like_comments, min_delay_sec, max_delay_sec, active_token_id, post_filter, post_filter_enabled, post_overrides, ai_enabled, ai_persona, page_name, throttle_per_min, reply_groups, banned_words, banned_action, mention_author, once_per_user")
         .eq("id", row.config_id)
         .eq("enabled", true)
         .maybeSingle();

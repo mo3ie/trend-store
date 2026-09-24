@@ -27,6 +27,9 @@ const EDITABLE = [
   "like_comments", "min_delay_sec", "max_delay_sec", "default_private_reply",
   "public_replies", "post_filter", "post_filter_enabled", "active_token_id",
   "post_overrides",
+  // keyword reply groups + moderation (2026-09) — Page-level defaults that every
+  // post inherits unless it opts out
+  "reply_groups", "banned_words", "banned_action", "mention_author", "once_per_user",
 ] as const;
 
 // GET — the user's Meta Pages, each merged with its bot config + subscription state.
