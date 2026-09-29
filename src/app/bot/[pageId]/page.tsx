@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Loader2, Bot, MessageSquare, Users, Activity,
-  Settings2, Plus, Trash2, Save, AlertTriangle, Upload, X,
+  Settings2, Plus, Trash2, Save, AlertTriangle, Upload, X, Package,
   Sparkles, CreditCard, Power, Clock, Newspaper, Star, CheckCircle2, RefreshCw, Pencil,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
@@ -45,6 +45,7 @@ interface Config {
   reply_groups: ReplyGroup[] | null; banned_words: string[] | null;
   banned_action: "delete" | "hide" | "ignore" | null;
   mention_author: boolean | null; once_per_user: boolean | null;
+  catalog_match: string | null; catalog_ambiguous_reply: string | null;
 }
 interface Sub { status: string; expires_at: string | null; }
 interface Token { id: string; label: string | null; status: string; cooldown_until: string | null; fail_count: number; last_used_at: string | null; }
@@ -73,7 +74,7 @@ export default function BotManage() {
   const [config, setConfig] = useState<Config | null>(null);
   const [sub, setSub] = useState<Sub | null>(null);
   const [price, setPrice] = useState(50);
-  const [tab, setTab] = useState<"settings" | "rules" | "posts" | "accounts" | "activity">("rules");
+  const [tab, setTab] = useState<"settings" | "rules" | "posts" | "catalog" | "accounts" | "activity">("rules");
   const [toast, setToast] = useState("");
   const [subscribing, setSubscribing] = useState(false);
   const [pay, setPay] = useState<{ amount: number; label: string } | null>(null);
@@ -197,6 +198,7 @@ export default function BotManage() {
             ["rules", MessageSquare, t("القواعد", "Rules")],
             ["settings", Settings2, t("الإعدادات", "Settings")],
             ["posts", Newspaper, t("المنشورات", "Posts")],
+            ["catalog", Package, t("الكتالوج", "Catalog")],
             ["accounts", Users, t("الحسابات", "Accounts")],
             ["activity", Activity, t("النشاط", "Activity")],
           ] as const).map(([k, Icon, label]) => (
@@ -210,6 +212,7 @@ export default function BotManage() {
         {config && tab === "rules" && <RulesTab configId={config.id} flash={flash} t={t} />}
         {config && tab === "settings" && <SettingsTab config={config} patch={patchConfig} t={t} />}
         {config && tab === "posts" && <PostsTab config={config} pageId={pageId} patch={patchConfig} flash={flash} t={t} />}
+        {config && tab === "catalog" && <CatalogTab config={config} pageId={pageId} patch={patchConfig} flash={flash} t={t} />}
         {config && tab === "accounts" && <AccountsTab config={config} patch={patchConfig} flash={flash} t={t} />}
         {config && tab === "activity" && <ActivityTab configId={config.id} t={t} />}
       </div>
@@ -1083,6 +1086,161 @@ function PostReplyEditor({ post, initial, t, onClose, onSave }: { post: Post; in
         style={{ width: "100%", marginTop: 20, background: `linear-gradient(135deg, ${GREEN}, #16a34a)`, border: "none", borderRadius: 11, padding: "13px 0", color: c.text, fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
         {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />} {t("حفظ ردّ المنشور", "Save post reply")}
       </button>
+    </div>
+  );
+}
+
+// ── Catalog tab ──────────────────────────────────────────────────────────────
+// Thirty photos, thirty products, hundreds of comments each meaning exactly one of
+// them. This is where the owner tells the bot how to tell them apart.
+interface CatalogRow {
+  id: string; name: string; aliases: string[] | null; sku: string | null;
+  price_text: string | null; images: string[] | null;
+  image_hashes: string[] | null; post_ids: string[] | null;
+  available: boolean | null; active: boolean | null;
+}
+
+function CatalogTab({ config, pageId, patch, flash, t }: { config: Config; pageId: string; patch: (p: Partial<Config>) => Promise<boolean>; flash: (m: string) => void; t: TF }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const CARD = c.card;
+  const BORDER = c.border;
+  const [rows, setRows] = useState<CatalogRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState("");
+  const [priceList, setPriceList] = useState("");
+  const [result, setResult] = useState("");
+
+  const load = async () => {
+    const d = await fetch(`/api/bot/catalog?pageId=${encodeURIComponent(pageId)}`).then((r) => r.json()).catch(() => null);
+    setRows(d?.products || []); setLoading(false);
+  };
+  useEffect(() => { load(); }, [pageId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function run(action: string, extra: Record<string, unknown> = {}) {
+    setBusy(action); setResult("");
+    const d = await fetch("/api/bot/catalog", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pageId, action, ...extra }),
+    }).then((r) => r.json()).catch(() => null);
+    setBusy("");
+    if (!d || d.error) { flash(d?.error || t("تعذّر التنفيذ", "Failed")); return; }
+    if (action === "prices") setResult(t(`حُدِّث ${d.updated} من ${d.total}${d.missed?.length ? ` — لم نتعرّف على ${d.missed.length}` : ""}`,
+                                        `Updated ${d.updated} of ${d.total}${d.missed?.length ? ` — ${d.missed.length} not recognised` : ""}`));
+    if (action === "rehash")   setResult(t(`بُصِمت صور ${d.hashed} منتجاً`, `Fingerprinted ${d.hashed} products`));
+    if (action === "autobind") setResult(t(`رُبط ${d.bound} منتجاً من ${d.posts} منشوراً`, `Bound ${d.bound} products across ${d.posts} posts`));
+    await load();
+  }
+
+  async function saveRow(r: CatalogRow, p: Partial<CatalogRow>) {
+    setRows((x) => x.map((y) => (y.id === r.id ? { ...y, ...p } : y)));
+    await fetch("/api/bot/catalog", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pageId, items: [{ id: r.id, ...p }] }),
+    }).catch(() => null);
+  }
+
+  const box: React.CSSProperties = { background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: 20 };
+  const inp: React.CSSProperties = { width: "100%", background: c.input, border: `1px solid ${BORDER}`, borderRadius: 9, padding: "9px 12px", color: c.text, boxSizing: "border-box" };
+  const mode = config.catalog_match || "off";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <div style={box}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 7 }}>
+          <Package size={15} color={BLUE} /> {t("الرد بسعر المنتج المقصود", "Answer with the right product's price")}
+        </div>
+        <div style={{ fontSize: 12, color: c.muted, lineHeight: 1.8, marginBottom: 12 }}>
+          {t("حين تنشر صوراً كثيرة لمنتجات مختلفة، يعرف البوت أي منتج يقصده كل تعليق — من الصورة التي عُلّق عليها، أو من صورة أرفقها صاحب التعليق، أو من اسم المنتج في النص — ويرسل سعره هو وحده.",
+             "When you post many photos for different products, the bot works out which one each comment means — from the photo it sits under, from a picture the commenter attached, or from the product name in the text — and sends that product's price only.")}
+        </div>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+          {([["off", t("متوقف", "Off")], ["post", t("حسب المنشور", "By post")], ["name", t("حسب الاسم", "By name")], ["image", t("حسب الصورة", "By image")], ["all", t("الكل", "All signals")]] as const).map(([m, label]) => (
+            <button key={m} onClick={() => patch({ catalog_match: m })}
+              style={{ background: mode === m ? `${BLUE}22` : c.surface, border: `1px solid ${mode === m ? `${BLUE}77` : BORDER}`, borderRadius: 9, padding: "8px 14px", color: mode === m ? c.text : c.muted, fontWeight: 700, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: 11.5, color: c.muted, marginTop: 9, lineHeight: 1.7 }}>
+          {t("«الكل» يجرّب المنشور ثم الصورة ثم الاسم — كلها مجانية وحتمية، والذكاء الاصطناعي لا يُستدعى إلا إذا فشلت جميعاً.",
+             "\"All\" tries post, then image, then name — all free and deterministic. AI is only called if every one of them fails.")}
+        </div>
+      </div>
+
+      {/* Paste a price list; names are matched, images stay attached to the product. */}
+      <div style={box}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>{t("تحديث الأسعار بالجملة", "Bulk price update")}</div>
+        <div style={{ fontSize: 12, color: c.muted, marginBottom: 10, lineHeight: 1.8 }}>
+          {t("الصق قائمة: اسم المنتج = السعر، سطر لكل منتج. تُطابَق بالاسم أو المرادف أو الكود، والصور تبقى مربوطة بالمنتج فتتبع السعر الجديد وحدها.",
+             "Paste a list: product name = price, one per line. Matched by name, alias or SKU — the images stay attached to the product, so they follow the new price on their own.")}
+        </div>
+        <textarea value={priceList} onChange={(e) => setPriceList(e.target.value)} rows={5}
+          placeholder={"iPhone 15 Pro = 5390 د.ل\nسماعة ايربودز = 250 د.ل"}
+          style={{ ...inp, resize: "vertical", lineHeight: 1.9 }} />
+        <button onClick={() => run("prices", { text: priceList })} disabled={busy === "prices" || !priceList.trim()}
+          style={{ marginTop: 10, background: `linear-gradient(135deg, ${GREEN}, #16a34a)`, border: "none", borderRadius: 10, padding: "11px 20px", color: c.text, fontWeight: 700, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 7, opacity: busy === "prices" || !priceList.trim() ? 0.5 : 1 }}>
+          {busy === "prices" ? <Loader2 size={15} className="spin" /> : <Save size={15} />} {t("تحديث الأسعار", "Update prices")}
+        </button>
+      </div>
+
+      <div style={box}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>{t("تجهيز المطابقة", "Prepare matching")}</div>
+        <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
+          <button onClick={() => run("rehash")} disabled={!!busy}
+            style={{ background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "11px 16px", color: c.text, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 7 }}>
+            {busy === "rehash" ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} color={BLUE} />} {t("بصمة صور الكتالوج", "Fingerprint catalog images")}
+          </button>
+          <button onClick={() => run("autobind")} disabled={!!busy}
+            style={{ background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "11px 16px", color: c.text, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 7 }}>
+            {busy === "autobind" ? <Loader2 size={15} className="spin" /> : <Newspaper size={15} color={BLUE} />} {t("اربط المنشورات بالمنتجات تلقائياً", "Auto-bind posts to products")}
+          </button>
+        </div>
+        {result && <div style={{ fontSize: 12.5, color: GREEN, marginTop: 10, lineHeight: 1.7 }}>{result}</div>}
+        <div style={{ fontSize: 11.5, color: c.muted, marginTop: 9, lineHeight: 1.7 }}>
+          {t("ابصم الصور أولاً، ثم اربط — الربط يستعمل البصمات للمنشورات التي لا تذكر اسم المنتج في نصّها.",
+             "Fingerprint first, then bind — binding uses the fingerprints for posts whose caption names no product.")}
+        </div>
+      </div>
+
+      <div style={box}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
+          {t("المنتجات", "Products")} ({rows.length})
+        </div>
+        {loading ? <Loader2 size={20} className="spin" color={BLUE} /> : rows.length === 0 ? (
+          <div style={{ fontSize: 13, color: c.muted, lineHeight: 1.8 }}>
+            {t("لا منتجات بعد — أضفها من «الموظف الذكي» ← الأصناف، أو ارفع ملفاً هناك.",
+               "No products yet — add them in AI Employee → Catalog, or upload a file there.")}
+          </div>
+        ) : rows.map((r) => (
+          <div key={r.id} style={{ background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 12, marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {r.images?.[0] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={r.images[0]} alt="" style={{ width: 44, height: 44, borderRadius: 9, objectFit: "cover", flexShrink: 0 }} />
+              ) : <div style={{ width: 44, height: 44, borderRadius: 9, background: c.card, flexShrink: 0 }} />}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+                <div style={{ fontSize: 12, color: c.muted }}>{r.price_text || t("بلا سعر", "no price")}</div>
+              </div>
+              <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+                <span title={t("صور مبصومة", "fingerprinted images")}
+                  style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "3px 8px", background: (r.image_hashes?.length ?? 0) ? "rgba(34,197,94,0.15)" : c.card, color: (r.image_hashes?.length ?? 0) ? GREEN : c.dim }}>
+                  🖼 {r.image_hashes?.length ?? 0}
+                </span>
+                <span title={t("منشورات مربوطة", "bound posts")}
+                  style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "3px 8px", background: (r.post_ids?.length ?? 0) ? `${BLUE}22` : c.card, color: (r.post_ids?.length ?? 0) ? BLUE : c.dim }}>
+                  📌 {r.post_ids?.length ?? 0}
+                </span>
+              </div>
+            </div>
+            <input defaultValue={(r.aliases || []).join("، ")}
+              onBlur={(e) => saveRow(r, { aliases: e.target.value.split(/[،,]/).map((x) => x.trim()).filter(Boolean) })}
+              placeholder={t("مرادفات الاسم — افصل بفاصلة (كما يكتبه الزبائن)", "Name aliases — comma separated (how customers write it)")}
+              style={{ ...inp, padding: "8px 11px", marginTop: 9, fontSize: 12.5 }} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

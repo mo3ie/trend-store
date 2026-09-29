@@ -30,6 +30,8 @@ const EDITABLE = [
   // keyword reply groups + moderation (2026-09) — Page-level defaults that every
   // post inherits unless it opts out
   "reply_groups", "banned_words", "banned_action", "mention_author", "once_per_user",
+  // smart catalog matching (2026-09)
+  "catalog_match", "catalog_ambiguous_reply",
 ] as const;
 
 // GET — the user's Meta Pages, each merged with its bot config + subscription state.

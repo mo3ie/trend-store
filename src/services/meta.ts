@@ -263,6 +263,20 @@ export async function likeComment(commentId: string, pageToken: string): Promise
   await graph(`${commentId}/likes`, "POST", {}, pageToken);
 }
 
+// The picture attached to a comment, when there is one. Used to recognise which
+// product a commenter means when they re-post the shop's own photo to ask its
+// price. Returns null rather than throwing — a missing attachment is normal.
+export async function getCommentAttachment(commentId: string, pageToken: string): Promise<string | null> {
+  try {
+    const data = await graph<{ attachment?: { media?: { image?: { src?: string } }; type?: string } }>(
+      `${commentId}?fields=attachment`, "GET", undefined, pageToken
+    );
+    return data.attachment?.media?.image?.src ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Comment moderation (pages_manage_engagement) ──────────────────────────────
 
 // Hides a comment: it stays visible to its author and their friends, but nobody

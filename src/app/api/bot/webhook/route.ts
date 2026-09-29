@@ -47,6 +47,15 @@ export async function POST(req: NextRequest) {
       // Only brand-new comments (not edits/removes, not likes/posts).
       if (v.item !== "comment" || v.verb !== "add") continue;
       const from = (v.from ?? {}) as { id?: string; name?: string };
+      // A comment can carry a photo — someone re-posting the shop's own product
+      // picture to ask its price. Meta puts it on the change under `photo`, and
+      // occasionally only as an attachment; take whichever arrived. When neither
+      // did, the engine fetches it from Graph, but only if it needs to.
+      const att = (v.attachment ?? {}) as { media?: { image?: { src?: string } }; type?: string };
+      const attachmentUrl =
+        (typeof v.photo === "string" && v.photo) ||
+        att.media?.image?.src ||
+        null;
       events.push({
         pageId,
         commentId: String(v.comment_id ?? ""),
@@ -54,6 +63,7 @@ export async function POST(req: NextRequest) {
         message:   String(v.message ?? ""),
         fromId:    String(from.id ?? ""),
         fromName:  String(from.name ?? ""),
+        attachmentUrl,
       });
     }
   }

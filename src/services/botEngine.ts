@@ -10,11 +10,15 @@ import {
   likeComment,
   hideComment,
   deleteComment,
+  getCommentAttachment,
   getSystemPageToken,
   type BotAttachment,
 } from "@/services/meta";
 import { generateAiReply, aiAvailable } from "@/services/botAi";
 import { featuresFor, hasProduct } from "@/lib/entitlements";
+import {
+  loadCatalog, matchByName, matchByPost, matchProduct, productReply,
+} from "@/services/catalogMatcher";
 
 export interface BotRule {
   id:             string;
@@ -115,6 +119,8 @@ export interface CommentEvent {
   message:    string;
   fromId:     string;
   fromName:   string;
+  /** A picture attached to the comment, when Meta sent one on the webhook. */
+  attachmentUrl?: string | null;
 }
 
 // Meta error strings/codes that mean "you're posting too fast / temporarily blocked".
@@ -323,7 +329,7 @@ export async function processComment(ev: CommentEvent): Promise<string> {
   // Load an active config for this page.
   const { data: config } = await supabaseAdmin
     .from("bot_configs")
-    .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, public_replies, default_private_reply, like_comments, min_delay_sec, max_delay_sec, active_token_id, post_filter, post_filter_enabled, post_overrides, ai_enabled, ai_persona, page_name, throttle_per_min, reply_groups, banned_words, banned_action, mention_author, once_per_user")
+    .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, public_replies, default_private_reply, like_comments, min_delay_sec, max_delay_sec, active_token_id, post_filter, post_filter_enabled, post_overrides, ai_enabled, ai_persona, page_name, throttle_per_min, reply_groups, banned_words, banned_action, mention_author, once_per_user, catalog_match, catalog_ambiguous_reply")
     .eq("page_id", ev.pageId)
     .eq("platform", "meta")
     .eq("enabled", true)
@@ -388,6 +394,8 @@ export interface BotConfig {
   banned_action:         string | null;
   mention_author:        boolean | null;
   once_per_user:         boolean | null;
+  catalog_match:         string | null;
+  catalog_ambiguous_reply: string | null;
   like_comments:         boolean;
   min_delay_sec:         number;
   max_delay_sec:         number;
@@ -490,11 +498,57 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
   // No keyword rule matched → let the AI answer (if the page enabled it and a key is
   // configured). The AI text becomes the private reply; the public reply falls back to
   // the page default. Without AI we stay silent rather than guess.
+  // ── Catalog matching ──────────────────────────────────────────────────────
+  // A Page with thirty product photos gets comments that each mean exactly one of
+  // them. Work out which, from the photo the comment sits under, from a picture the
+  // commenter attached, or from the product's name in the text — all free, all
+  // deterministic, and all ahead of the AI so a model can never invent a price the
+  // owner already wrote down.
+  let catalogPrivate: string | null = null;
+  let matchedProductId: string | null = null;
+  let matchSignal: string | null = null;
+  const catalogMode = config.catalog_match || "off";
+  if (!rule && !group && !useOverride && catalogMode !== "off"
+      && (await featuresFor(config.user_id, "bot", ev.pageId).catch(() => new Set<string>())).has("catalog_reply")) {
+    const catalog = await loadCatalog(config.user_id, ev.pageId);
+    if (catalog.length) {
+      // Only pay the extra Graph round-trip when the cheaper signals cannot decide.
+      let attachmentUrl = ev.attachmentUrl ?? null;
+      const needImage = (catalogMode === "all" || catalogMode === "image")
+        && !attachmentUrl
+        && !matchByPost(ev.postId, catalog).product
+        && !matchByName(ev.message, catalog).product;
+      if (needImage) {
+        const got = await withRotation<string | null>(config.id, (tok) =>
+          getCommentAttachment(ev.commentId, tok), config.active_token_id, ev.pageId
+        ).catch(() => null);
+        attachmentUrl = got && got.ok ? got.value : null;
+      }
+
+      const m = await matchProduct({
+        message: ev.message, postId: ev.postId, attachmentUrl, catalog, mode: catalogMode,
+      });
+      matchSignal = m.signal;
+      if (m.product) {
+        matchedProductId = m.product.id;
+        catalogPrivate = productReply(m.product);
+      } else if (m.signal === "ambiguous") {
+        // Two products fit equally well. Asking is cheap; quoting the wrong price
+        // is not, so the bot names the candidates instead of picking one.
+        const names = (m.candidates || []).slice(0, 4).map((p) => p.name).join("، ");
+        catalogPrivate = (config.catalog_ambiguous_reply || "أي منتج تقصد بالضبط؟").replace("{{options}}", names)
+          + (names ? `\n${names}` : "");
+      }
+    }
+  }
+  update.matched_product_id = matchedProductId;
+  update.match_signal = matchSignal;
+
   let aiPrivate: string | null = null;
-  // AI answers only what the groups and rules did not. Keeping it last is what stops
-  // a model inventing a price the owner already wrote down.
+  // AI answers only what the groups, rules and catalog did not. Keeping it last is
+  // what stops a model inventing a price the owner already wrote down.
   const aiWanted = (override?.ai ?? config.ai_enabled) === true;
-  if (!rule && !group && !useOverride) {
+  if (!rule && !group && !useOverride && !catalogPrivate) {
     if (aiWanted && aiAvailable() && (await featuresFor(config.user_id, "bot", ev.pageId).catch(() => new Set<string>())).has("ai_reply")) {
       // Feed the AI the store's live catalog (from the AI Employee) so it can quote
       // exact, always-up-to-date prices/availability without inventing them.
@@ -609,7 +663,7 @@ export async function drainDeferred(limit = 50): Promise<{ processed: number; se
     if (!configs.has(row.config_id)) {
       const { data } = await supabaseAdmin
         .from("bot_configs")
-        .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, public_replies, default_private_reply, like_comments, min_delay_sec, max_delay_sec, active_token_id, post_filter, post_filter_enabled, post_overrides, ai_enabled, ai_persona, page_name, throttle_per_min, reply_groups, banned_words, banned_action, mention_author, once_per_user")
+        .select("id, user_id, enabled, reply_public, reply_private, default_public_reply, public_replies, default_private_reply, like_comments, min_delay_sec, max_delay_sec, active_token_id, post_filter, post_filter_enabled, post_overrides, ai_enabled, ai_persona, page_name, throttle_per_min, reply_groups, banned_words, banned_action, mention_author, once_per_user, catalog_match, catalog_ambiguous_reply")
         .eq("id", row.config_id)
         .eq("enabled", true)
         .maybeSingle();
