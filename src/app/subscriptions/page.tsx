@@ -36,7 +36,7 @@ const SCOPE_ORDER: Record<string, number> = { single: 0, triple: 1, unlimited: 2
 const FEATURE_LABEL: Record<string, string> = {
   reply_keyword: "الرد بالكلمات المفتاحية", private_dm: "رسالة خاصة تلقائية", like: "إعجاب تلقائي",
   post_targeting: "ردود مخصصة لكل منشور", ai_reply: "ردود الذكاء الاصطناعي", price_reply: "رد تلقائي بالأسعار",
-  priority: "أولوية الدعم", ai_targeting: "مساعد الاستهداف بالذكاء الاصطناعي", auto_target: "استهداف تلقائي بلمسة",
+  priority: "أولوية الدعم", catalog_reply: "الرد بسعر المنتج المقصود من الصورة أو الاسم", ai_targeting: "مساعد الاستهداف بالذكاء الاصطناعي", auto_target: "استهداف تلقائي بلمسة",
   support_247: "دعم على مدار الساعة", full_bot_features: "كل مزايا بوت الرد",
   content_plan: "خطة محتوى بالذكاء الاصطناعي", auto_publish: "النشر التلقائي والجدولة", web_images: "صور من الإنترنت",
   boosting: "ترويج المنشورات", brain_memory: "عقل وذاكرة لكل صفحة", ai_images: "توليد الصور بالذكاء الاصطناعي",
