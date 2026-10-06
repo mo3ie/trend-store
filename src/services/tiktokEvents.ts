@@ -87,12 +87,13 @@ export async function enqueueCommentEvent(event: CommentUpdateEvent): Promise<En
  */
 export async function processQueuedComment(
   target: TikTokTarget,
-  row: { comment_id: string; post_id: string | null; comment_message: string | null },
+  row: { comment_id: string; post_id: string | null; comment_message: string | null; commenter_name?: string | null },
 ): Promise<void> {
   await processClaimedComment(target, {
     commentId: row.comment_id,
     videoId: row.post_id ?? "",
     text: row.comment_message ?? "",
+    username: row.commenter_name ?? "",
   });
 }
 

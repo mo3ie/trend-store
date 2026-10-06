@@ -20,7 +20,14 @@ import { generateAiReply, aiAvailable } from "@/services/botAi";
 import { getValidAccessToken } from "@/lib/tiktokTokens";
 import { hasProduct } from "@/lib/entitlements";
 import { checkAppRateLimit, checkAccountRateLimit } from "@/lib/rateLimit";
-import { listComments, listVideos, replyToComment, businessIdFromOpenId, TikTokError } from "@/services/tiktok";
+import {
+  listComments, listVideos, replyToComment, likeComment, hideComment, deleteComment,
+  businessIdFromOpenId, TikTokError,
+} from "@/services/tiktok";
+import { decide, type ReplyGroup, type ReplyPolicy } from "@/services/replyDecision";
+import { loadCatalog, matchProduct, productReply } from "@/services/catalogMatcher";
+import { featuresFor } from "@/lib/entitlements";
+import type { PostOverride } from "@/services/botEngine";
 
 /** The bot's view of a connected TikTok account: credentials + rule configuration. */
 export interface TikTokTarget {
@@ -33,6 +40,21 @@ export interface TikTokTarget {
   aiPersona: string | null;
   replyPublic: boolean;
   throttlePerMin: number;
+  /** Everything the Facebook bot answers with — the schema is shared, so TikTok
+   *  gets the same keyword groups, moderation and per-video overrides. */
+  pageId: string;
+  replyGroups: ReplyGroup[] | null;
+  bannedWords: string[] | null;
+  bannedAction: "delete" | "hide" | "ignore";
+  mentionAuthor: boolean;
+  oncePerUser: boolean;
+  likeComments: boolean;
+  publicReplies: string[] | null;
+  defaultPublicReply: string | null;
+  defaultPrivateReply: string | null;
+  postOverrides: Record<string, PostOverride> | null;
+  catalogMatch: string;
+  catalogAmbiguousReply: string | null;
 }
 
 /** Loads the account + its bot config, verifying the subscription gate. */
@@ -47,7 +69,7 @@ export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
 
   const { data: config } = await supabaseAdmin
     .from("bot_configs")
-    .select("id, user_id, page_id, page_name, enabled, ai_enabled, ai_persona, reply_public, throttle_per_min")
+    .select("id, user_id, page_id, page_name, enabled, ai_enabled, ai_persona, reply_public, throttle_per_min, reply_groups, banned_words, banned_action, mention_author, once_per_user, like_comments, public_replies, default_public_reply, default_private_reply, post_overrides, catalog_match, catalog_ambiguous_reply")
     .eq("platform", "tiktok")
     .eq("page_id", openId)
     .eq("enabled", true)
@@ -78,7 +100,29 @@ export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
     aiPersona: config.ai_persona,
     replyPublic: config.reply_public !== false,
     throttlePerMin: config.throttle_per_min || 20,
+    pageId: config.page_id,
+    replyGroups: (config.reply_groups as ReplyGroup[] | null) ?? null,
+    bannedWords: (config.banned_words as string[] | null) ?? null,
+    bannedAction: (config.banned_action as "delete" | "hide" | "ignore") || "hide",
+    mentionAuthor: config.mention_author !== false,
+    oncePerUser: config.once_per_user !== false,
+    likeComments: !!config.like_comments,
+    publicReplies: (config.public_replies as string[] | null) ?? null,
+    defaultPublicReply: config.default_public_reply,
+    defaultPrivateReply: config.default_private_reply,
+    postOverrides: (config.post_overrides as Record<string, PostOverride> | null) ?? null,
+    catalogMatch: config.catalog_match || "off",
+    catalogAmbiguousReply: config.catalog_ambiguous_reply,
   };
+}
+
+/** The override for one video, keyed either way the id can arrive. */
+function overrideForVideo(
+  overrides: Record<string, PostOverride> | null, videoId: string,
+): PostOverride | null {
+  if (!overrides || !videoId) return null;
+  const tail = videoId.includes("_") ? videoId.split("_")[1] : videoId;
+  return overrides[videoId] || overrides[tail] || null;
 }
 
 async function rulesFor(configId: string): Promise<BotRule[]> {
@@ -114,14 +158,100 @@ async function finishComment(commentId: string, patch: Record<string, unknown>):
   await supabaseAdmin.from("bot_reply_log").update(patch).eq("comment_id", commentId);
 }
 
-/** Decides the reply text: keyword rule first, AI only as the fallback when enabled. */
-async function decideReply(target: TikTokTarget, text: string, rules: BotRule[]) {
-  const rule = matchRule(text, rules);
-  let reply = rule?.public_reply || rule?.private_reply || null;
-  if (!reply && target.aiEnabled && aiAvailable()) {
-    reply = await generateAiReply(text, target.aiPersona, target.pageName);
+/**
+ * Decides the reply using the SAME core as the Facebook bot (services/replyDecision),
+ * so keyword groups, banned-word moderation, mentions, the smart catalog and the
+ * AI fallback behave identically on both platforms. Only delivery differs.
+ *
+ * TikTok has no organic private reply, so what Facebook would send as a DM is sent
+ * here as the public answer — the private text is the richer one (it carries the
+ * price), which is what a commenter actually asked for.
+ */
+async function decideReply(
+  target: TikTokTarget,
+  comment: { text: string; videoId: string; username?: string },
+  rules: BotRule[],
+) {
+  const rule = matchRule(comment.text, rules);
+  const override = overrideForVideo(target.postOverrides, comment.videoId);
+  if (override?.disabled) return { rule: null, decision: null as null, skip: "video_reply_disabled" };
+
+  // The catalog answers "how much is this one?" from the video it was asked under,
+  // from a picture, or from the product's name — before any paid model is involved.
+  let catalogText: string | null = null;
+  if (!rule && target.catalogMatch !== "off"
+      && (await featuresFor(target.userId, "bot", target.pageId).catch(() => new Set<string>())).has("catalog_reply")) {
+    const catalog = await loadCatalog(target.userId, target.pageId);
+    if (catalog.length) {
+      const m = await matchProduct({
+        message: comment.text, postId: comment.videoId, attachmentUrl: null,
+        catalog, mode: target.catalogMatch,
+      });
+      if (m.product) catalogText = productReply(m.product);
+      else if (m.signal === "ambiguous") {
+        const names = (m.candidates || []).slice(0, 4).map((p) => p.name).join("، ");
+        catalogText = (target.catalogAmbiguousReply || "أي منتج تقصد بالضبط؟") + (names ? `\n${names}` : "");
+      }
+    }
   }
-  return { rule, reply };
+
+  const policy: ReplyPolicy = {
+    mode: override?.mode ?? "groups",
+    groups: override?.groups ?? null,
+    pageGroups: target.replyGroups,
+    inheritGroups: override?.inherit_groups ?? true,
+    bannedWords: [...(override?.banned_words || []), ...(target.bannedWords || [])],
+    bannedAction: override?.banned_action || target.bannedAction,
+    mention: override?.mention ?? target.mentionAuthor,
+    like: override?.like ?? target.likeComments,
+    flatPublic: override?.public_replies ?? null,
+    flatPrivate: override?.private_reply ?? null,
+    defaultPublic: target.publicReplies,
+    defaultPublicOne: target.defaultPublicReply,
+    defaultPrivate: target.defaultPrivateReply,
+  };
+
+  // AI stays last, and only when nothing the owner wrote down already answers.
+  let aiText: string | null = null;
+  const aiWanted = (override?.ai ?? target.aiEnabled) === true;
+  if (!rule && !catalogText && aiWanted && aiAvailable()
+      && (await featuresFor(target.userId, "bot", target.pageId).catch(() => new Set<string>())).has("ai_reply")) {
+    aiText = await generateAiReply(comment.text, target.aiPersona, target.pageName);
+  }
+
+  const decision = decide({
+    message: comment.text,
+    fromName: comment.username,
+    policy,
+    ruleMatched: !!rule,
+    rulePublic: rule?.public_replies ?? null,
+    rulePublicOne: rule?.public_reply ?? null,
+    rulePrivate: rule?.private_reply ?? null,
+    catalogText,
+    aiText,
+  });
+  return { rule, decision, skip: null as string | null };
+}
+
+/** Hide or delete a comment that tripped the banned-word list. */
+async function moderate(
+  target: TikTokTarget, videoId: string, commentId: string, action: "delete" | "hide" | "ignore",
+): Promise<void> {
+  if (action === "ignore") return;
+  const token = await getValidAccessToken(target.accountId);
+  if (!token) return;
+  const businessId = businessIdFromOpenId(target.openId);
+  try {
+    if (action === "delete") await deleteComment(token, businessId, commentId);
+    else await hideComment(token, businessId, videoId, commentId);
+  } catch { /* moderation is best-effort — never fail the pipeline over it */ }
+}
+
+/** Like a comment, best-effort. */
+async function like(target: TikTokTarget, commentId: string): Promise<void> {
+  const token = await getValidAccessToken(target.accountId);
+  if (!token) return;
+  try { await likeComment(token, businessIdFromOpenId(target.openId), commentId); } catch { /* ignore */ }
 }
 
 /**
@@ -164,32 +294,71 @@ async function sendReply(
  */
 export async function processClaimedComment(
   target: TikTokTarget,
-  comment: { commentId: string; videoId: string; text: string },
+  comment: { commentId: string; videoId: string; text: string; username?: string },
 ): Promise<void> {
   const rules = await rulesFor(target.configId);
-  const { rule, reply } = await decideReply(target, comment.text, rules);
 
   const patch: Record<string, unknown> = {
-    matched_rule_id: rule?.id ?? null,
     private_status: "skipped",         // organic TikTok replies are public
     sent_at: new Date().toISOString(),
     processed_at: new Date().toISOString(),
   };
 
+  // One answer per person per video: someone who comments five times gets one
+  // reply, not five. The claim row for THIS comment already exists, so an earlier
+  // answered comment from the same author is what we look for.
+  if (target.oncePerUser && comment.username) {
+    const { data: prior } = await supabaseAdmin
+      .from("bot_reply_log").select("id")
+      .eq("config_id", target.configId).eq("post_id", comment.videoId)
+      .eq("commenter_name", comment.username)
+      .neq("comment_id", comment.commentId)
+      .in("public_status", ["sent", "failed"]).limit(1);
+    if (prior && prior.length) {
+      await finishComment(comment.commentId, { ...patch, public_status: "skipped", error: "already_replied_to_user" });
+      return;
+    }
+  }
+
+  const { rule, decision, skip } = await decideReply(target, comment, rules);
+  patch.matched_rule_id = rule?.id ?? null;
+
+  if (skip || !decision) {
+    await finishComment(comment.commentId, { ...patch, public_status: "skipped", error: skip || "no_rule_match" });
+    return;
+  }
+
+  if (decision.kind === "moderate") {
+    await moderate(target, comment.videoId, comment.commentId, decision.action);
+    await finishComment(comment.commentId, {
+      ...patch, public_status: "skipped", moderation: decision.action, error: "banned_word",
+    });
+    return;
+  }
+
+  if (decision.kind === "silent") {
+    await finishComment(comment.commentId, { ...patch, public_status: "skipped", error: decision.reason });
+    return;
+  }
+
+  // TikTok has no organic private reply, so the richer text — the one carrying the
+  // price — becomes the public answer rather than being dropped on the floor.
+  const reply = decision.privateText || decision.publicText;
   if (!reply || !target.replyPublic) {
     await finishComment(comment.commentId, {
-      ...patch,
-      public_status: "skipped",
+      ...patch, public_status: "skipped",
       error: reply ? "public_replies_disabled" : "no_rule_match",
     });
     return;
   }
 
   const sent = await sendReply(target, comment.videoId, comment.commentId, reply);
+  if (sent.ok && decision.like) await like(target, comment.commentId);
   await finishComment(comment.commentId, {
     ...patch,
     public_status: sent.ok ? "sent" : "failed",
-    error: sent.error ?? null,
+    match_signal: decision.source,
+    error: sent.error ?? (decision.label ? `group:${decision.label}` : decision.source),
   });
 }
 
@@ -246,6 +415,7 @@ async function reconcileAccount(target: TikTokTarget): Promise<number> {
         commentId: comment.commentId,
         videoId: comment.videoId,
         text: comment.text,
+        username: comment.username || comment.uniqueIdentifier || "",
       });
       replied++;
     }
