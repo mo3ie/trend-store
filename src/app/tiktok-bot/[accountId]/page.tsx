@@ -4,16 +4,24 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Loader2, Music2, MessageSquare, Settings2, Activity,
-  Video, Trash2, Save, Power, CreditCard, AlertTriangle, Sparkles, KeyRound,
+  Video, Trash2, Save, Power, CreditCard, AlertTriangle, Sparkles, KeyRound, Package,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import LangToggle from "@/components/LangToggle";
 import WalletModal from "@/components/WalletModal";
+import { useTheme } from "@/hooks/useTheme";
+import { botColors } from "@/lib/botTheme";
+import { BannedWordsEditor, CatalogPanel, ReplyGroupsEditor, type ReplyGroup } from "@/components/bot/ReplySettings";
 
 // Same console shape as the Facebook bot — TikTok palette (pink/cyan).
-const GRADIENT = "linear-gradient(135deg, #0b0b12 0%, #17141f 100%)";
 const PINK = "#ff0050", CYAN = "#00f2ea", GREEN = "#22c55e";
-const CARD = "rgba(255,255,255,0.04)", BORDER = "rgba(255,255,255,0.08)";
+
+/** TikTok keeps its own backdrop; everything else comes from the shared palette. */
+function tiktokGradient(light: boolean): string {
+  return light
+    ? "linear-gradient(135deg, #fbf5f8 0%, #f1f4fb 100%)"
+    : "linear-gradient(135deg, #0b0b12 0%, #17141f 100%)";
+}
 
 type TF = (ar: string, en: string) => string;
 
@@ -21,6 +29,14 @@ interface Sub { status: string; expires_at: string | null; }
 interface Config {
   id: string; enabled: boolean; reply_public: boolean; ai_enabled: boolean;
   ai_persona: string | null; throttle_per_min: number;
+  // Same `bot_configs` row as the Facebook bot, so the same reply configuration.
+  page_id?: string;
+  reply_groups: ReplyGroup[] | null; banned_words: string[] | null;
+  banned_action: "delete" | "hide" | "ignore" | null;
+  mention_author: boolean | null; once_per_user: boolean | null;
+  like_comments: boolean | null; public_replies: string[] | null;
+  default_public_reply: string | null;
+  catalog_match: string | null; catalog_ambiguous_reply: string | null;
 }
 interface Account {
   account_id: string; page_id: string; page_name: string; page_picture?: string;
@@ -41,6 +57,11 @@ function subActive(s: Sub | null): boolean {
 }
 
 export default function TikTokBotManage() {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const CARD = c.card;
+  const BORDER = c.border;
+  const GRADIENT = tiktokGradient(light);
   const router = useRouter();
   const params = useParams();
   const accountId = String(params.accountId);
@@ -50,7 +71,7 @@ export default function TikTokBotManage() {
   const [loading, setLoading] = useState(true);
   const [account, setAccount] = useState<Account | null>(null);
   const [price, setPrice] = useState(50);
-  const [tab, setTab] = useState<"rules" | "settings" | "videos" | "activity">("rules");
+  const [tab, setTab] = useState<"rules" | "settings" | "videos" | "catalog" | "activity">("rules");
   const [toast, setToast] = useState("");
   const [subscribing, setSubscribing] = useState(false);
   const [pay, setPay] = useState<{ amount: number; label: string } | null>(null);
@@ -122,11 +143,11 @@ export default function TikTokBotManage() {
 
   if (!account) {
     return (
-      <div style={{ minHeight: "100vh", background: GRADIENT, color: "#fff", fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+      <div style={{ minHeight: "100vh", background: GRADIENT, color: c.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
         <Music2 size={40} color="#475569" />
-        <div style={{ color: "#94a3b8", fontSize: 14 }}>{t("هذا الحساب غير مرتبط", "This account is not connected")}</div>
+        <div style={{ color: c.muted, fontSize: 14 }}>{t("هذا الحساب غير مرتبط", "This account is not connected")}</div>
         <button onClick={() => router.push("/tiktok-bot")}
-          style={{ background: `${PINK}22`, border: `1px solid ${PINK}55`, borderRadius: 10, padding: "10px 20px", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
+          style={{ background: `${PINK}22`, border: `1px solid ${PINK}55`, borderRadius: 10, padding: "10px 20px", color: c.text, fontWeight: 700, cursor: "pointer" }}>
           {t("رجوع", "Back")}
         </button>
       </div>
@@ -138,9 +159,9 @@ export default function TikTokBotManage() {
   const running = account.config.enabled && active;
 
   return (
-    <div style={{ minHeight: "100vh", background: GRADIENT, color: "#fff", fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80 }}>
+    <div style={{ minHeight: "100vh", background: GRADIENT, color: c.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80 }}>
       <div style={{ padding: "18px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 12 }}>
-        <button onClick={() => router.push("/tiktok-bot")} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+        <button onClick={() => router.push("/tiktok-bot")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
           <Back size={18} /> {t("رجوع", "Back")}
         </button>
         <h1 style={{ fontSize: 16, fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -158,7 +179,7 @@ export default function TikTokBotManage() {
             <div style={{ fontWeight: 700, fontSize: 14 }}>
               {running ? t("البوت يعمل الآن", "Bot is running") : active ? t("مشترك — البوت متوقف", "Subscribed — bot is off") : t("غير مشترك", "Not subscribed")}
             </div>
-            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>
+            <div style={{ fontSize: 12, color: c.muted, marginTop: 3 }}>
               {active && sub?.expires_at
                 ? t(`ينتهي الاشتراك: ${new Date(sub.expires_at).toLocaleDateString("ar-LY")}`, `Renews/expires: ${new Date(sub.expires_at).toLocaleDateString("en-GB")}`)
                 : t(`${price} د.ل شهرياً`, `${price} LYD / month`)}
@@ -166,7 +187,7 @@ export default function TikTokBotManage() {
           </div>
           {!active ? (
             <button onClick={subscribe} disabled={subscribing}
-              style={{ background: `linear-gradient(135deg, ${PINK}, #d6006b)`, border: "none", borderRadius: 11, padding: "11px 20px", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+              style={{ background: `linear-gradient(135deg, ${PINK}, #d6006b)`, border: "none", borderRadius: 11, padding: "11px 20px", color: c.text, fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
               {subscribing ? <Loader2 size={16} className="spin" /> : <CreditCard size={16} />}
               {t(`اشترك — ${price} د.ل`, `Subscribe — ${price} LYD`)}
             </button>
@@ -188,6 +209,7 @@ export default function TikTokBotManage() {
             ["rules", MessageSquare, t("القواعد", "Rules")],
             ["settings", Settings2, t("الإعدادات", "Settings")],
             ["videos", Video, t("الفيديوهات", "Videos")],
+            ["catalog", Package, t("الكتالوج", "Catalog")],
             ["activity", Activity, t("النشاط", "Activity")],
           ] as const).map(([k, Icon, label]) => (
             <button key={k} onClick={() => setTab(k)}
@@ -200,11 +222,14 @@ export default function TikTokBotManage() {
         {tab === "rules" && <RulesTab configId={account.config.id} t={t} />}
         {tab === "settings" && <SettingsTab config={account.config} patch={patchConfig} onDisconnect={disconnect} scopes={account.granted_scopes} t={t} />}
         {tab === "videos" && <VideosTab t={t} />}
+        {tab === "catalog" && (
+          <CatalogTab config={account.config} pageId={account.page_id} patch={patchConfig} t={t} />
+        )}
         {tab === "activity" && <ActivityTab configId={account.config.id} t={t} />}
       </div>
 
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, insetInlineStart: "50%", transform: "translateX(-50%)", background: "#1e293b", border: `1px solid ${PINK}55`, borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 700, zIndex: 50, boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>{toast}</div>
+        <div style={{ position: "fixed", bottom: 24, insetInlineStart: "50%", transform: "translateX(-50%)", background: c.toast, border: `1px solid ${PINK}55`, borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 700, zIndex: 50, boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>{toast}</div>
       )}
 
       {pay && (
@@ -222,6 +247,8 @@ export default function TikTokBotManage() {
 
 // ── Toggle ─────────────────────────────────────────────────────────────────────
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  const { light } = useTheme();
+  const c = botColors(light);
   return (
     <button onClick={() => onChange(!on)} aria-pressed={on}
       style={{ width: 52, height: 30, borderRadius: 20, border: "none", cursor: "pointer", background: on ? GREEN : "#334155", position: "relative", transition: "background .2s", flexShrink: 0 }}>
@@ -231,11 +258,14 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 }
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const BORDER = c.border;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 0", borderBottom: `1px solid ${BORDER}` }}>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>{label}</div>
-        {hint && <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>{hint}</div>}
+        {hint && <div style={{ fontSize: 12, color: c.muted, marginTop: 3 }}>{hint}</div>}
       </div>
       {children}
     </div>
@@ -247,7 +277,28 @@ function SettingsTab({ config, patch, onDisconnect, scopes, t }: {
   config: Config; patch: (p: Partial<Config>) => Promise<boolean>; onDisconnect: () => void;
   scopes?: string[]; t: TF;
 }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const CARD = c.card;
+  const BORDER = c.border;
+
+  // Account-level keyword groups and banned words — inherited by every video
+  // unless a video defines its own, exactly as on the Facebook side.
+  const [groups, setGroups] = useState<ReplyGroup[]>(config.reply_groups || []);
+  const [banned, setBanned] = useState((config.banned_words || []).join("، "));
+  function saveGroups() {
+    patch({
+      reply_groups: groups
+        .map((g) => ({ ...g, keywords: (g.keywords || []).map((k) => k.trim()).filter(Boolean) }))
+        .filter((g) => g.keywords.length > 0),
+      banned_words: banned.split(/[،,\n]/).map((x) => x.trim()).filter(Boolean),
+    });
+  }
+
+  const box: React.CSSProperties = { background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: 20, marginTop: 18 };
+
   return (
+    <>
     <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: "6px 20px 20px" }}>
       <Row label={t("الرد العلني على التعليقات", "Public reply on comments")}
         hint={t("ينشر البوت الرد تحت تعليق العميل", "The bot posts the reply under the customer's comment")}>
@@ -260,7 +311,7 @@ function SettingsTab({ config, patch, onDisconnect, scopes, t }: {
       <Row label={t("سقف الردود بالدقيقة", "Replies per minute")} hint={t("حماية من الحظر", "Anti-block protection")}>
         <input type="number" min={1} max={60} defaultValue={config.throttle_per_min}
           onBlur={(e) => patch({ throttle_per_min: Number(e.target.value) })}
-          style={{ width: 70, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 9, padding: "9px 10px", color: "#fff", textAlign: "center" }} />
+          style={{ width: 70, background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 9, padding: "9px 10px", color: c.text, textAlign: "center" }} />
       </Row>
 
       <div style={{ marginTop: 18 }}>
@@ -270,7 +321,7 @@ function SettingsTab({ config, patch, onDisconnect, scopes, t }: {
         <textarea defaultValue={config.ai_persona || ""} rows={3}
           onBlur={(e) => patch({ ai_persona: e.target.value })}
           placeholder={t("مثال: أنت موظف مبيعات لطيف في محل إلكترونيات في بنغازي…", "e.g. You are a friendly sales rep at an electronics shop in Benghazi…")}
-          style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "11px 14px", color: "#fff", fontSize: 13.5, resize: "vertical" }} />
+          style={{ width: "100%", boxSizing: "border-box", background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "11px 14px", color: c.text, fontSize: 13.5, resize: "vertical" }} />
       </div>
 
       {!!scopes?.length && (
@@ -280,11 +331,11 @@ function SettingsTab({ config, patch, onDisconnect, scopes, t }: {
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {scopes.map((sc) => (
-              <span key={sc} style={{ fontSize: 11.5, color: "#cbd5e1", background: "rgba(255,255,255,0.06)",
+              <span key={sc} style={{ fontSize: 11.5, color: "#cbd5e1", background: c.surface,
                 border: `1px solid ${BORDER}`, borderRadius: 999, padding: "4px 10px" }}>{sc}</span>
             ))}
           </div>
-          <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 8, lineHeight: 1.7 }}>
+          <div style={{ fontSize: 11.5, color: c.muted, marginTop: 8, lineHeight: 1.7 }}>
             {t(
               "تُمنح هذه الصلاحيات من تيك توك عند الربط — لتغييرها أعد ربط الحساب.",
               "TikTok grants these at connection time — reconnect the account to change them.",
@@ -298,11 +349,52 @@ function SettingsTab({ config, patch, onDisconnect, scopes, t }: {
         <Trash2 size={15} /> {t("إلغاء ربط الحساب", "Disconnect account")}
       </button>
     </div>
+
+    {/* Keyword groups — "price" comments get the price, "phone" comments get the
+        numbers. Set once here and every video inherits them. */}
+    <div style={box}>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 7 }}>
+        <MessageSquare size={15} color={CYAN} /> {t("مجموعات الردود الافتراضية", "Default reply groups")}
+      </div>
+      <div style={{ fontSize: 12, color: c.muted, marginBottom: 10, lineHeight: 1.8 }}>
+        {t("اضبطها مرة واحدة وترثها كل الفيديوهات — تعليق فيه «سعر» يأخذ ردّ السعر، وتعليق فيه «رقم» يأخذ أرقام التواصل.",
+           "Set these once and every video inherits them — a comment containing \"price\" gets the price reply, one containing \"phone\" gets the contact numbers.")}
+      </div>
+      <ReplyGroupsEditor groups={groups} onChange={setGroups} onSave={saveGroups} c={c} t={t} accent={PINK} />
+    </div>
+
+    <div style={box}>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t("الكلمات المحظورة", "Banned words")}</div>
+      <BannedWordsEditor
+        words={banned} action={(config.banned_action as "delete" | "hide" | "ignore") || "hide"}
+        onWords={setBanned} onAction={(a) => patch({ banned_action: a })}
+        onSave={saveGroups} c={c} t={t}
+      />
+      <div style={{ marginTop: 16 }}>
+        <Row label={t("ابدأ الرد باسم صاحب التعليق", "Open replies with the commenter's name")}
+          hint={t("«أحمد، السعر 250 د.ل»", "\"Ahmed, it's 250 LYD\"")}>
+          <Toggle on={config.mention_author !== false} onChange={(v) => patch({ mention_author: v })} />
+        </Row>
+        <Row label={t("رد واحد لكل شخص في الفيديو", "One reply per person per video")}
+          hint={t("من يعلّق خمس مرات يصله رد واحد", "Someone who comments five times gets one answer")}>
+          <Toggle on={config.once_per_user !== false} onChange={(v) => patch({ once_per_user: v })} />
+        </Row>
+        <Row label={t("إعجاب بالتعليقات", "Like comments")}
+          hint={t("إعجاب على كل تعليق يردّ عليه", "A like on every comment it answers")}>
+          <Toggle on={!!config.like_comments} onChange={(v) => patch({ like_comments: v })} />
+        </Row>
+      </div>
+    </div>
+    </>
   );
 }
 
 // ── Rules tab — compact keyword→reply editor (TikTok replies are public only) ──
 function RulesTab({ configId, t }: { configId: string; t: TF }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const CARD = c.card;
+  const BORDER = c.border;
   const [rules, setRules] = useState<Rule[]>([]);
   const [kw, setKw] = useState("");
   const [reply, setReply] = useState("");
@@ -334,14 +426,14 @@ function RulesTab({ configId, t }: { configId: string; t: TF }) {
     setRules((r) => r.filter((x) => x.id !== id));
   }
 
-  const inp: React.CSSProperties = { width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "11px 14px", color: "#fff", fontSize: 13.5 };
+  const inp: React.CSSProperties = { width: "100%", boxSizing: "border-box", background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "11px 14px", color: c.text, fontSize: 13.5 };
 
   return (
     <div>
       {loading ? (
-        <div style={{ textAlign: "center", padding: 30, color: "#64748b" }}><Loader2 size={24} className="spin" /></div>
+        <div style={{ textAlign: "center", padding: 30, color: c.dim }}><Loader2 size={24} className="spin" /></div>
       ) : rules.length === 0 ? (
-        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 14, marginBottom: 16 }}>
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 24, textAlign: "center", color: c.muted, fontSize: 14, marginBottom: 16 }}>
           {t("لا قواعد بعد — أضف أول قاعدة ردّ بالأسفل", "No rules yet — add your first reply rule below")}
         </div>
       ) : (
@@ -367,7 +459,7 @@ function RulesTab({ configId, t }: { configId: string; t: TF }) {
         <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={3} style={{ ...inp, resize: "vertical", marginBottom: 10 }}
           placeholder={t("نص الرد — مثال: السعر 250 د.ل، راسلنا للطلب 📩", "Reply text — e.g. Price is 250 LYD, DM us to order 📩")} />
         <button onClick={add} disabled={saving || !reply.trim()}
-          style={{ width: "100%", background: reply.trim() ? `linear-gradient(135deg, ${PINK}, #d6006b)` : "rgba(255,255,255,0.06)", border: "none", borderRadius: 11, padding: "12px 0", color: reply.trim() ? "#fff" : "#64748b", fontWeight: 700, fontSize: 14, cursor: reply.trim() ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          style={{ width: "100%", background: reply.trim() ? `linear-gradient(135deg, ${PINK}, #d6006b)` : c.surface, border: "none", borderRadius: 11, padding: "12px 0", color: reply.trim() ? "#fff" : "#64748b", fontWeight: 700, fontSize: 14, cursor: reply.trim() ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
           {saving ? <Loader2 size={15} className="spin" /> : <Save size={15} />} {t("إضافة قاعدة", "Add rule")}
         </button>
       </div>
@@ -377,11 +469,15 @@ function RulesTab({ configId, t }: { configId: string; t: TF }) {
 
 // ── Videos tab — placeholder shell (per-video replies land here later) ────────
 function VideosTab({ t }: { t: TF }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const CARD = c.card;
+  const BORDER = c.border;
   return (
     <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: 34, textAlign: "center" }}>
       <Video size={36} color="#475569" style={{ marginBottom: 12 }} />
       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>{t("ردود خاصة بكل فيديو", "Per-video replies")}</div>
-      <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.8 }}>
+      <div style={{ fontSize: 13, color: c.muted, lineHeight: 1.8 }}>
         {t(
           "قريباً — اختر فيديو من حسابك وخصّص له ردّاً مختلفاً عن القاعدة العامة.",
           "Coming soon — pick a video from your account and give it its own reply, separate from the general rules.",
@@ -391,8 +487,34 @@ function VideosTab({ t }: { t: TF }) {
   );
 }
 
+// ── Catalog tab ──────────────────────────────────────────────────────────────
+// The same smart catalog the Facebook bot uses, reading the same products: which
+// one a comment is about, and that product's price. Only the wording differs
+// ("video" rather than "post"), which the shared panel handles.
+function CatalogTab({ config, pageId, patch, t }: {
+  config: Config; pageId: string; patch: (p: Partial<Config>) => Promise<boolean>; t: TF;
+}) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  return (
+    <CatalogPanel
+      pageId={pageId}
+      platform="tiktok"
+      mode={config.catalog_match || "off"}
+      onMode={(m) => patch({ catalog_match: m })}
+      c={c}
+      t={t}
+      accent={PINK}
+    />
+  );
+}
+
 // ── Activity tab ─────────────────────────────────────────────────────────────
 function ActivityTab({ configId, t }: { configId: string; t: TF }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const CARD = c.card;
+  const BORDER = c.border;
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [stats, setStats] = useState<{ total: number; public_sent: number; failed: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -409,22 +531,22 @@ function ActivityTab({ configId, t }: { configId: string; t: TF }) {
     return <span style={{ fontSize: 11, color: c, background: `${c}18`, padding: "2px 7px", borderRadius: 6 }}>{l}</span>;
   };
 
-  if (loading) return <div style={{ textAlign: "center", padding: 30, color: "#64748b" }}><Loader2 size={24} className="spin" /></div>;
+  if (loading) return <div style={{ textAlign: "center", padding: 30, color: c.dim }}><Loader2 size={24} className="spin" /></div>;
 
   return (
     <div>
       {stats && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
-          {[[t("تعليقات معالجة", "Comments handled"), stats.total, CYAN], [t("ردود علنية", "Public replies"), stats.public_sent, PINK], [t("إخفاقات", "Failures"), stats.failed, "#ef4444"]].map(([l, v, c], i) => (
+          {[[t("تعليقات معالجة", "Comments handled"), stats.total, CYAN], [t("ردود علنية", "Public replies"), stats.public_sent, PINK], [t("إخفاقات", "Failures"), stats.failed, "#ef4444"]].map(([l, v, hue], i) => (
             <div key={i} style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: c as string }}>{v as number}</div>
-              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{l as string}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: hue as string }}>{v as number}</div>
+              <div style={{ fontSize: 11, color: c.muted, marginTop: 3 }}>{l as string}</div>
             </div>
           ))}
         </div>
       )}
       {logs.length === 0 ? (
-        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 24, textAlign: "center", color: c.muted, fontSize: 14 }}>
           {t("لا نشاط بعد — سيظهر هنا كل تعليق يرد عليه البوت", "No activity yet — every comment the bot replies to will appear here")}
         </div>
       ) : (
@@ -437,7 +559,7 @@ function ActivityTab({ configId, t }: { configId: string; t: TF }) {
               </div>
               <div style={{ fontSize: 13, color: "#cbd5e1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.comment_message || "—"}</div>
               {l.error && <div style={{ fontSize: 11, color: "#f87171", marginTop: 4 }}>{l.error}</div>}
-              <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{new Date(l.created_at).toLocaleString(t("ar-LY", "en-GB"))}</div>
+              <div style={{ fontSize: 11, color: c.dim, marginTop: 4 }}>{new Date(l.created_at).toLocaleString(t("ar-LY", "en-GB"))}</div>
             </div>
           ))}
         </div>

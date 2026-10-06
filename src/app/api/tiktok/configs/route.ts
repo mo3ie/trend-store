@@ -4,7 +4,14 @@ import { getAuthUser } from "@/lib/authUser";
 import { checkRateLimit, rateLimitedJson, identifierFor, RATE_RULES } from "@/lib/rateLimit";
 import { listTikTokAccounts, tokenStatusFor, disconnectTikTokAccount } from "@/lib/tiktokTokens";
 
-const EDITABLE = ["enabled", "reply_public", "ai_enabled", "ai_persona", "throttle_per_min"] as const;
+const EDITABLE = [
+  "enabled", "reply_public", "ai_enabled", "ai_persona", "throttle_per_min",
+  // Same reply configuration as the Facebook bot — one `bot_configs` row, one
+  // decision engine, so the editable surface has to match too.
+  "reply_groups", "banned_words", "banned_action", "mention_author", "once_per_user",
+  "like_comments", "public_replies", "default_public_reply", "post_overrides",
+  "catalog_match", "catalog_ambiguous_reply",
+] as const;
 
 /**
  * GET — the user's connected TikTok accounts.
