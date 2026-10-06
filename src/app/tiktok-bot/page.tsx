@@ -78,9 +78,16 @@ function TikTokBotInner() {
 
   async function connect() {
     setConnecting(true); setError("");
-    const data = await fetch("/api/tiktok/connect").then((r) => r.json());
-    if (data.url) window.location.href = data.url;
-    else { setError(data.error || t("حدث خطأ", "Something went wrong")); setConnecting(false); }
+    const res = await fetch("/api/tiktok/connect");
+    const data = await res.json().catch(() => ({}));
+    if (data.url) { window.location.href = data.url; return; }
+    setError(
+      data.error === "tiktok_not_configured" || res.status === 503
+        ? t("ربط حسابات تيك توك قيد التفعيل حالياً — سيُفتح قريباً.",
+            "TikTok account linking is being activated — it will open shortly.")
+        : (data.message || data.error || t("حدث خطأ", "Something went wrong")),
+    );
+    setConnecting(false);
   }
 
   const shown = accounts.filter((a) => (a.page_name || "").toLowerCase().includes(q.trim().toLowerCase()));
@@ -116,7 +123,7 @@ function TikTokBotInner() {
           <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 10px" }}>
             {t("ردّ تلقائي على كل تعليق في فيديوهاتك", "Auto-reply to every comment on your videos")}
           </h2>
-          <p style={{ color: "#cbd5e1", fontSize: 14, lineHeight: 1.9, margin: "0 0 18px" }}>
+          <p style={{ color: col.muted, fontSize: 14, lineHeight: 1.9, margin: "0 0 18px" }}>
             {t(
               "يراقب البوت تعليقات فيديوهاتك ويرد عليها تلقائياً بالسعر والتفاصيل — على مدار الساعة، دون أن تفوتك أي فرصة بيع.",
               "The bot watches the comments on your videos and replies automatically with the price and details — 24/7, so you never miss a sale.",
@@ -129,7 +136,7 @@ function TikTokBotInner() {
               [Zap, t("تهدئة تلقائية ضد الحظر", "Auto pacing anti-block")],
               [ShieldCheck, t("صلاحيات تيك توك رسمية", "Official TikTok permissions")],
             ] as [React.ComponentType<{ size?: number; color?: string }>, string][]).map(([Icon, label], i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#e2e8f0" }}>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: col.text }}>
                 <Icon size={16} color={CYAN} /> {label}
               </div>
             ))}
@@ -149,7 +156,7 @@ function TikTokBotInner() {
           <div style={{ textAlign: "center", padding: 50, color: col.dim }}><Loader2 size={30} className="spin" /></div>
         ) : accounts.length === 0 ? (
           <div style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 16, padding: 34, textAlign: "center" }}>
-            <Music2 size={40} color="#475569" style={{ marginBottom: 14 }} />
+            <Music2 size={40} color={col.dim} style={{ marginBottom: 14 }} />
             <p style={{ color: col.muted, margin: "0 0 18px", fontSize: 14 }}>
               {t("اربط حساب تيك توك أولاً لتفعيل البوت عليه", "Connect a TikTok account first to enable the bot on it")}
             </p>
@@ -174,7 +181,7 @@ function TikTokBotInner() {
             )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 14px", flexWrap: "wrap" }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#cbd5e1", margin: 0 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: col.text, margin: 0 }}>
                 {t("حساباتك", "Your accounts")} ({accounts.length})
               </h3>
               <button onClick={connect} disabled={connecting}

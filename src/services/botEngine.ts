@@ -4,6 +4,7 @@
 // Idempotency is guaranteed by the UNIQUE(comment_id) row in bot_reply_log.
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { throttleGate, isItemTargeted } from "@/services/botThrottle";
 import {
   replyToComment,
   sendPrivateReply,
@@ -85,7 +86,7 @@ function getOverride(overrides: Record<string, PostOverride> | null | undefined,
   return overrides[postId] || overrides[suffix] || null;
 }
 
-function overrideHasContent(o: PostOverride | null): boolean {
+export function overrideHasContent(o: PostOverride | null): boolean {
   if (!o) return false;
   const flat = (o.public_replies?.some((s) => (s || "").trim()) ?? false)
     || !!(o.private_reply || "").trim()
@@ -183,31 +184,9 @@ export function matchRule(message: string, rules: BotRule[]): BotRule | null {
 }
 
 // ── Throttle (primary anti-block defense) ────────────────────────────────────
-// When a post goes viral, hundreds of comments arrive at once. Replying to all of
-// them instantly is exactly what trips Facebook's spam detection and gets the
-// account temporarily blocked. We cap replies per page per minute using the
-// bot_reply_log as the counter (durable across serverless instances) and add a
-// small human-like jitter before each reply.
-async function throttleGate(configId: string, perMin: number, minDelaySec: number, maxDelaySec: number): Promise<boolean> {
-  const since = new Date(Date.now() - 60_000).toISOString();
-  // Count by sent_at (when we actually hit the Graph API), NOT created_at (when the
-  // comment arrived) — otherwise drained rows carry an old created_at, never count
-  // toward the current minute, and the drain blows straight through the cap.
-  const { count } = await supabaseAdmin
-    .from("bot_reply_log")
-    .select("id", { count: "exact", head: true })
-    .eq("config_id", configId)
-    .gte("sent_at", since);
-
-  if ((count ?? 0) >= perMin) return false; // over budget → defer this comment
-
-  // Human-like pacing: wait a configurable min–max before we touch the Graph API.
-  const lo = Math.max(0, Math.min(minDelaySec, maxDelaySec));
-  const hi = Math.max(lo, maxDelaySec);
-  const waitMs = (lo + Math.random() * (hi - lo)) * 1000;
-  await new Promise((r) => setTimeout(r, waitMs));
-  return true;
-}
+// Moved to `services/botThrottle.ts` so the TikTok bot uses the same pacing: it was
+// capping replies per sweep but never waiting between them, which is the weaker half
+// of the protection on the stricter platform.
 
 interface PoolToken { id: string; access_token: string; }
 
@@ -340,13 +319,13 @@ export async function processComment(ev: CommentEvent): Promise<string> {
   // comments on any other post. Match the full "{pageId}_{postId}" id or the numeric
   // suffix, since the webhook and the stored ids can differ in shape. A post with its
   // own custom reply is always targeted, even in "specific posts" mode.
-  if (config.post_filter_enabled && (config.post_filter?.length ?? 0) > 0) {
-    const pid = ev.postId || "";
-    const suffix = (s: string) => (s.includes("_") ? s.split("_")[1] : s);
-    const want = suffix(pid);
-    const targeted = (config.post_filter as string[]).some((f) => f === pid || suffix(f) === want);
-    const hasOverride = overrideHasContent(getOverride(config.post_overrides, pid));
-    if (!targeted && !hasOverride) return "post_not_targeted";
+  if (!isItemTargeted(
+        ev.postId || "",
+        !!config.post_filter_enabled,
+        config.post_filter as string[] | null,
+        overrideHasContent(getOverride(config.post_overrides, ev.postId || "")),
+      )) {
+    return "post_not_targeted";
   }
 
   // Subscription gate — the NEW subscription system (entitlements v2) is the source of

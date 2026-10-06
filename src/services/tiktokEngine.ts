@@ -15,7 +15,11 @@
 // Credentials come from tiktok_tokens via getValidAccessToken (decrypted server-side only).
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { matchRule, type BotRule } from "@/services/botEngine";
+import {
+  humanPause, isItemTargeted, repliesInLastMinute,
+  DEFAULT_PER_MIN, DEFAULT_MIN_DELAY_SEC, DEFAULT_MAX_DELAY_SEC,
+} from "@/services/botThrottle";
+import { matchRule, overrideHasContent, type BotRule } from "@/services/botEngine";
 import { generateAiReply, aiAvailable } from "@/services/botAi";
 import { getValidAccessToken } from "@/lib/tiktokTokens";
 import { hasProduct } from "@/lib/entitlements";
@@ -40,6 +44,12 @@ export interface TikTokTarget {
   aiPersona: string | null;
   replyPublic: boolean;
   throttlePerMin: number;
+  /** Human-like pacing before each reply — the anti-block defence, shared with Meta. */
+  minDelaySec: number;
+  maxDelaySec: number;
+  /** When set, the bot answers only the videos the owner listed. */
+  videoFilter: string[] | null;
+  videoFilterEnabled: boolean;
   /** Everything the Facebook bot answers with — the schema is shared, so TikTok
    *  gets the same keyword groups, moderation and per-video overrides. */
   pageId: string;
@@ -69,7 +79,7 @@ export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
 
   const { data: config } = await supabaseAdmin
     .from("bot_configs")
-    .select("id, user_id, page_id, page_name, enabled, ai_enabled, ai_persona, reply_public, throttle_per_min, reply_groups, banned_words, banned_action, mention_author, once_per_user, like_comments, public_replies, default_public_reply, default_private_reply, post_overrides, catalog_match, catalog_ambiguous_reply")
+    .select("id, user_id, page_id, page_name, enabled, ai_enabled, ai_persona, reply_public, throttle_per_min, min_delay_sec, max_delay_sec, post_filter, post_filter_enabled, reply_groups, banned_words, banned_action, mention_author, once_per_user, like_comments, public_replies, default_public_reply, default_private_reply, post_overrides, catalog_match, catalog_ambiguous_reply")
     .eq("platform", "tiktok")
     .eq("page_id", openId)
     .eq("enabled", true)
@@ -99,7 +109,11 @@ export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
     aiEnabled: !!config.ai_enabled,
     aiPersona: config.ai_persona,
     replyPublic: config.reply_public !== false,
-    throttlePerMin: config.throttle_per_min || 20,
+    throttlePerMin: config.throttle_per_min || DEFAULT_PER_MIN,
+    minDelaySec: config.min_delay_sec ?? DEFAULT_MIN_DELAY_SEC,
+    maxDelaySec: config.max_delay_sec ?? DEFAULT_MAX_DELAY_SEC,
+    videoFilter: (config.post_filter as string[] | null) ?? null,
+    videoFilterEnabled: !!config.post_filter_enabled,
     pageId: config.page_id,
     replyGroups: (config.reply_groups as ReplyGroup[] | null) ?? null,
     bannedWords: (config.banned_words as string[] | null) ?? null,
@@ -320,6 +334,18 @@ export async function processClaimedComment(
     }
   }
 
+  // Video targeting: an owner who listed specific videos expects silence on the rest.
+  // A video with its own custom reply is always answered — see `isItemTargeted`.
+  if (!isItemTargeted(
+        comment.videoId,
+        target.videoFilterEnabled,
+        target.videoFilter,
+        overrideHasContent(overrideForVideo(target.postOverrides, comment.videoId)),
+      )) {
+    await finishComment(comment.commentId, { ...patch, public_status: "skipped", error: "video_not_targeted" });
+    return;
+  }
+
   const { rule, decision, skip } = await decideReply(target, comment, rules);
   patch.matched_rule_id = rule?.id ?? null;
 
@@ -351,6 +377,11 @@ export async function processClaimedComment(
     });
     return;
   }
+
+  // Human-like pacing. TikTok's rate limits are the stricter of the two platforms, and
+  // this bot was capping replies per sweep without ever waiting between them — a burst
+  // of instant replies is exactly what gets an account throttled or blocked.
+  await humanPause(target.minDelaySec, target.maxDelaySec);
 
   const sent = await sendReply(target, comment.videoId, comment.commentId, reply);
   if (sent.ok && decision.like) await like(target, comment.commentId);
@@ -401,6 +432,12 @@ async function reconcileAccount(target: TikTokTarget): Promise<number> {
       if (comment.createTime && comment.createTime < cutoff) continue;
       if (comment.owner) continue;                    // our own comment
       if (!target.replyPublic) continue;
+
+      // Per-minute budget. Checked before claiming, not after: the claim is what makes
+      // duplicate deliveries safe, so a comment we claim and then decline to answer is
+      // a comment no later sweep will ever pick up again. Stopping here instead leaves
+      // it unclaimed for the next poll.
+      if (await repliesInLastMinute(target.configId) >= target.throttlePerMin) return replied;
 
       // Same claim as the webhook path — whichever gets here first wins, the other no-ops.
       const claimed = await claimComment(target, {

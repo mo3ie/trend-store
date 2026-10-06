@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import {
-  MessageSquareReply, Megaphone, ArrowLeft, ArrowRight, Check, Clock,
+  MessageSquareReply, Megaphone, Bot, ArrowLeft, ArrowRight, Check, Clock,
   Users, LayoutGrid, Upload, MessageSquare, PlayCircle, Link2, ShieldCheck, Settings2,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
@@ -30,6 +30,26 @@ const TOOLS = [
       ["قواعد كلمات مفتاحية", "Keyword rules"],
       ["ردود ذكية بالذكاء الاصطناعي", "Smart AI replies"],
       ["حماية من الحظر", "Anti-block protection"],
+    ] as const,
+  },
+  {
+    key: "studio",
+    name: ["الموظف الذكي", "AI Employee"] as const,
+    tagline: ["ينشر لك يومياً كموظف تسويق", "Posts daily like a marketing employee"] as const,
+    desc: [
+      "أخبره ببيانات نشاطك وأصنافك، واختر عدد المنشورات اليومية — فيصمّم خطة محتوى كاملة (نصوص وفيديوهات)، يجدولها، ويردّ بالأسعار على التعليقات.",
+      "Give it your business info and products, pick posts per day — it drafts a full content plan (captions & videos), schedules them, and replies with prices.",
+    ] as const,
+    href: "/studio",
+    icon: Bot,
+    color: "#d6409f",
+    accent: "#ff7a59",
+    soon: false,
+    features: [
+      ["خطة نشر أسبوعية بالذكاء", "AI weekly content plan"],
+      ["كتالوج أصناف وصور", "Catalog with images"],
+      ["جدولة تلقائية", "Automatic scheduling"],
+      ["ردود جاهزة لكل منشور", "Per-post ready replies"],
     ] as const,
   },
   {
