@@ -157,3 +157,87 @@ account-holder scopes under review.
    (`regularRate`, `vipRate`, `*Commission`, `packagesTt`).
 5. **Cron** — `/api/tiktok/ads/campaigns/daily-debit` is in `vercel.json` at 06:15 UTC
    and needs `CRON_SECRET`.
+
+---
+
+## Phase 2 — the TikTok-native rebuild
+
+The first version of these screens was a clone of the Facebook tools, and the owner's
+verdict was that it was *too* identical: same chrome, Facebook vocabulary, and the AI
+Employee card even opened the Facebook Page-linking flow. The ideas were right; the
+execution was a second copy of another product. Rebuilt around three principles.
+
+### 1. No gradient fills, a black stage instead
+
+`src/lib/tiktokTheme.ts` is the area's own language. The Facebook tools are built on
+gradient fills; this area has none. Its signature is a black 9:16 **stage** that stays
+black in both themes (video is the content, and a black vertical frame reads as
+"phone"), plus pink/cyan as a hard unblurred **offset** rather than a blend — a
+pink-to-cyan gradient reads as generic neon, while the offset is the actual logo
+mechanic.
+
+The text inks are split from the brand hues because raw cyan on a light background is
+about 1.5:1 contrast. On light it may only be an edge, never text.
+
+### 2. Prep mode, not a dead end
+
+Nothing can be linked until the credentials land, so the unlinked screen is what every
+user sees FIRST. The old screens treated that as an error: a marketing hero, a price,
+and a link button that fails. Now:
+
+* The account strip states the truth and offers a notify toggle, not a broken button.
+* Everything that does not need the TikTok API works and is saved now.
+* The bot's **live simulator** answers a comment using the owner's real rules and real
+  catalog prices (`/api/tiktok/bot/simulate`, which runs the actual decision core —
+  an approximation would be worse than nothing, since owners tune rules against it).
+  The AI tier is deliberately not invoked from a preview: it bills per call.
+* Subscription gates only the go-live switch, via a sticky bar.
+
+### 3. The deliverables are different objects
+
+| | Facebook | TikTok |
+|---|---|---|
+| A post | caption + image | a **script**: hook, shots, on-screen text, sound |
+| The bot | public reply + private DM | one **public** reply, price included |
+| An ad | boost a post by URL | Spark Ad: pick a video by thumbnail |
+| A/B test | two audiences | **two videos** |
+
+* `supabase/tiktok-studio-script.sql` adds `hook`, `scenes`, `screen_text`, `sound`,
+  `duration_sec`. The generator now has two prompts, because asking one to serve both
+  produced Facebook captions with a TikTok label on them. A still is labelled "cover
+  frame" and never presented as the post.
+* `components/tiktok/ReplyThread.tsx` draws the composer AS the comment thread — the
+  owner types into a rendered public place, so the fact never needs a warning label.
+  The slot Facebook spends on the DM becomes **reply variants** the bot rotates;
+  identical replies under every comment look like spam to viewers and to moderation.
+  A lint fires when a product is in play and no variant carries a price, since on this
+  platform there is no DM for the price to go in.
+* The two-video test splits the budget across two ad groups — and TikTok's minimum
+  applies to **each**, so a legal $60 campaign split in two becomes two illegal $30
+  groups. The floor is therefore checked against the per-group share, in
+  `launchCampaign` and again in the create route before payment.
+
+### The $20/day floor, presented honestly
+
+No comparison to another platform's prices anywhere: without the comparison there is
+nothing to feel cheated about. Instead:
+
+* A **receipt** whose hero number is what goes to TikTok, with the service fee as
+  small print beneath it. When most of the money visibly leaves for the platform, the
+  price reads as reach being bought.
+* A budget **slider whose track includes the forbidden zone**, hatched and unreachable.
+  The advertiser sees a wall that belongs to TikTok rather than a price we chose.
+* The default offer is a **3-day sprint** — the smallest thing TikTok will run.
+
+### Also
+
+* `/api/tiktok/status` describes each tool from the owner's own data, replacing feature
+  bullets that read identically on every account.
+* `/subscriptions` now says prices are being set when a product has no active plans,
+  instead of rendering an empty selector; each tool deep-links to its own tab.
+* The app-review demonstration material moved out of the main flow to a single
+  "عرض تقديمي" item in the hub's overflow menu. `/tiktok-demo/*` and
+  `/tiktok-bot/demo-account/*` are unchanged.
+* Payment reuses `/ads/checkout`. That URL carries the other area's name, which is the
+  one piece of shared vocabulary left standing — duplicating a tested payment sheet
+  across four gateways was the worse trade.

@@ -298,9 +298,22 @@ export interface LaunchInput {
   adText?: string | null;
   landingPageUrl?: string | null;
   targeting?: TikTokTargeting | null;
+  /**
+   * The B side of a head-to-head test: a SECOND organic video, same audience.
+   *
+   * Facebook's A/B pits two audiences against each other. On TikTok the creative is
+   * what decides delivery — the same offer on a different clip can differ by an order
+   * of magnitude — so the useful question here is "which of my videos performs?",
+   * not "which age bracket?". The budget is split evenly between the two ad groups.
+   */
+  itemIdB?: string | null;
 }
 
-export interface LaunchResult { campaignId: string; adgroupId: string; adId: string }
+export interface LaunchResult {
+  campaignId: string; adgroupId: string; adId: string;
+  /** Present only for a two-video test. */
+  adgroupB?: string; adB?: string;
+}
 
 /** TikTok wants "YYYY-MM-DD HH:mm:ss", not an ISO string. */
 function ttTime(d: Date): string {
@@ -317,20 +330,27 @@ function ttTime(d: Date): string {
 export async function launchCampaign(input: LaunchInput): Promise<LaunchResult> {
   const {
     token, advertiserId, campaignName, budgetUsd, durationDays, continuous,
-    identityId, identityType = "TT_USER", itemId, adText, landingPageUrl, targeting,
+    identityId, identityType = "TT_USER", itemId, itemIdB, adText, landingPageUrl, targeting,
   } = input;
 
   const obj = resolveObjective(input.objective);
   const days = Math.max(1, Number(durationDays) || 1);
 
-  // The platform floor, checked before spending an API call on a doomed request.
+  // A head-to-head test runs two ad groups, and TikTok's minimum applies to EACH of
+  // them — so a legal $60 campaign split in two becomes two illegal $30 groups. The
+  // floor is therefore checked against the per-group share, not the total.
+  const groups = itemIdB ? 2 : 1;
+  const perGroupBudget = Math.floor(budgetUsd / groups);
+
   const floor = continuous ? MIN_DAILY_USD : minTotalUsd(days);
-  if (budgetUsd < floor) {
+  if (perGroupBudget < floor) {
     throw new TikTokAdsError(
       "below_minimum",
-      continuous
-        ? `TikTok requires at least $${MIN_DAILY_USD} per day`
-        : `TikTok requires at least $${floor} for ${days} days`,
+      groups === 2
+        ? `A two-video test needs at least $${floor * 2} (TikTok's $${MIN_DAILY_USD}/day minimum applies to each video)`
+        : continuous
+          ? `TikTok requires at least $${MIN_DAILY_USD} per day`
+          : `TikTok requires at least $${floor} for ${days} days`,
     );
   }
 
@@ -362,7 +382,7 @@ export async function launchCampaign(input: LaunchInput): Promise<LaunchResult> 
     bid_type: "BID_TYPE_NO_BID",
     pacing: "PACING_MODE_SMOOTH",
     budget_mode: continuous ? "BUDGET_MODE_DAY" : "BUDGET_MODE_TOTAL",
-    budget: budgetUsd,
+    budget: perGroupBudget,
     schedule_type: continuous ? "SCHEDULE_FROM_NOW" : "SCHEDULE_START_END",
     schedule_start_time: ttTime(start),
     identity_id: identityId,
@@ -377,38 +397,52 @@ export async function launchCampaign(input: LaunchInput): Promise<LaunchResult> 
     adgroupBody.landing_page_url = landingPageUrl || "https://www.trendstore-ly.com";
   }
 
-  let adgroupId = "";
-  try {
-    const ag = await call<{ adgroup_id?: string }>("POST", "adgroup/create/", token, adgroupBody);
-    adgroupId = String(ag.adgroup_id || "");
-    if (!adgroupId) throw new TikTokAdsError("no_adgroup_id", "TikTok created no ad group id", "adgroup/create/");
-  } catch (e) {
-    await pauseCampaign(token, advertiserId, campaignId).catch(() => {});
-    throw e;
-  }
+  /**
+   * One side of the test: an ad group plus its ad, for one video.
+   *
+   * Both sides are identical except the clip, which is the only way the comparison
+   * means anything — if the audiences differed too, a win would not say which
+   * variable caused it.
+   */
+  const makeSide = async (video: string | null | undefined, suffix: string) => {
+    const body = { ...adgroupBody, adgroup_name: `${campaignName.slice(0, 460)} — ${suffix}` };
+    const ag = await call<{ adgroup_id?: string }>("POST", "adgroup/create/", token, body);
+    const groupId = String(ag.adgroup_id || "");
+    if (!groupId) throw new TikTokAdsError("no_adgroup_id", "TikTok created no ad group id", "adgroup/create/");
 
-  const creative: Record<string, unknown> = {
-    ad_name: campaignName.slice(0, 480),
-    identity_id: identityId,
-    identity_type: identityType,
-    ad_format: "SINGLE_VIDEO",
-    ad_text: (adText || "").slice(0, 100) || undefined,
-    call_to_action: obj.promotionType === "FOLLOWERS" ? "FOLLOW_NOW" : "SHOP_NOW",
-  };
-  // Spark Ad: promote the existing organic post rather than uploading a new creative.
-  if (itemId) creative.tiktok_item_id = itemId;
-  if (obj.promotionType === "WEBSITE") creative.landing_page_url = landingPageUrl || "https://www.trendstore-ly.com";
+    const creative: Record<string, unknown> = {
+      ad_name: `${campaignName.slice(0, 460)} — ${suffix}`,
+      identity_id: identityId,
+      identity_type: identityType,
+      ad_format: "SINGLE_VIDEO",
+      ad_text: (adText || "").slice(0, 100) || undefined,
+      call_to_action: obj.promotionType === "FOLLOWERS" ? "FOLLOW_NOW" : "SHOP_NOW",
+    };
+    // Spark Ad: promote the existing organic video rather than uploading a creative.
+    if (video) creative.tiktok_item_id = video;
+    if (obj.promotionType === "WEBSITE") {
+      creative.landing_page_url = landingPageUrl || "https://www.trendstore-ly.com";
+    }
 
-  try {
     const ad = await call<{ ad_ids?: string[]; creatives?: Array<{ ad_id?: string }> }>(
       "POST", "ad/create/", token,
-      { advertiser_id: advertiserId, adgroup_id: adgroupId, creatives: [creative] },
+      { advertiser_id: advertiserId, adgroup_id: groupId, creatives: [creative] },
     );
     const adId = String(ad.ad_ids?.[0] || ad.creatives?.[0]?.ad_id || "");
     if (!adId) throw new TikTokAdsError("no_ad_id", "TikTok created no ad id", "ad/create/");
-    return { campaignId, adgroupId, adId };
+    return { groupId, adId };
+  };
+
+  try {
+    const a = await makeSide(itemId, "A");
+    if (!itemIdB) return { campaignId, adgroupId: a.groupId, adId: a.adId };
+
+    const b = await makeSide(itemIdB, "B");
+    return { campaignId, adgroupId: a.groupId, adId: a.adId, adgroupB: b.groupId, adB: b.adId };
   } catch (e) {
-    // Never leave a live ad group with no ad behind: it can still accrue spend.
+    // Pause the whole campaign on any failure. A half-built test must not spend: an
+    // ad group with no ad still accrues cost, and a one-sided "test" would report a
+    // winner that never had an opponent.
     await pauseCampaign(token, advertiserId, campaignId).catch(() => {});
     throw e;
   }

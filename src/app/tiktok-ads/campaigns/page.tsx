@@ -8,14 +8,14 @@ import {
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
-import { botColors } from "@/lib/botTheme";
+import { tt, ttCard, ttPrimary, ttSecondary, TT_CYAN } from "@/lib/tiktokTheme";
+import { ScreenTitle } from "@/components/tiktok/TikTokKit";
 import LangToggle from "@/components/LangToggle";
 import {
   CAMPAIGN_STATUS_LABELS, CAMPAIGN_STATUS_LABELS_EN, CAMPAIGN_STATUS_COLORS,
 } from "@/services/campaigns";
 
-const PINK = "#ff0050", CYAN = "#00f2ea";
-const G_TT = "linear-gradient(135deg,#ff0050,#ff4d80 55%,#00f2ea)";
+const PINK = "#ff0050", CYAN = TT_CYAN;
 
 interface Campaign {
   id: string;
@@ -50,7 +50,7 @@ function CampaignsInner() {
   const justPaid = params.get("paid") === "1";
   const { t, rtl } = useLang();
   const { light } = useTheme();
-  const c = botColors(light);
+  const c = tt(light);
   const Fwd = rtl ? ArrowLeft : ArrowRight;
   const LYD = t("د.ل", "LYD");
 
@@ -103,19 +103,19 @@ function CampaignsInner() {
   }
 
   const card: React.CSSProperties = {
-    background: c.card, border: `1px solid ${c.border}`, borderRadius: 18, padding: 18,
+    ...ttCard(c), padding: 16,
   };
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: c.gradient, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ minHeight: "100vh", background: c.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Loader2 size={26} className="spin" color={PINK} />
       </div>
     );
   }
 
   return (
-    <div dir={rtl ? "rtl" : "ltr"} style={{ minHeight: "100vh", background: c.gradient, color: c.text }}>
+    <div dir={rtl ? "rtl" : "ltr"} style={{ minHeight: "100vh", background: c.bg, color: c.text }}>
       <div style={{ maxWidth: 820, margin: "0 auto", padding: "18px 16px 70px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={() => router.push("/tiktok-ads")}
@@ -128,10 +128,10 @@ function CampaignsInner() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 9 }}>
             {t("حملاتي", "My campaigns")}
-            {syncing && <Loader2 size={15} className="spin" color={c.dim} />}
+            {syncing && <Loader2 size={15} className="spin" color={c.muted} />}
           </h1>
           <button onClick={() => router.push("/tiktok-ads/create")}
-            style={{ background: G_TT, color: "#fff", border: "none", borderRadius: 11, padding: "10px 17px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 7 }}>
+            style={{ ...ttPrimary(rtl), padding: "10px 16px", fontSize: 13.5 }}>
             <Plus size={16} /> {t("حملة جديدة", "New campaign")}
           </button>
         </div>
@@ -155,7 +155,7 @@ function CampaignsInner() {
 
         {campaigns.length === 0 ? (
           <div style={{ ...card, marginTop: 16, textAlign: "center", padding: 34 }}>
-            <Eye size={26} color={c.dim} />
+            <Eye size={26} color={c.muted} />
             <div style={{ fontSize: 15, fontWeight: 700, marginTop: 12 }}>{t("لا حملات بعد", "No campaigns yet")}</div>
             <div style={{ fontSize: 13, color: c.muted, marginTop: 7, lineHeight: 1.8 }}>
               {t("أنشئ حملتك الأولى واختر فيديو من حسابك لترويجه.",
@@ -168,7 +168,7 @@ function CampaignsInner() {
               const label = rtl
                 ? (CAMPAIGN_STATUS_LABELS[cp.status] || cp.status)
                 : (CAMPAIGN_STATUS_LABELS_EN[cp.status] || cp.status);
-              const color = CAMPAIGN_STATUS_COLORS[cp.status] || c.dim;
+              const color = CAMPAIGN_STATUS_COLORS[cp.status] || c.muted;
               const obj = cp.objective ? OBJECTIVE_LABELS[cp.objective] : null;
               const live = ["active", "in_review", "issues"].includes(cp.status);
               const busy = busyId === cp.id;
@@ -185,7 +185,7 @@ function CampaignsInner() {
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: 12, color: c.dim, marginTop: 5 }}>
+                      <div style={{ fontSize: 12, color: c.muted, marginTop: 5 }}>
                         {obj ? t(obj[0], obj[1]) : ""}
                         {obj ? " · " : ""}
                         {cp.continuous
@@ -208,10 +208,10 @@ function CampaignsInner() {
                         [Wallet, t("وصول", "Reach"), (cp.reach ?? 0).toLocaleString()],
                         [MousePointerClick, t("نقرات", "Clicks"), (cp.clicks ?? 0).toLocaleString()],
                       ] as const).map(([Icon, lbl, val], i) => (
-                        <div key={i} style={{ background: c.surface, border: `1px solid ${c.borderSoft}`, borderRadius: 11, padding: "10px 12px" }}>
+                        <div key={i} style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 11, padding: "10px 12px" }}>
                           <Icon size={14} color={i % 2 ? CYAN : PINK} />
                           <div style={{ fontSize: 16, fontWeight: 800, marginTop: 5 }}>{val}</div>
-                          <div style={{ fontSize: 11, color: c.dim, marginTop: 2 }}>{lbl}</div>
+                          <div style={{ fontSize: 11, color: c.muted, marginTop: 2 }}>{lbl}</div>
                         </div>
                       ))}
                     </div>
@@ -226,7 +226,7 @@ function CampaignsInner() {
                   <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
                     {cp.status === "pending_payment" && (
                       <button onClick={() => router.push(`/ads/checkout?campaignId=${cp.id}`)}
-                        style={{ flex: "1 1 130px", background: G_TT, color: "#fff", border: "none", borderRadius: 10, padding: "10px 0", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                        style={{ flex: "1 1 130px", ...ttPrimary(rtl), padding: "10px 0", fontSize: 13, width: "100%" }}>
                         {t("إكمال الدفع", "Complete payment")}
                       </button>
                     )}

@@ -41,6 +41,9 @@ export { pollinations } from "@/services/studioImages";
 interface AIPost {
   day?: number; slot?: number; product?: string; type?: string;
   caption?: string; hashtags?: string; cta?: string; image_prompt?: string;
+  // TikTok only — a video script rather than a photo post.
+  hook?: string; scenes?: Array<{ t?: string; do?: string; text?: string }>;
+  screen_text?: string; sound?: string; duration_sec?: number;
 }
 
 // POST — generate a content plan. Body: { pageId, postsPerDay, durationDays, startDate? }
@@ -88,7 +91,34 @@ export async function POST(req: NextRequest) {
   ].filter(Boolean).join("\n");
   const catalog = items.map((p) => `- ${p.name}${p.category ? ` [${p.category}]` : ""}${p.price_text ? ` — ${p.price_text}` : ""}`).join("\n");
 
-  const system = [
+  // The two platforms get different prompts because they are different deliverables:
+  // a Facebook post is a caption plus an image, a TikTok is a SCRIPT whose first two
+  // seconds decide whether anyone watches at all. Asking one prompt to serve both
+  // produced Facebook captions with a TikTok label on them.
+  const tiktokSystem = [
+    "You are an expert Arabic TikTok content strategist for a small business in LIBYA.",
+    "Design a plan of SHORT VERTICAL VIDEOS (9:16). Every item is a video to FILM, never a photo post.",
+    `Produce EXACTLY ${total} videos total, spread as ${postsPerDay} per day over ${durationDays} days.`,
+    types.length
+      ? `Use ONLY these angles (rotate among them): ${types.join(" | ")}. The "type" field must be one of these (in Arabic).`
+      : "Vary the angle: product reveal, before/after, unboxing, a common customer question answered, a price reveal, a quick how-to, a trend/duet idea.",
+    guidance ? `Follow the owner's guidance closely: ${guidance}` : "",
+    memory?.style ? `This owner's established STYLE/voice (keep to it): ${memory.style}` : "",
+    memory?.notes ? `The owner's accumulated preferences over time (respect them): ${memory.notes}` : "",
+    "hook: the FIRST 0-2 SECONDS of on-screen text, in ARABIC, at most 40 characters. This is the most important line — it must stop the scroll. Never a greeting, never the brand name.",
+    "scenes: 3-5 ordered beats the owner can film from. Each: t (a time range like \"0-3s\"), do (what to SHOW, in Arabic, concrete and filmable with a phone), text (optional on-screen text, Arabic).",
+    "screen_text: the main text overlay across the video, ARABIC, short.",
+    "sound: a suggested sound or trend DESCRIBED in Arabic words (for example: صوت ترند سريع، موسيقى هادئة) — never a made-up song id.",
+    "duration_sec: 12-30.",
+    "caption: the description under the video, ARABIC, short, with ONE clear call to action and the price when relevant.",
+    "IMPORTANT: on TikTok there are no automated private messages, so if the video is about a product, the PRICE must appear in the caption or the on-screen text — not left for a DM.",
+    "Only use products from the catalog. Pick the best product for each video.",
+    "image_prompt: a short ENGLISH visual description for the COVER FRAME of the video (vertical, product-focused, well-lit).",
+    "Return ONLY JSON, no prose, exactly:",
+    '{"summary": "<one short Arabic sentence>", "posts": [{"day": <1..N>, "slot": <1..postsPerDay>, "product": "<exact catalog name or empty>", "type": "<short Arabic label>", "hook": "<Arabic, <=40 chars>", "scenes": [{"t":"0-3s","do":"<Arabic>","text":"<Arabic>"}], "screen_text": "<Arabic>", "sound": "<Arabic>", "duration_sec": <12..30>, "caption": "<Arabic>", "hashtags": "<#.. #..>", "cta": "<short Arabic>", "image_prompt": "<English>"}]}',
+  ].join(" ");
+
+  const metaSystem = [
     "You are an expert Arabic social-media manager for a small business in LIBYA.",
     "Design a Facebook content plan. Write engaging LIBYAN-friendly ARABIC captions that sell without being pushy.",
     `Produce EXACTLY ${total} posts total, spread as ${postsPerDay} per day over ${durationDays} days.`,
@@ -104,6 +134,8 @@ export async function POST(req: NextRequest) {
     "Return ONLY JSON, no prose, exactly:",
     '{"summary": "<one short Arabic sentence>", "posts": [{"day": <1..N>, "slot": <1..postsPerDay>, "product": "<exact catalog name or empty>", "type": "<short Arabic label>", "caption": "<Arabic>", "hashtags": "<#.. #..>", "cta": "<short Arabic>", "image_prompt": "<English>"}]}',
   ].join(" ");
+
+  const system = platform === "tiktok" ? tiktokSystem : metaSystem;
   const userMsg = `STORE INFO:\n${brandLines || "(none)"}\n\nCATALOG (${items.length} items):\n${catalog}`;
 
   let parsed: { summary?: string; posts?: AIPost[] };
@@ -162,6 +194,19 @@ export async function POST(req: NextRequest) {
       image_source: productImg ? "product" : "ai",
       reply_config: defaultReply(prod, ap.cta),
       status: "draft",
+      // The video script. Null on Facebook rows — a caption is not a hook, and
+      // storing one as the other would make the storyboard lie.
+      hook: platform === "tiktok" ? (ap.hook || null) : null,
+      scenes: platform === "tiktok" && Array.isArray(ap.scenes)
+        ? ap.scenes.slice(0, 6).map((sc) => ({
+            t: String(sc?.t ?? ""), do: String(sc?.do ?? ""), text: String(sc?.text ?? ""),
+          })).filter((sc) => sc.do || sc.text)
+        : null,
+      screen_text: platform === "tiktok" ? (ap.screen_text || null) : null,
+      sound: platform === "tiktok" ? (ap.sound || null) : null,
+      duration_sec: platform === "tiktok"
+        ? Math.max(8, Math.min(60, Number(ap.duration_sec) || 18))
+        : null,
     };
   });
 

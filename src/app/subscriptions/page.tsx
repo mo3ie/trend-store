@@ -59,7 +59,15 @@ export default function SubscriptionsPage() {
   const [access, setAccess] = useState<Access | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [product, setProduct] = useState<(typeof PRODUCTS)[number]["key"]>("bot");
+  // Deep links from the tools land on the right product: each tool's subscribe bar
+  // links here with ?product=. Read in the initialiser rather than an effect so the
+  // correct tab renders on the first paint instead of flashing "bot" first.
+  const [product, setProduct] = useState<(typeof PRODUCTS)[number]["key"]>(() => {
+    if (typeof window === "undefined") return "bot";
+    const want = new URLSearchParams(window.location.search).get("product");
+    const hit = PRODUCTS.find((p) => p.key === want);
+    return hit ? hit.key : "bot";
+  });
   const [scope, setScope] = useState<"single" | "triple" | "unlimited">("single");
   const [duration, setDuration] = useState<"monthly" | "quarterly" | "yearly">("monthly");
 
@@ -233,6 +241,13 @@ export default function SubscriptionsPage() {
         {access && !access.admin && !access.trial && subs.length === 0 && (
           <p className="text-sm bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-xl px-4 py-3">
             انتهت تجربتك المجانية — اشترك في الأداة التي تريدها للاستمرار.
+          </p>
+        )}
+
+        {plans.filter((p) => p.product === product).length === 0 && (
+          <p className="text-sm bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-xl px-4 py-3">
+            أسعار هذه الأداة قيد الإعداد — ستظهر الباقات هنا بمجرد تحديدها. يمكنك تجهيز
+            كل شيء داخل الأداة الآن، ويعمل فور تفعيل الاشتراك.
           </p>
         )}
 

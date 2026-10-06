@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const {
-    advertiserId, identityId, identityType, itemId, objective, adText,
+    advertiserId, identityId, identityType, itemId, itemIdB, objective, adText,
     landingPageUrl, targeting, packageId, budgetUsd, durationDays, continuous,
   } = body;
 
@@ -68,6 +68,9 @@ export async function POST(req: NextRequest) {
   const tier = await getTikTokUserTier(user.id);
   const pricing = await getTikTokAdsPricing();
   const isContinuous = continuous === true;
+  // Two videos means two ad groups, and TikTok's minimum applies to each — so the
+  // whole budget has to clear twice the floor. Caught here, before payment.
+  const sides = typeof itemIdB === "string" && itemIdB ? 2 : 1;
 
   let budgetUsdFinal: number, baseLyd: number, serviceFee: number, totalLyd: number, days: number;
 
@@ -96,6 +99,12 @@ export async function POST(req: NextRequest) {
     // A fixed package from the server's own price list.
     const found = findTikTokOption(pricing, String(packageId), Number(durationDays));
     if (!found) return NextResponse.json({ error: "الباقة غير صحيحة" }, { status: 400 });
+    if (sides === 2 && found.option.budgetUsd < minTotalUsd(found.option.days) * 2) {
+      return NextResponse.json({
+        error: "below_minimum_ab",
+        message: "تجربة فيديوهين تحتاج باقة أكبر — تيك توك يفرض الحد الأدنى على كل فيديو منفصلاً.",
+      }, { status: 400 });
+    }
     budgetUsdFinal = found.option.budgetUsd;
     baseLyd = found.option.priceLyd;
     serviceFee = 0;
@@ -111,7 +120,7 @@ export async function POST(req: NextRequest) {
     const usd = Number(budgetUsd);
     const d = Number(durationDays);
     if (!d) return NextResponse.json({ error: "المدة مطلوبة" }, { status: 400 });
-    const floor = minTotalUsd(d);
+    const floor = minTotalUsd(d) * sides;
     if (!usd || usd < floor) {
       return NextResponse.json({
         error: "below_minimum",
@@ -154,9 +163,14 @@ export async function POST(req: NextRequest) {
       continuous: isContinuous,
       daily_budget_usd: isContinuous ? budgetUsdFinal : null,
       daily_price_lyd: isContinuous ? totalLyd : null,
-      targeting: targeting && typeof targeting === "object"
-        ? { ...targeting, landingPageUrl: landingPageUrl || null }
-        : { landingPageUrl: landingPageUrl || null },
+      // The B video rides on the targeting blob so the two sides stay together with
+      // the campaign they belong to.
+      targeting: {
+        ...(targeting && typeof targeting === "object" ? targeting : {}),
+        landingPageUrl: landingPageUrl || null,
+        itemIdB: typeof itemIdB === "string" && itemIdB ? itemIdB : null,
+      },
+      ab_test: !!(typeof itemIdB === "string" && itemIdB),
     })
     .select()
     .single();

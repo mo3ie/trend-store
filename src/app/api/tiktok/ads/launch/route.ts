@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
       identityId: campaign.tiktok_identity_id,
       identityType: campaign.tiktok_identity_type || "TT_USER",
       itemId: campaign.tiktok_item_id,
+      itemIdB: campaign.external_variant_b ? null : (campaign.targeting as { itemIdB?: string })?.itemIdB || null,
       adText: campaign.ad_text,
       landingPageUrl: tg.landingPageUrl || null,
       targeting: {
@@ -89,6 +90,9 @@ export async function POST(req: NextRequest) {
       external_campaign_id: result.campaignId,
       external_adset_id: result.adgroupId,   // TikTok calls it an ad group
       external_ad_id: result.adId,
+      external_adgroup_b: result.adgroupB ?? null,
+      external_ad_b: result.adB ?? null,
+      ab_test: !!result.adgroupB,
       error_message: null,
       next_charge_at: campaign.continuous === true
         ? new Date(Date.now() + 86400000).toISOString()

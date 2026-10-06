@@ -1,250 +1,410 @@
 "use client";
 
-import { useState, useEffect, Suspense, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft, ArrowRight, Loader2, Music2, Plus, MessageSquare, Sparkles, Zap,
-  ShieldCheck, CheckCircle, XCircle, Settings2, Search, Radio,
+  ArrowLeft, ArrowRight, Loader2, Settings2, Plus, Trash2, Save,
+  AlertCircle, CheckCircle, Radio, Video,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
-import { botColors } from "@/lib/botTheme";
-import { useTikTokDemo } from "@/hooks/useTikTokDemo";
 import LangToggle from "@/components/LangToggle";
-import { TikTokDemoAccountCard } from "@/components/tiktok-demo/DemoAccountCard";
+import { tt, ttCard, ttPrimary, ttSecondary, ttInput } from "@/lib/tiktokTheme";
+import {
+  AccountStrip, ScreenTitle, TabStrip, SubscribeBar, Chip,
+} from "@/components/tiktok/TikTokKit";
+import { ReplySimulator, ReplyThread, type ThreadValue } from "@/components/tiktok/ReplyThread";
 
-// TikTok brand palette — deliberately distinct from the blue Facebook console.
-const PINK = "#ff0050", CYAN = "#00f2ea";
-const GREEN = "#22c55e";
+/**
+ * The comment auto-reply bot, for TikTok.
+ *
+ * Rewritten around the live simulator. Before, with nothing linked, this screen was a
+ * marketing hero, a price, and a link button that cannot work — a dead end dressed as
+ * a product page. Now the first thing above the fold answers a comment using the
+ * owner's real rules and real catalog prices, which proves the tool works before
+ * linking and before payment. The rules the owner writes here are saved and run the
+ * moment linking opens.
+ */
 
-interface Sub { status: string; expires_at: string | null; }
-interface Config { id: string; enabled: boolean; }
-interface Account {
-  account_id: string; page_id: string; page_name: string; page_picture?: string;
-  granted_scopes?: string[]; token_status?: string;
-  config: Config | null; subscription: Sub | null;
+interface Status {
+  linking: { organic: boolean };
+  account: { id: string; openId: string; handle: string; avatarUrl: string | null } | null;
+  bot: { configured: boolean; enabled: boolean; rules: number; priceLyd: number | null };
 }
-/** App-level webhook state — one configuration serves every connected account. */
-interface WebhookState { subscribed: boolean; event_type: string; last_event_at: string | null; }
 
-function subActive(s: Sub | null): boolean {
-  return !!s && s.status === "active" && (!s.expires_at || new Date(s.expires_at).getTime() > Date.now());
+interface Rule { id: string; keywords: string[]; public_reply: string | null; enabled: boolean; priority: number }
+
+interface Config {
+  id: string; enabled: boolean;
+  default_public_reply: string | null;
+  public_replies: string[] | null;
+  like_comments: boolean;
+  mention_author: boolean;
+  once_per_user: boolean;
+  banned_words: string[] | null;
+  banned_action: string | null;
+  catalog_match: string | null;
 }
 
 function TikTokBotInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const params = useSearchParams();
   const { t, rtl } = useLang();
   const { light } = useTheme();
-  const col = botColors(light);
+  const c = tt(light);
   const Back = rtl ? ArrowLeft : ArrowRight;
 
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [st, setSt] = useState<Status | null>(null);
+  const [config, setConfig] = useState<Config | null>(null);
+  const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [price, setPrice] = useState(50);
+  const [tab, setTab] = useState<"try" | "rules" | "settings">("try");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [connecting, setConnecting] = useState(false);
-  const [webhook, setWebhook] = useState<WebhookState | null>(null);
-  const [q, setQ] = useState("");
-  // Prototype state for the TikTok Accounts API demonstration. It is local-only and is
-  // rendered alongside — never instead of — the real connected accounts below.
-  const demo = useTikTokDemo();
+  const [flash, setFlash] = useState("");
+
+  // Simulator
+  const [probe, setProbe] = useState("");
+  const [simReply, setSimReply] = useState<string | null>(null);
+  const [simSource, setSimSource] = useState<string | null>(null);
+  const [simBusy, setSimBusy] = useState(false);
+
+  // Default reply, as a thread
+  const [thread, setThread] = useState<ThreadValue>({ variants: [""], like: false });
+  const [saving, setSaving] = useState(false);
+
+  const pageId = st?.account?.openId || "";
+  const handle = st?.account?.handle || t("حسابك", "your account");
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const [cfg, st] = await Promise.all([
-      fetch("/api/tiktok/configs").then((r) => r.json()).catch(() => ({ accounts: [] })),
-      fetch("/api/bot/settings").then((r) => r.json()).catch(() => ({ monthly_price_lyd: 50 })),
-    ]);
-    setAccounts(cfg.accounts || []);
-    setWebhook(cfg.webhook ?? null);
-    setPrice(Number(st.monthly_price_lyd ?? 50));
+    const s = await fetch("/api/tiktok/status").then((r) => (r.status === 401 ? null : r.json()));
+    if (!s) { router.push("/login?next=/tiktok-bot"); return; }
+    if (!s.error) setSt(s);
+
+    const d = await fetch("/api/tiktok/configs").then((r) => r.json()).catch(() => ({}));
+    const cfg: Config | null = (d.accounts || []).map((a: { config: Config | null }) => a.config).find(Boolean) ?? null;
+    if (cfg) {
+      setConfig(cfg);
+      setThread({
+        variants: (cfg.public_replies?.length ? cfg.public_replies : [cfg.default_public_reply || ""]).slice(0, 3),
+        like: !!cfg.like_comments,
+      });
+      const r = await fetch(`/api/bot/rules?configId=${cfg.id}`).then((x) => x.json()).catch(() => ({}));
+      setRules(r.rules || []);
+    }
     setLoading(false);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
-    const s = searchParams.get("success");
-    const e = searchParams.get("error");
-    if (s === "1") setSuccess(t("تم ربط حساب تيك توك بنجاح!", "TikTok account connected!"));
-    if (e === "cancelled") setError(t("تم إلغاء الربط", "Connection cancelled"));
-    // Fixed error codes from the hardened callback (no raw upstream text is reflected).
-    if (e === "invalid_state") setError(t("رابط الربط غير صالح — أعد المحاولة من جديد", "Invalid connection link — please start again"));
-    if (e === "expired") setError(t("انتهت صلاحية محاولة الربط — أعد المحاولة", "The connection attempt expired — please try again"));
-    if (e === "not_signed_in") setError(t("سجّل الدخول أولاً ثم أعد الربط", "Please sign in first, then connect again"));
-    if (e === "oauth_failed") setError(t("فشل الربط — حاول مرة أخرى", "Connection failed — please try again"));
     load();
-  }, [searchParams, load, t]);
+    if (params.get("success") === "1") setFlash(t("تم ربط حساب تيك توك", "TikTok account linked"));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  async function connect() {
-    setConnecting(true); setError("");
-    const res = await fetch("/api/tiktok/connect");
-    const data = await res.json().catch(() => ({}));
-    if (data.url) { window.location.href = data.url; return; }
-    setError(
-      data.error === "tiktok_not_configured" || res.status === 503
-        ? t("ربط حسابات تيك توك قيد التفعيل حالياً — سيُفتح قريباً.",
-            "TikTok account linking is being activated — it will open shortly.")
-        : (data.message || data.error || t("حدث خطأ", "Something went wrong")),
-    );
-    setConnecting(false);
+  // Debounced so the simulator does not fire a request per keystroke.
+  useEffect(() => {
+    if (!probe.trim()) { setSimReply(null); setSimSource(null); return; }
+    setSimBusy(true);
+    const id = setTimeout(async () => {
+      try {
+        const r = await fetch("/api/tiktok/bot/simulate", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pageId: pageId || undefined, text: probe }),
+        });
+        const d = await r.json();
+        setSimReply(d.reply ?? d.message ?? null);
+        setSimSource(d.source ?? null);
+      } catch { /* leave the previous answer standing */ }
+      setSimBusy(false);
+    }, 350);
+    return () => clearTimeout(id);
+  }, [probe, pageId]);
+
+  async function saveThread() {
+    if (!config) {
+      setError(t("لم تُنشأ إعدادات بعد — أضف قاعدة أولاً.", "No settings yet — add a rule first."));
+      return;
+    }
+    setSaving(true); setError("");
+    const variants = thread.variants.map((v) => v.trim()).filter(Boolean);
+    const r = await fetch("/api/tiktok/configs", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: config.id,
+        public_replies: variants,
+        default_public_reply: variants[0] || "",
+        like_comments: thread.like,
+      }),
+    }).catch(() => null);
+    setSaving(false);
+    if (!r || !r.ok) {
+      setError(t("تعذّر الحفظ — حاول مجدداً", "Could not save — try again"));
+      return;
+    }
+    setFlash(t("حُفظ", "Saved"));
+    setTimeout(() => setFlash(""), 1800);
   }
 
-  const shown = accounts.filter((a) => (a.page_name || "").toLowerCase().includes(q.trim().toLowerCase()));
+  async function addRule() {
+    if (!config) return;
+    await fetch("/api/bot/rules", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ configId: config.id, keywords: [""], public_reply: "", enabled: true, priority: 0 }),
+    }).catch(() => {});
+    const r = await fetch(`/api/bot/rules?configId=${config.id}`).then((x) => x.json()).catch(() => ({}));
+    setRules(r.rules || []);
+  }
+
+  async function saveRule(rule: Rule) {
+    await fetch("/api/bot/rules", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...rule, configId: config?.id }),
+    }).catch(() => {});
+    setFlash(t("حُفظ", "Saved"));
+    setTimeout(() => setFlash(""), 1500);
+  }
+
+  async function deleteRule(id: string) {
+    await fetch(`/api/bot/rules?id=${id}`, { method: "DELETE" }).catch(() => {});
+    setRules(rules.filter((r) => r.id !== id));
+  }
+
+  const linkingPending = !!st && !st.linking.organic;
+  // Shown only once an active plan gives this product a price — otherwise there is
+  // nothing to buy and the bar would invite a purchase that cannot complete.
+  const sellable = st?.bot.priceLyd !== null && st?.bot.priceLyd !== undefined;
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", background: c.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Loader2 size={24} className="spin" color={c.pinkInk} />
+      </div>
+    );
+  }
 
   return (
-    <div style={{ minHeight: "100vh", background: col.gradient, color: col.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80 }}>
-      <div style={{ padding: "20px 24px", borderBottom: `1px solid ${col.border}`, display: "flex", alignItems: "center", gap: 12 }}>
-        <button onClick={() => router.push("/tiktok")} style={{ background: "none", border: "none", color: col.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-          <Back size={18} /> {t("رجوع", "Back")}
-        </button>
-        <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
-          <Music2 size={20} color={PINK} /> {t("بوت تيك توك", "TikTok Bot")}
-        </h1>
-        <div style={{ marginInlineStart: "auto" }}><LangToggle /></div>
-      </div>
+    <div dir={rtl ? "rtl" : "ltr"} style={{ minHeight: "100vh", background: c.bg, color: c.text, paddingBottom: sellable ? 84 : 32 }}>
+      <div style={{ maxWidth: 680, margin: "0 auto", padding: "16px 16px 32px" }}>
 
-      <div style={{ maxWidth: 720, margin: "0 auto", padding: "36px 24px" }}>
-        {success && (
-          <div style={{ background: "rgba(34,197,94,0.14)", border: "1px solid #22c55e40", borderRadius: 12, padding: "13px 17px", marginBottom: 20, display: "flex", alignItems: "center", gap: 9, color: "#86efac", fontSize: 14 }}>
-            <CheckCircle size={17} /> {success}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <button onClick={() => router.push("/tiktok")}
+            style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit", fontSize: 14 }}>
+            <Back size={18} /> {t("أدوات تيك توك", "TikTok tools")}
+          </button>
+          <LangToggle />
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <ScreenTitle c={c} rtl={rtl}>{t("الرد الآلي على التعليقات", "Comment auto-reply")}</ScreenTitle>
+        </div>
+
+        <AccountStrip
+          account={st?.account ? { handle: st.account.handle, avatarUrl: st.account.avatarUrl } : null}
+          c={c} t={t} rtl={rtl} pending={linkingPending}
+        />
+
+        {flash && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", background: `${c.ok}18`, border: `1px solid ${c.ok}55`, borderRadius: 11, padding: "10px 13px", marginBottom: 13, fontSize: 13 }}>
+            <CheckCircle size={16} color={c.ok} /> {flash}
           </div>
         )}
         {error && (
-          <div style={{ background: "rgba(239,68,68,0.14)", border: "1px solid #ef444440", borderRadius: 12, padding: "13px 17px", marginBottom: 20, display: "flex", alignItems: "center", gap: 9, color: "#fca5a5", fontSize: 14 }}>
-            <XCircle size={17} /> {error}
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: `${c.danger}18`, border: `1px solid ${c.danger}55`, borderRadius: 11, padding: "10px 13px", marginBottom: 13, fontSize: 13, lineHeight: 1.6 }}>
+            <AlertCircle size={16} color={c.danger} style={{ flexShrink: 0, marginTop: 1 }} /> {error}
           </div>
         )}
 
-        {demo.hydrated && demo.connected && <TikTokDemoAccountCard />}
+        <TabStrip
+          c={c} value={tab} onChange={setTab}
+          tabs={[
+            { key: "try" as const,      label: t("التجربة والردّ", "Try it & reply") },
+            { key: "rules" as const,    label: `${t("القواعد", "Rules")}${rules.length ? ` (${rules.length})` : ""}` },
+            { key: "settings" as const, label: t("الإعدادات", "Settings") },
+          ]}
+        />
 
-        {/* Hero */}
-        <div style={{ background: `linear-gradient(135deg, ${PINK}1c, ${CYAN}12)`, border: `1px solid ${PINK}33`, borderRadius: 20, padding: 28, marginBottom: 28 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 10px" }}>
-            {t("ردّ تلقائي على كل تعليق في فيديوهاتك", "Auto-reply to every comment on your videos")}
-          </h2>
-          <p style={{ color: col.muted, fontSize: 14, lineHeight: 1.9, margin: "0 0 18px" }}>
-            {t(
-              "يراقب البوت تعليقات فيديوهاتك ويرد عليها تلقائياً بالسعر والتفاصيل — على مدار الساعة، دون أن تفوتك أي فرصة بيع.",
-              "The bot watches the comments on your videos and replies automatically with the price and details — 24/7, so you never miss a sale.",
-            )}
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-            {([
-              [MessageSquare, t("رد علني فوري تحت التعليق", "Instant public reply under the comment")],
-              [Sparkles, t("ردود ذكية بالذكاء الاصطناعي", "Smart AI replies")],
-              [Zap, t("تهدئة تلقائية ضد الحظر", "Auto pacing anti-block")],
-              [ShieldCheck, t("صلاحيات تيك توك رسمية", "Official TikTok permissions")],
-            ] as [React.ComponentType<{ size?: number; color?: string }>, string][]).map(([Icon, label], i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: col.text }}>
-                <Icon size={16} color={CYAN} /> {label}
-              </div>
-            ))}
-          </div>
-          <div style={{ marginTop: 18, fontSize: 15, fontWeight: 700, color: col.text }}>
-            {price} {t("د.ل / شهرياً لكل حساب", "LYD / month per account")}
-          </div>
-          <div style={{ marginTop: 10, fontSize: 12, color: col.muted, lineHeight: 1.7 }}>
-            {t(
-              "ملاحظة: تيك توك لا يوفّر رسائل خاصة آلية للتعليقات العضوية — يرد البوت علنياً تحت التعليق.",
-              "Note: TikTok offers no automated DMs for organic comments — the bot replies publicly under the comment.",
-            )}
-          </div>
-        </div>
-
-        {loading ? (
-          <div style={{ textAlign: "center", padding: 50, color: col.dim }}><Loader2 size={30} className="spin" /></div>
-        ) : accounts.length === 0 ? (
-          <div style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 16, padding: 34, textAlign: "center" }}>
-            <Music2 size={40} color={col.dim} style={{ marginBottom: 14 }} />
-            <p style={{ color: col.muted, margin: "0 0 18px", fontSize: 14 }}>
-              {t("اربط حساب تيك توك أولاً لتفعيل البوت عليه", "Connect a TikTok account first to enable the bot on it")}
-            </p>
-            <button onClick={connect} disabled={connecting}
-              style={{ background: `linear-gradient(135deg, ${PINK}, #d6006b)`, border: "none", borderRadius: 12, padding: "13px 26px", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
-              {connecting ? <Loader2 size={18} className="spin" /> : <Plus size={18} />}
-              {connecting ? t("جارٍ الاتصال...", "Connecting...") : t("ربط حساب تيك توك", "Connect a TikTok account")}
-            </button>
-          </div>
-        ) : (
+        {/* ── TRY + the default reply ──────────────────────────────────────── */}
+        {tab === "try" && (
           <>
-            {webhook && (
-              <div style={{ background: webhook.subscribed ? "rgba(34,197,94,0.10)" : "rgba(251,191,36,0.10)",
-                border: `1px solid ${webhook.subscribed ? "rgba(34,197,94,0.30)" : "rgba(251,191,36,0.30)"}`,
-                borderRadius: 12, padding: "11px 15px", marginBottom: 14, display: "flex", alignItems: "center", gap: 9,
-                fontSize: 13, color: webhook.subscribed ? "#86efac" : "#fbbf24" }}>
-                <Radio size={15} />
-                {webhook.subscribed
-                  ? t("الردّ الفوري مفعّل — تصل التعليقات لحظياً", "Instant replies active — comments arrive in real time")
-                  : t("الردّ الفوري غير مفعّل بعد — يعمل البوت بالفحص الدوري", "Instant delivery not enabled yet — the bot falls back to periodic checks")}
-              </div>
-            )}
+            <ReplySimulator
+              c={c} t={t} rtl={rtl} handle={handle}
+              onProbe={setProbe} reply={simReply} source={simSource} busy={simBusy}
+            />
 
-            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 14px", flexWrap: "wrap" }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: col.text, margin: 0 }}>
-                {t("حساباتك", "Your accounts")} ({accounts.length})
-              </h3>
-              <button onClick={connect} disabled={connecting}
-                style={{ marginInlineStart: "auto", background: `${PINK}1f`, border: `1px solid ${PINK}55`, borderRadius: 10, padding: "8px 14px", color: col.text, fontWeight: 700, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7 }}>
-                {connecting ? <Loader2 size={15} className="spin" /> : <Plus size={15} />} {t("ربط حساب", "Connect account")}
+            <div style={{ ...ttCard(c), padding: 16, marginTop: 14 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+                {t("الردّ الافتراضي", "The default reply")}
+              </div>
+              <ReplyThread
+                value={thread} onChange={setThread}
+                c={c} t={t} rtl={rtl}
+                handle={handle} avatarUrl={st?.account?.avatarUrl}
+                triggerComment={probe}
+                hasProduct={config?.catalog_match !== "off"}
+                onInsertPrice={() => {
+                  const v = [...thread.variants];
+                  const i = 0;
+                  v[i] = `${(v[i] || "").trim()} {السعر}`.trim();
+                  setThread({ ...thread, variants: v });
+                }}
+              />
+              <button onClick={saveThread} disabled={saving}
+                style={{ ...ttPrimary(rtl, saving), width: "100%", marginTop: 16 }}>
+                {saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />} {t("حفظ", "Save")}
               </button>
             </div>
 
-            {/* Search */}
-            <div style={{ position: "relative", marginBottom: 14 }}>
-              <Search size={16} style={{ position: "absolute", insetInlineStart: 14, top: "50%", transform: "translateY(-50%)", color: col.dim }} />
-              <input value={q} onChange={(e) => setQ(e.target.value)}
-                placeholder={t("ابحث عن حساب…", "Search for an account…")}
-                style={{ width: "100%", boxSizing: "border-box", background: col.input, border: `1px solid ${col.border}`, borderRadius: 12, paddingBlock: 11, paddingInlineStart: 40, paddingInlineEnd: 14, color: col.text, fontSize: 14 }} />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {shown.map((a) => {
-                const active = subActive(a.subscription);
-                const on = a.config?.enabled && active;
-                return (
-                  <div key={a.page_id} style={{ background: col.card, border: `1px solid ${on ? `${GREEN}44` : col.border}`, borderRadius: 16, padding: "16px 20px", display: "flex", alignItems: "center", gap: 14 }}>
-                    {a.page_picture ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={a.page_picture} alt="" style={{ width: 46, height: 46, borderRadius: "50%", objectFit: "cover" }} />
-                    ) : (
-                      <div style={{ width: 46, height: 46, borderRadius: "50%", background: `${PINK}22`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <Music2 size={22} color={PINK} />
-                      </div>
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.page_name}</div>
-                      <div style={{ fontSize: 12, marginTop: 4, color: on ? GREEN : active ? "#fbbf24" : col.muted, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                        {on ? <><CheckCircle size={13} /> {t("يعمل", "Running")}</> : active ? t("مشترك — متوقف", "Subscribed — off") : t("غير مشترك", "Not subscribed")}
-                        {a.token_status && a.token_status !== "active" && (
-                          <span style={{ color: "#f87171" }}>
-                            • {t("يحتاج إعادة ربط", "Needs reconnect")}
-                          </span>
-                        )}
-                        {!!a.granted_scopes?.length && (
-                          <span style={{ color: col.dim }}>
-                            • {a.granted_scopes.length} {t("صلاحية", "permissions")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <button onClick={() => router.push(`/tiktok-bot/${a.page_id}`)}
-                      style={{ background: `${PINK}22`, border: `1px solid ${PINK}55`, borderRadius: 10, padding: "9px 16px", color: col.text, cursor: "pointer", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 7 }}>
-                      <Settings2 size={15} /> {t("إدارة", "Manage")}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+            {st?.account && (
+              <button onClick={() => router.push(`/tiktok-bot/${st.account!.id}`)}
+                style={{ ...ttSecondary(c), width: "100%", marginTop: 12 }}>
+                <Video size={16} /> {t("ردود مخصّصة لكل فيديو", "Per-video custom replies")}
+              </button>
+            )}
           </>
+        )}
+
+        {/* ── RULES ────────────────────────────────────────────────────────── */}
+        {tab === "rules" && (
+          <div>
+            <p style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.75, margin: "0 0 14px" }}>
+              {t("كل قاعدة: كلمات يبحث عنها البوت في التعليق، وردّ علني يُنشره تحته.",
+                 "Each rule: words the bot looks for in a comment, and the public reply it posts under it.")}
+            </p>
+            {rules.length === 0 ? (
+              <div style={{ ...ttCard(c), padding: 24, textAlign: "center" }}>
+                <Radio size={22} color={c.muted} />
+                <div style={{ fontSize: 13.5, fontWeight: 700, marginTop: 10 }}>{t("لا قواعد بعد", "No rules yet")}</div>
+                <div style={{ fontSize: 12.5, color: c.muted, marginTop: 6, lineHeight: 1.7 }}>
+                  {t("ابدأ بقاعدة واحدة: «بكم، السعر، كم» ← السعر.",
+                     "Start with one rule: \"how much, price\" → the price.")}
+                </div>
+                <button onClick={addRule} disabled={!config} style={{ ...ttPrimary(rtl, !config), marginTop: 14 }}>
+                  <Plus size={16} /> {t("أضف قاعدة", "Add a rule")}
+                </button>
+                {!config && (
+                  <div style={{ fontSize: 11.5, color: c.muted, marginTop: 10, lineHeight: 1.65 }}>
+                    {t("تُنشأ الإعدادات تلقائياً عند ربط حساب تيك توك.",
+                       "Settings are created automatically once a TikTok account is linked.")}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 10 }}>
+                {rules.map((rule) => (
+                  <RuleCard key={rule.id} rule={rule} c={c} t={t} rtl={rtl}
+                    onSave={saveRule} onDelete={() => deleteRule(rule.id)} />
+                ))}
+                <button onClick={addRule} style={{ ...ttSecondary(c), width: "100%" }}>
+                  <Plus size={16} /> {t("أضف قاعدة", "Add a rule")}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── SETTINGS ─────────────────────────────────────────────────────── */}
+        {tab === "settings" && (
+          <div style={{ ...ttCard(c), padding: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+              <Settings2 size={16} color={c.pinkInk} /> {t("الإعدادات", "Settings")}
+            </div>
+            {config ? (
+              <div style={{ display: "grid", gap: 12 }}>
+                {([
+                  ["mention_author", t("ابدأ الردّ باسم صاحب التعليق", "Open the reply with the commenter's name")],
+                  ["once_per_user", t("ردّ واحد لكل شخص في الفيديو", "One reply per person per video")],
+                  ["enabled", t("البوت يعمل", "Bot is running")],
+                ] as const).map(([k, label]) => (
+                  <label key={k} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer" }}>
+                    <input type="checkbox" checked={!!config[k as keyof Config]}
+                      onChange={async (e) => {
+                        const next = { ...config, [k]: e.target.checked } as Config;
+                        setConfig(next);
+                        const res = await fetch("/api/tiktok/configs", {
+                          method: "PATCH", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ id: config.id, [k]: e.target.checked }),
+                        }).catch(() => null);
+                        // Turning the bot ON needs an active subscription, so a
+                        // refused toggle must snap back rather than lie about state.
+                        if (!res || !res.ok) {
+                          const d = await res?.json().catch(() => ({}));
+                          setConfig(config);
+                          setError(d?.message || t("تعذّر التغيير", "Could not change that"));
+                        }
+                      }} />
+                    {label}
+                  </label>
+                ))}
+                <div style={{ fontSize: 11.5, color: c.muted, lineHeight: 1.7, marginTop: 4 }}>
+                  {t("يتهدّأ البوت تلقائياً بين الردود حتى لا يُحظر الحساب — لا يحتاج ضبطاً.",
+                     "The bot paces itself between replies so the account isn't blocked — nothing to configure.")}
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.7 }}>
+                {t("تظهر الإعدادات بعد ربط حساب تيك توك.", "Settings appear once a TikTok account is linked.")}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
-      <style>{`@keyframes spin-anim { to { transform: rotate(360deg); } } .spin { animation: spin-anim 1s linear infinite; } input, textarea { font-family: inherit; }`}</style>
+      {sellable && (
+        <SubscribeBar
+          priceLyd={st?.bot.priceLyd ?? null} c={c} t={t} rtl={rtl}
+          onSubscribe={() => router.push("/subscriptions?product=tiktok_bot")}
+          note={t("القواعد والتجربة مجاناً — تشغيل البوت بالاشتراك",
+                  "Rules and the try-out are free — running the bot needs a subscription")}
+        />
+      )}
+    </div>
+  );
+}
+
+function RuleCard({
+  rule, c, t, rtl, onSave, onDelete,
+}: {
+  rule: Rule; c: ReturnType<typeof tt>; t: (a: string, e: string) => string; rtl: boolean;
+  onSave: (r: Rule) => void; onDelete: () => void;
+}) {
+  const [kw, setKw] = useState((rule.keywords || []).join("، "));
+  const [reply, setReply] = useState(rule.public_reply || "");
+
+  return (
+    <div style={{ ...ttCard(c), padding: 14 }}>
+      <label style={{ display: "block", fontSize: 11.5, color: c.muted, marginBottom: 5 }}>
+        {t("الكلمات (افصل بفاصلة)", "Keywords (comma separated)")}
+      </label>
+      <input value={kw} onChange={(e) => setKw(e.target.value)} style={ttInput(c)} />
+
+      <label style={{ display: "block", fontSize: 11.5, color: c.muted, margin: "11px 0 5px" }}>
+        {t("الردّ العلني", "Public reply")}
+      </label>
+      <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={2}
+        style={{ ...ttInput(c), resize: "vertical" }} />
+
+      <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
+        <button
+          onClick={() => onSave({
+            ...rule,
+            keywords: kw.split(/[،,\n]/).map((x) => x.trim()).filter(Boolean),
+            public_reply: reply,
+          })}
+          style={{ ...ttSecondary(c), flex: 1, padding: "9px 0", fontSize: 13 }}>
+          <Save size={14} /> {t("حفظ", "Save")}
+        </button>
+        <button onClick={onDelete} aria-label={t("حذف", "Delete")}
+          style={{ background: "transparent", border: `1.5px solid ${c.border}`, borderRadius: 10, padding: "9px 13px", color: c.danger, cursor: "pointer", display: "flex", alignItems: "center" }}>
+          <Trash2 size={14} />
+        </button>
+      </div>
     </div>
   );
 }
 
 export default function TikTokBotPage() {
-  return <Suspense><TikTokBotInner /></Suspense>;
+  return (
+    <Suspense fallback={null}>
+      <TikTokBotInner />
+    </Suspense>
+  );
 }
