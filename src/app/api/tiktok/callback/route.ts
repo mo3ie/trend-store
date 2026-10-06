@@ -98,17 +98,42 @@ export async function GET(req: NextRequest) {
 
     // 6) The bot's rules/log/subscription stay in the existing engine's tables, keyed by the
     //    same identifier. One rule engine, one set of rules — no second bot.
-    await supabaseAdmin.from("bot_configs").upsert(
-      {
-        user_id: userId,
-        page_id: businessId,
-        page_name: profile?.displayName || profile?.username || "TikTok",
-        page_picture: profile?.profileImage ?? null,
-        platform: "tiktok",
-        tiktok_account_id: accountId,
-      },
-      { onConflict: "user_id,page_id,platform" },
-    );
+    //    An owner who configured the bot BEFORE linking (prep mode) has a draft row
+    //    holding their rules, groups, banned words and catalog setting. Adopting it
+    //    here is the difference between linking and finding your work waiting, and
+    //    linking and finding an empty bot you have to set up a second time.
+    const prepPage = `prep:${userId}`;
+    const { data: draft } = await supabaseAdmin
+      .from("bot_configs").select("id")
+      .eq("user_id", userId).eq("platform", "tiktok").eq("page_id", prepPage)
+      .maybeSingle();
+
+    const { data: already } = await supabaseAdmin
+      .from("bot_configs").select("id")
+      .eq("user_id", userId).eq("platform", "tiktok").eq("page_id", businessId)
+      .maybeSingle();
+
+    const identity = {
+      page_name: profile?.displayName || profile?.username || "TikTok",
+      page_picture: profile?.profileImage ?? null,
+      tiktok_account_id: accountId,
+    };
+
+    if (draft && !already) {
+      // Re-key the draft onto the real account: its id is unchanged, so the rules and
+      // reply log that already point at it follow along untouched.
+      await supabaseAdmin.from("bot_configs")
+        .update({ page_id: businessId, ...identity })
+        .eq("id", draft.id);
+    } else {
+      await supabaseAdmin.from("bot_configs").upsert(
+        { user_id: userId, page_id: businessId, platform: "tiktok", ...identity },
+        { onConflict: "user_id,page_id,platform" },
+      );
+      // A draft that could not be adopted (because a config for this account already
+      // existed) is dropped rather than left to confuse the next lookup.
+      if (draft) await supabaseAdmin.from("bot_configs").delete().eq("id", draft.id);
+    }
 
     const res = NextResponse.redirect(siteUrl(`${returnPath}?success=1`));
     res.cookies.set(OAUTH_STATE_COOKIE, "", stateCookieOptions(0));

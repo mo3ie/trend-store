@@ -241,3 +241,42 @@ nothing to feel cheated about. Instead:
 * Payment reuses `/ads/checkout`. That URL carries the other area's name, which is the
   one piece of shared vocabulary left standing — duplicating a tested payment sheet
   across four gateways was the worse trade.
+
+---
+
+## Correction: the Business Messaging API IS available for Libya
+
+An earlier note in this repo (and in the product copy) said TikTok has no automated
+private reply for this market. **That was wrong**, and the owner caught it.
+
+The official access page states the rule by region:
+
+* **Not available** in the EEA, Switzerland or the UK.
+* **US** Business Accounts: the developer needs the Data security & privacy review,
+  the US data security review, and the USDS Addendum.
+* **"Rest of World"** — which includes Libya — *"developers who have passed the Data
+  security & privacy review are permitted to call the Business Messaging API on behalf
+  of these accounts."*
+
+And the API has a **Comment-to-Message** capability explicitly: endpoints exist to
+enable/disable it per Business Account and to read its current setting, alongside
+send-message, list-conversations, list-messages, image upload/download, unlock
+conversations, automatic messages (`/business/message/auto_message/create/`, with
+`WELCOME_MESSAGE`, keyword reply, suggested questions, chat prompts) and webhooks.
+
+So the Facebook pattern — a public reply plus a private message carrying the price —
+is reachable here after all. Two gates stand in front of it:
+
+1. The **Data security & privacy review** (the Rest-of-World requirement above).
+2. Automatic messages additionally need **Advanced Access** and a **Verified Business
+   Account**.
+
+### What this changes in the product
+
+The copy that says "TikTok has no automated private messages" appears in the hub, the
+reply composer's price lint, and this document. It is accurate *today* — we have not
+passed the review — but it is a statement about our access, not about the platform,
+and it must be reworded as such rather than presented as a permanent limit.
+
+The reply composer's "variants" design stays regardless: rotating replies is good
+practice on a public comment thread whether or not a DM is also sent.

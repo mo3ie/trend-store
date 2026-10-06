@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Loader2, Settings2, Plus, Trash2, Save,
-  AlertCircle, CheckCircle, Radio, Video,
+  AlertCircle, CheckCircle, Radio, Video, Sparkles, ShieldBan, Package,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
@@ -14,6 +14,10 @@ import {
   AccountStrip, ScreenTitle, TabStrip, SubscribeBar, Chip,
 } from "@/components/tiktok/TikTokKit";
 import { ReplySimulator, ReplyThread, type ThreadValue } from "@/components/tiktok/ReplyThread";
+import {
+  BannedWordsEditor, CatalogPanel, ReplyGroupsEditor, type ReplyGroup,
+} from "@/components/bot/ReplySettings";
+import { botColors } from "@/lib/botTheme";
 
 /**
  * The comment auto-reply bot, for TikTok.
@@ -36,6 +40,7 @@ interface Rule { id: string; keywords: string[]; public_reply: string | null; en
 
 interface Config {
   id: string; enabled: boolean;
+  page_id: string;
   default_public_reply: string | null;
   public_replies: string[] | null;
   like_comments: boolean;
@@ -44,6 +49,10 @@ interface Config {
   banned_words: string[] | null;
   banned_action: string | null;
   catalog_match: string | null;
+  catalog_ambiguous_reply: string | null;
+  reply_groups: ReplyGroup[] | null;
+  ai_enabled: boolean;
+  ai_persona: string | null;
 }
 
 function TikTokBotInner() {
@@ -52,15 +61,19 @@ function TikTokBotInner() {
   const { t, rtl } = useLang();
   const { light } = useTheme();
   const c = tt(light);
+  // The shared reply editors take the bot palette; map it from the same theme flag
+  // so they sit inside TikTok cards without a second theme toggle.
+  const bot = botColors(light);
   const Back = rtl ? ArrowLeft : ArrowRight;
 
   const [st, setSt] = useState<Status | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"try" | "rules" | "settings">("try");
+  const [tab, setTab] = useState<"try" | "rules" | "smart" | "settings">("try");
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
+  const [draft, setDraft] = useState(false);
 
   // Simulator
   const [probe, setProbe] = useState("");
@@ -71,6 +84,9 @@ function TikTokBotInner() {
   // Default reply, as a thread
   const [thread, setThread] = useState<ThreadValue>({ variants: [""], like: false });
   const [saving, setSaving] = useState(false);
+  const [groups, setGroups] = useState<ReplyGroup[]>([]);
+  const [banned, setBanned] = useState("");
+  const [bannedAction, setBannedAction] = useState<"delete" | "hide" | "ignore">("hide");
 
   const pageId = st?.account?.openId || "";
   const handle = st?.account?.handle || t("حسابك", "your account");
@@ -81,13 +97,26 @@ function TikTokBotInner() {
     if (!s.error) setSt(s);
 
     const d = await fetch("/api/tiktok/configs").then((r) => r.json()).catch(() => ({}));
-    const cfg: Config | null = (d.accounts || []).map((a: { config: Config | null }) => a.config).find(Boolean) ?? null;
+    let cfg: Config | null = (d.accounts || []).map((a: { config: Config | null }) => a.config).find(Boolean) ?? null;
+
+    // No linked account yet → work on a draft, so the whole editor surface is usable
+    // now and moves onto the real account the moment it links.
+    if (!cfg) {
+      const p = await fetch("/api/tiktok/bot/prep", { method: "POST" })
+        .then((r) => r.json()).catch(() => ({}));
+      cfg = (p.config as Config | null) ?? null;
+      setDraft(!!p.draft);
+    }
+
     if (cfg) {
       setConfig(cfg);
       setThread({
         variants: (cfg.public_replies?.length ? cfg.public_replies : [cfg.default_public_reply || ""]).slice(0, 3),
         like: !!cfg.like_comments,
       });
+      setGroups((cfg.reply_groups as ReplyGroup[] | null) || []);
+      setBanned((cfg.banned_words || []).join("، "));
+      setBannedAction((cfg.banned_action as "delete" | "hide" | "ignore") || "hide");
       const r = await fetch(`/api/bot/rules?configId=${cfg.id}`).then((x) => x.json()).catch(() => ({}));
       setRules(r.rules || []);
     }
@@ -142,6 +171,24 @@ function TikTokBotInner() {
     }
     setFlash(t("حُفظ", "Saved"));
     setTimeout(() => setFlash(""), 1800);
+  }
+
+  /** One writer for every editor on this screen, draft or live. */
+  async function patch(fields: Record<string, unknown>): Promise<boolean> {
+    if (!config) return false;
+    const r = await fetch("/api/tiktok/configs", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: config.id, ...fields }),
+    }).catch(() => null);
+    if (!r || !r.ok) {
+      const d = await r?.json().catch(() => ({}));
+      setError(d?.message || t("تعذّر الحفظ", "Could not save"));
+      return false;
+    }
+    setConfig({ ...config, ...(fields as Partial<Config>) });
+    setFlash(t("حُفظ", "Saved"));
+    setTimeout(() => setFlash(""), 1500);
+    return true;
   }
 
   async function addRule() {
@@ -218,6 +265,7 @@ function TikTokBotInner() {
           tabs={[
             { key: "try" as const,      label: t("التجربة والردّ", "Try it & reply") },
             { key: "rules" as const,    label: `${t("القواعد", "Rules")}${rules.length ? ` (${rules.length})` : ""}` },
+            { key: "smart" as const,    label: t("الردّ الذكي", "Smart reply") },
             { key: "settings" as const, label: t("الإعدادات", "Settings") },
           ]}
         />
@@ -302,6 +350,101 @@ function TikTokBotInner() {
         )}
 
         {/* ── SETTINGS ─────────────────────────────────────────────────────── */}
+        {/* ── SMART REPLY: keyword groups, banned words, catalog, AI ─────── */}
+        {tab === "smart" && config && (
+          <div style={{ display: "grid", gap: 14 }}>
+            {/* Keyword groups: different answers for different questions. */}
+            <div style={{ ...ttCard(c), padding: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+                {t("مجموعات الكلمات", "Keyword groups")}
+              </div>
+              <p style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.7, margin: "0 0 12px" }}>
+                {t("ردّ مختلف لكل نوع سؤال: من يسأل عن السعر يأخذ السعر، ومن يسأل عن الفرع يأخذ العنوان.",
+                   "A different answer per kind of question: price questions get the price, location questions get the address.")}
+              </p>
+              <ReplyGroupsEditor
+                groups={groups} onChange={setGroups}
+                c={bot} t={t} accent={c.pinkInk}
+              />
+              <button onClick={() => patch({ reply_groups: groups })}
+                style={{ ...ttSecondary(c), width: "100%", marginTop: 12 }}>
+                <Save size={15} /> {t("حفظ المجموعات", "Save groups")}
+              </button>
+            </div>
+
+            {/* Moderation. */}
+            <div style={{ ...ttCard(c), padding: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <ShieldBan size={16} color={c.pinkInk} /> {t("الكلمات المحظورة", "Banned words")}
+              </div>
+              <p style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.7, margin: "0 0 12px" }}>
+                {t("التعليق الذي يحتوي إحداها لا يُردّ عليه — يُخفى أو يُحذف حسب اختيارك.",
+                   "A comment containing one of these is never answered — it is hidden or deleted, as you choose.")}
+              </p>
+              <BannedWordsEditor
+                words={banned} action={bannedAction}
+                onWords={setBanned} onAction={setBannedAction}
+                c={bot} t={t}
+              />
+              <button
+                onClick={() => patch({
+                  banned_words: banned.split(/[،,\n]/).map((x) => x.trim()).filter(Boolean),
+                  banned_action: bannedAction,
+                })}
+                style={{ ...ttSecondary(c), width: "100%", marginTop: 12 }}>
+                <Save size={15} /> {t("حفظ", "Save")}
+              </button>
+            </div>
+
+            {/* The catalog: the free, deterministic answer that runs before the AI. */}
+            <div style={{ ...ttCard(c), padding: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <Package size={16} color={c.pinkInk} /> {t("مطابقة المنتجات", "Product matching")}
+              </div>
+              <p style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.7, margin: "0 0 12px" }}>
+                {t("يتعرّف على المنتج من اسمه في التعليق أو من صورة الفيديو، فيردّ بسعره مباشرة — بلا تكلفة وبلا ذكاء اصطناعي.",
+                   "It recognises the product from its name in the comment or the video's image and answers with its price — free, and without the AI.")}
+              </p>
+              <CatalogPanel
+                pageId={config.page_id}
+                platform="tiktok"
+                mode={config.catalog_match || "off"}
+                onMode={(m) => patch({ catalog_match: m })}
+                c={bot} t={t} accent={c.pinkInk}
+              />
+            </div>
+
+            {/* The AI, last — and said to be last, because that is what keeps it cheap. */}
+            <div style={{ ...ttCard(c), padding: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <Sparkles size={16} color={c.cyanInk} /> {t("ردّ الذكاء الاصطناعي", "AI reply")}
+              </div>
+              <p style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.7, margin: "0 0 12px" }}>
+                {t("يُستدعى أخيراً فقط: بعد المجموعات والقواعد والمنتجات. فما تجيب عنه الإعدادات مجاناً لا يُستهلك فيه ذكاء اصطناعي.",
+                   "Called last only: after the groups, the rules and the products. Anything your settings answer for free never reaches it.")}
+              </p>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer" }}>
+                <input type="checkbox" checked={!!config.ai_enabled}
+                  onChange={(e) => patch({ ai_enabled: e.target.checked })} />
+                {t("فعّل الردّ الذكي لما لا تطابقه أي قاعدة", "Let AI answer what no rule matched")}
+              </label>
+              {config.ai_enabled && (
+                <>
+                  <div style={{ fontSize: 12, color: c.muted, margin: "13px 0 6px" }}>
+                    {t("شخصية الردّ (اختياري)", "Reply persona (optional)")}
+                  </div>
+                  <textarea
+                    defaultValue={config.ai_persona || ""}
+                    onBlur={(e) => patch({ ai_persona: e.target.value })}
+                    rows={2}
+                    placeholder={t("مثال: ردّ بلهجة ليبية ودودة ومختصرة", "e.g. reply in warm, brief Libyan Arabic")}
+                    style={{ ...ttInput(c), resize: "vertical" }} />
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {tab === "settings" && (
           <div style={{ ...ttCard(c), padding: 16 }}>
             <div style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
