@@ -1,6 +1,16 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-export type Product = "bot" | "ads" | "studio";
+export type Product =
+  | "bot" | "ads" | "studio"
+  // TikTok mirrors the Facebook products one for one. They are separate products,
+  // not a flag on the originals: a customer who paid for the Facebook bot has not
+  // paid for the TikTok one, and the two carry different prices.
+  | "tiktok_bot" | "tiktok_ads" | "tiktok_studio";
+
+/** The TikTok twin of a product, for gates that run on either platform. */
+export const TIKTOK_OF: Record<string, Product> = {
+  bot: "tiktok_bot", ads: "tiktok_ads", studio: "tiktok_studio",
+};
 
 // New users get a free trial of ALL products; admins have everything open forever.
 export const TRIAL_DAYS = 3;

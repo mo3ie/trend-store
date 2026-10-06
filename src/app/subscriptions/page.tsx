@@ -5,7 +5,7 @@ import { Loader2, Wallet, Check, CreditCard, X, ReceiptText, ShieldCheck, Refres
 import WalletModal from "@/components/WalletModal";
 
 interface Plan {
-  id: string; product: "bot" | "ads" | "studio"; tier: string;
+  id: string; product: string; tier: string;
   page_scope: "single" | "triple" | "unlimited"; page_limit: number;
   duration: "monthly" | "quarterly" | "yearly"; months: number;
   price_lyd: number; features: string[];
@@ -20,10 +20,14 @@ interface Payment { id: string; product: string; amount_lyd: number; created_at:
 interface Page { page_id: string; page_name: string | null; page_picture: string | null; }
 interface Access { admin: boolean; trial: boolean; trialEndsAt: string | null; full: boolean; }
 
+// Facebook first, then the TikTok twins. Same ideas, own prices.
 const PRODUCTS = [
   { key: "bot", label: "بوت الرد الآلي" },
   { key: "ads", label: "الإعلانات VIP" },
   { key: "studio", label: "الموظف الذكي" },
+  { key: "tiktok_bot", label: "بوت تيك توك" },
+  { key: "tiktok_ads", label: "إعلانات تيك توك" },
+  { key: "tiktok_studio", label: "الموظف الذكي — تيك توك" },
 ] as const;
 const TIER_LABEL: Record<string, string> = { regular: "عادي", vip: "VIP", basic: "عادي", medium: "متوسط" };
 const SCOPE_LABEL: Record<string, string> = { single: "صفحة واحدة", triple: "٣ صفحات", unlimited: "غير محدود" };
@@ -55,7 +59,7 @@ export default function SubscriptionsPage() {
   const [access, setAccess] = useState<Access | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [product, setProduct] = useState<"bot" | "ads" | "studio">("bot");
+  const [product, setProduct] = useState<(typeof PRODUCTS)[number]["key"]>("bot");
   const [scope, setScope] = useState<"single" | "triple" | "unlimited">("single");
   const [duration, setDuration] = useState<"monthly" | "quarterly" | "yearly">("monthly");
 
@@ -285,7 +289,7 @@ export default function SubscriptionsPage() {
               </ul>
               {/* The monthly allowance is the single most important number on a Studio
                   plan, so it is stated on the card rather than discovered after paying. */}
-              {plan!.product === "studio" && ((plan!.ai_image_quota ?? 0) > 0 || (plan!.ai_video_quota ?? 0) > 0) && (
+              {plan!.product.endsWith("studio") && ((plan!.ai_image_quota ?? 0) > 0 || (plan!.ai_video_quota ?? 0) > 0) && (
                 <div className="bg-purple-500/10 border border-purple-500/25 rounded-xl px-3 py-2.5 mb-4 text-xs leading-6">
                   <div className="font-bold text-purple-200 mb-0.5">حصة الذكاء القوي شهرياً</div>
                   <div className="text-slate-300">

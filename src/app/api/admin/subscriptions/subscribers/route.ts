@@ -30,7 +30,7 @@ export async function GET() {
     s.status === "active" && (!s.expires_at || new Date(s.expires_at).getTime() > now);
 
   const successPays = pays.filter((p) => p.status === "success");
-  const revenueByProduct: Record<string, number> = { bot: 0, ads: 0, studio: 0 };
+  const revenueByProduct: Record<string, number> = { bot: 0, ads: 0, studio: 0, tiktok_bot: 0, tiktok_ads: 0, tiktok_studio: 0 };
   let totalRevenue = 0, revenueMonth = 0;
   for (const p of successPays) {
     const amt = Number(p.amount_lyd) || 0;
@@ -39,7 +39,7 @@ export async function GET() {
     if (new Date(p.created_at).getTime() >= monthStart) revenueMonth += amt;
   }
 
-  const activeByProduct: Record<string, number> = { bot: 0, ads: 0, studio: 0 };
+  const activeByProduct: Record<string, number> = { bot: 0, ads: 0, studio: 0, tiktok_bot: 0, tiktok_ads: 0, tiktok_studio: 0 };
   const weekAhead = now + 7 * 86400000;
   let activeCount = 0, expiringSoon = 0, autoRenewCount = 0, expiredCount = 0;
   for (const s of subs) {

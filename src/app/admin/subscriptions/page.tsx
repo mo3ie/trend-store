@@ -5,7 +5,7 @@ import { CreditCard, Loader2, Save, CheckCircle, Users, TrendingUp } from "lucid
 
 interface Plan {
   id: string;
-  product: "bot" | "ads" | "studio";
+  product: string;
   tier: string;
   page_scope: "single" | "triple" | "unlimited";
   page_limit: number;
@@ -139,7 +139,7 @@ export default function AdminSubscriptionsPage() {
         <SubscribersView loading={subsLoading} stats={stats} subscribers={subscribers} payments={subPayments} onReload={loadSubscribers} />
       )}
 
-      {view === "prices" && (["bot", "ads", "studio"] as const).map((product) => {
+      {view === "prices" && (["bot", "ads", "studio", "tiktok_bot", "tiktok_ads", "tiktok_studio"] as const).map((product) => {
         const scopes = grouped[product]; if (!scopes) return null;
         return (
           <section key={product} className="bg-white/5 border border-purple-500/20 rounded-2xl p-5 space-y-4">
@@ -219,7 +219,10 @@ export default function AdminSubscriptionsPage() {
   );
 }
 
-const PRODUCT_LABEL_S: Record<string, string> = { bot: "بوت الرد", ads: "إعلانات", studio: "الموظف" };
+const PRODUCT_LABEL_S: Record<string, string> = {
+  bot: "بوت الرد", ads: "إعلانات", studio: "الموظف",
+  tiktok_bot: "بوت تيك توك", tiktok_ads: "إعلانات تيك توك", tiktok_studio: "موظف تيك توك",
+};
 const TIER_LABEL_S: Record<string, string> = { regular: "عادي", vip: "VIP", basic: "عادي", medium: "متوسط" };
 
 function SubscribersView({ loading, stats, subscribers, payments, onReload }: {
@@ -253,7 +256,7 @@ function SubscribersView({ loading, stats, subscribers, payments, onReload }: {
         <div className="bg-white/5 border border-purple-500/20 rounded-2xl p-5">
           <h3 className="font-bold mb-3 flex items-center gap-2"><TrendingUp size={17} className="text-green-400" /> الإيراد حسب المنتج</h3>
           <div className="grid grid-cols-3 gap-3">
-            {(["bot", "ads", "studio"] as const).map((p) => (
+            {(["bot", "ads", "studio", "tiktok_bot", "tiktok_ads", "tiktok_studio"] as const).map((p) => (
               <div key={p} className="bg-white/5 rounded-xl p-3 text-center">
                 <div className="text-lg font-extrabold text-green-300">{(stats.revenue_by_product[p] || 0).toLocaleString()}</div>
                 <div className="text-xs text-slate-400">{PRODUCT_LABEL_S[p]} · {stats.active_by_product[p] || 0} فعّال</div>

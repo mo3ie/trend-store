@@ -78,7 +78,7 @@ export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
 
   // Same gate as the Meta side: entitlements v2 (new subscription) is the source of
   // truth; the legacy bot_subscriptions row is kept as an OR-fallback for rollback.
-  const entitledV2 = await hasProduct(config.user_id, "bot", openId).catch(() => false);
+  const entitledV2 = await hasProduct(config.user_id, "tiktok_bot", openId).catch(() => false);
   const { data: sub } = await supabaseAdmin
     .from("bot_subscriptions")
     .select("status, expires_at")
@@ -180,7 +180,7 @@ async function decideReply(
   // from a picture, or from the product's name — before any paid model is involved.
   let catalogText: string | null = null;
   if (!rule && target.catalogMatch !== "off"
-      && (await featuresFor(target.userId, "bot", target.pageId).catch(() => new Set<string>())).has("catalog_reply")) {
+      && (await featuresFor(target.userId, "tiktok_bot", target.pageId).catch(() => new Set<string>())).has("catalog_reply")) {
     const catalog = await loadCatalog(target.userId, target.pageId);
     if (catalog.length) {
       const m = await matchProduct({
@@ -215,7 +215,7 @@ async function decideReply(
   let aiText: string | null = null;
   const aiWanted = (override?.ai ?? target.aiEnabled) === true;
   if (!rule && !catalogText && aiWanted && aiAvailable()
-      && (await featuresFor(target.userId, "bot", target.pageId).catch(() => new Set<string>())).has("ai_reply")) {
+      && (await featuresFor(target.userId, "tiktok_bot", target.pageId).catch(() => new Set<string>())).has("ai_reply")) {
     aiText = await generateAiReply(comment.text, target.aiPersona, target.pageName);
   }
 
