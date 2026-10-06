@@ -537,3 +537,43 @@ export async function deleteWebhookConfig(eventType: WebhookEventType): Promise<
 export function scopeFingerprint(scope: string): string {
   return createHash("sha256").update(scope).digest("hex").slice(0, 12);
 }
+
+// ── Content publishing (video.publish) ───────────────────────────────────────
+// NOT part of the approved Accounts API scope set. The code is here so the AI
+// Employee is complete the day the scope is granted; until then `canPublish`
+// is false and the Studio says so rather than failing mid-publish.
+
+/** True when the account's granted scopes include video publishing. */
+export function canPublish(grantedScopes: string[] | null | undefined): boolean {
+  return (grantedScopes || []).some((s) => s.includes("video.publish") || s.includes("video.upload"));
+}
+
+export interface PublishResult { publishId: string }
+
+/**
+ * Publishes a video to a TikTok account from a public file URL.
+ *
+ * TikTok pulls the file itself, which is why a clip has to be reachable — the
+ * same constraint the Facebook video path has. The caption carries the post text.
+ */
+export async function publishVideo(
+  token: string,
+  businessId: string,
+  opts: { videoUrl: string; caption: string; scheduleTime?: number },
+): Promise<PublishResult> {
+  const body: Record<string, unknown> = {
+    business_id: businessId,
+    video_url: opts.videoUrl,
+    post_info: { caption: opts.caption },
+  };
+  // TikTok takes a unix timestamp for a scheduled post, same as Meta.
+  if (opts.scheduleTime && opts.scheduleTime > Math.floor(Date.now() / 1000) + 300) {
+    body.schedule_time = opts.scheduleTime;
+  }
+  const data = await call<{ publish_id?: string; share_id?: string }>(
+    "business/video/publish/", "POST", { token, body },
+  );
+  const id = data.publish_id || data.share_id;
+  if (!id) throw new TikTokError("publish_no_id", "TikTok returned no publish id", "business/video/publish/");
+  return { publishId: String(id) };
+}

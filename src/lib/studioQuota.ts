@@ -46,12 +46,17 @@ function windowFor(startsAt: string | null): { start: Date; end: Date } {
   return { start, end: new Date(start.getTime() + MONTH_MS) };
 }
 
-/** The studio subscription backing this user's paid generation, if any. */
-async function studioSub(userId: string) {
+/**
+ * The studio subscription backing this user's paid generation, if any.
+ *
+ * Facebook and TikTok are separate products at separate prices, so the allowance
+ * follows whichever one the caller is working on.
+ */
+async function studioSub(userId: string, product: "studio" | "tiktok_studio" = "studio") {
   const nowIso = new Date().toISOString();
   const { data } = await supabaseAdmin
     .from("subscriptions").select("id, plan_id, starts_at, expires_at")
-    .eq("user_id", userId).eq("product", "studio").eq("status", "active")
+    .eq("user_id", userId).eq("product", product).eq("status", "active")
     .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
     .order("expires_at", { ascending: false })
     .limit(1).maybeSingle();
@@ -59,9 +64,9 @@ async function studioSub(userId: string) {
 }
 
 /** Read (and lazily create) the current window's usage row. */
-export async function getQuota(userId: string): Promise<QuotaState> {
+export async function getQuota(userId: string, product: "studio" | "tiktok_studio" = "studio"): Promise<QuotaState> {
   const access = await getAccess(userId);
-  const sub = await studioSub(userId);
+  const sub = await studioSub(userId, product);
   const { start, end } = windowFor(sub?.starts_at ?? null);
 
   let imageLimit = 0, videoLimit = 0;

@@ -19,7 +19,7 @@ const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
 const PINK    = "#d6409f";
 const PINK_BG = "rgba(214,64,159,0.12)";
 
-interface Page { id: string; page_id: string; page_name: string; }
+interface Page { id?: string; page_id: string; page_name: string; page_picture?: string | null; platform?: "meta" | "tiktok"; account_id?: string | null; }
 interface Product { id: string; category?: string; name: string; price_text?: string; description?: string; images?: string[]; active?: boolean; available?: boolean; }
 interface Brand {
   brand_name?: string; phones?: string[]; addresses?: string[]; links?: string[];
@@ -89,7 +89,11 @@ export default function StudioPage() {
     boxSizing: "border-box", fontFamily: "inherit",
   };
   const card: React.CSSProperties = { background: c.surface, border: `2px solid ${c.border}`, borderRadius: 18, padding: 20 };
-  const pagePic = (id: string) => `https://graph.facebook.com/${id}/picture?type=square&width=80&height=80`;
+  // Facebook exposes an avatar by Page id; TikTok hands us the URL on the row.
+  const pagePic = (p: Page) =>
+    p.platform === "tiktok"
+      ? (p.page_picture || "")
+      : `https://graph.facebook.com/${p.page_id}/picture?type=square&width=80&height=80`;
 
   const [pages, setPages] = useState<Page[]>([]);
   const [selectedPage, setSelectedPage] = useState("");
@@ -192,7 +196,8 @@ export default function StudioPage() {
   const [imgErr, setImgErr] = useState("");
 
   useEffect(() => {
-    fetch("/api/promo/pages").then((r) => {
+    // Facebook Pages and TikTok accounts in one list — the Studio works on both.
+    fetch("/api/studio/pages").then((r) => {
       if (r.status === 401) { setNotAuthed(true); setLoadingPages(false); return null; }
       return r.json();
     }).then((d) => {
@@ -638,7 +643,7 @@ export default function StudioPage() {
                 <span style={{ display: "flex", alignItems: "center", gap: 9, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
                   {selPage && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={pagePic(selPage.page_id)} alt="" style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
+                    <img src={pagePic(selPage)} alt="" style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
                   )}
                   {selPage ? selPage.page_name : t("اختر صفحة", "Choose a Page")}
                 </span>
@@ -655,10 +660,13 @@ export default function StudioPage() {
                   )}
                   <div style={{ maxHeight: 260, overflowY: "auto" }}>
                   {pages.filter((p) => p.page_name.toLowerCase().includes(pageSearch.trim().toLowerCase())).map((p) => (
-                    <button key={p.id} type="button" onClick={() => { setSelectedPage(p.page_id); setPageMenu(false); setPageSearch(""); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: p.page_id === selectedPage ? PINK_BG : "transparent", border: "none", cursor: "pointer", color: p.page_id === selectedPage ? PINK : c.text, textAlign: rtl ? "right" : "left", fontSize: 14, fontFamily: "inherit" }}>
+                    <button key={`${p.platform ?? "meta"}:${p.page_id}`} type="button" onClick={() => { setSelectedPage(p.page_id); setPageMenu(false); setPageSearch(""); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: p.page_id === selectedPage ? PINK_BG : "transparent", border: "none", cursor: "pointer", color: p.page_id === selectedPage ? PINK : c.text, textAlign: rtl ? "right" : "left", fontSize: 14, fontFamily: "inherit" }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={pagePic(p.page_id)} alt="" style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
+                      <img src={pagePic(p)} alt="" style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
                       <span style={{ flex: 1, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{p.page_name}</span>
+                      {p.platform === "tiktok" && (
+                        <span style={{ fontSize: 10, fontWeight: 800, borderRadius: 100, padding: "2px 7px", background: "rgba(255,0,80,0.15)", color: "#ff0050", flexShrink: 0 }}>TikTok</span>
+                      )}
                     </button>
                   ))}
                   </div>

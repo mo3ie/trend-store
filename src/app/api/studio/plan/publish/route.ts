@@ -3,12 +3,99 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
 import { publishPagePhoto, publishPageVideo, boostPost, getSystemPageToken } from "@/services/meta";
 import { hasProduct } from "@/lib/entitlements";
+import { getValidAccessToken } from "@/lib/tiktokTokens";
+import { businessIdFromOpenId, canPublish, publishVideo } from "@/services/tiktok";
 
 export const maxDuration = 60;
 
 // POST { planId } — publish/schedule every approved post of a plan to Facebook.
 // Requires pages_manage_posts on the Page token (posts that fail return status=failed
 // with the reason, surfaced in the Alerts tab). Turns on the plan's auto_publish.
+
+/**
+ * Publishes a plan's approved posts to a TikTok account.
+ *
+ * TikTok takes video, not photos, so a post without a clip is reported as such
+ * rather than silently skipped — an owner who approved ten posts and saw "0
+ * published" with no reason would have no idea what to fix.
+ *
+ * Video publishing is NOT in the app's approved scope set yet. Rather than fail
+ * one post at a time against the API, the whole call stops with a clear message
+ * when the account was never granted it.
+ */
+async function publishToTikTok(
+  userId: string,
+  plan: { id: string; page_id: string },
+  planId: string,
+) {
+  const { data: account } = await supabaseAdmin
+    .from("tiktok_accounts")
+    .select("id, granted_scopes")
+    .eq("user_id", userId).eq("tiktok_account_id", plan.page_id).is("revoked_at", null)
+    .maybeSingle();
+  if (!account) {
+    return NextResponse.json({ error: "الحساب غير مرتبط — أعد ربط حساب تيك توك" }, { status: 400 });
+  }
+  if (!canPublish(account.granted_scopes as string[] | null)) {
+    return NextResponse.json({
+      error: "publish_scope_missing",
+      message: "النشر على تيك توك يحتاج صلاحية نشر الفيديو — لم تُمنح لهذا التطبيق بعد. الخطة محفوظة وجاهزة، وتُنشر فور اعتماد الصلاحية.",
+    }, { status: 402 });
+  }
+  const token = await getValidAccessToken(account.id);
+  if (!token) {
+    return NextResponse.json({ error: "انتهت صلاحية الربط — أعد ربط حساب تيك توك" }, { status: 400 });
+  }
+
+  const { data: posts } = await supabaseAdmin
+    .from("studio_posts").select("*").eq("plan_id", planId)
+    .in("status", ["approved", "scheduled", "failed"]);
+
+  await supabaseAdmin.from("studio_plans").update({ auto_publish: true, status: "active" }).eq("id", planId);
+
+  const businessId = businessIdFromOpenId(plan.page_id);
+  const now = Math.floor(Date.now() / 1000);
+  let published = 0, scheduled = 0, failed = 0;
+
+  for (const p of posts || []) {
+    if (p.external_post_id) continue;                 // already on TikTok
+    const caption = [p.caption, p.hashtags].filter(Boolean).join("\n");
+    const whenUnix = p.scheduled_for ? Math.floor(new Date(p.scheduled_for).getTime() / 1000) : now;
+
+    if (!p.video_url) {
+      await supabaseAdmin.from("studio_posts").update({
+        status: "failed",
+        error: "تيك توك ينشر فيديو فقط — ارفع فيديو لهذا المنشور.",
+      }).eq("id", p.id);
+      failed++;
+      continue;
+    }
+
+    try {
+      const res = await publishVideo(token, businessId, {
+        videoUrl: p.video_url, caption, scheduleTime: whenUnix,
+      });
+      const isScheduled = whenUnix > now + 300;
+      await supabaseAdmin.from("studio_posts").update({
+        status: isScheduled ? "scheduled" : "published",
+        external_post_id: res.publishId,
+        published_at: isScheduled ? null : new Date().toISOString(),
+        error: null,
+      }).eq("id", p.id);
+      if (isScheduled) scheduled++; else published++;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "TikTok error";
+      await supabaseAdmin.from("studio_posts")
+        .update({ status: "failed", error: msg.slice(0, 300) }).eq("id", p.id);
+      failed++;
+    }
+  }
+
+  const { data: updated } = await supabaseAdmin
+    .from("studio_posts").select("*").eq("plan_id", planId).order("scheduled_for", { ascending: true });
+  return NextResponse.json({ ok: true, platform: "tiktok", published, scheduled, failed, posts: updated || [] });
+}
+
 export async function POST(req: NextRequest) {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
@@ -19,9 +106,18 @@ export async function POST(req: NextRequest) {
     .from("studio_plans").select("*").eq("id", planId).eq("user_id", user.id).maybeSingle();
   if (!plan) return NextResponse.json({ error: "الخطة غير موجودة" }, { status: 404 });
 
+  // A plan belongs to one platform, and each has its own product and its own price.
+  const platform: "meta" | "tiktok" = plan.platform === "tiktok" ? "tiktok" : "meta";
+  const studioProduct = platform === "tiktok" ? "tiktok_studio" : "studio";
+
   // Studio gate: admins + 3-day trial pass; afterwards a Studio subscription is required.
-  const entitled = await hasProduct(user.id, "studio", plan.page_id).catch(() => false);
+  const entitled = await hasProduct(user.id, studioProduct, plan.page_id).catch(() => false);
   if (!entitled) return NextResponse.json({ error: "subscription_required", code: "subscribe", message: "انتهت التجربة المجانية — اشترك في «الموظف الذكي» للمتابعة" }, { status: 402 });
+
+  // ── TikTok: publish videos to the connected account ───────────────────────
+  if (platform === "tiktok") {
+    return await publishToTikTok(user.id, plan, planId);
+  }
 
   const { data: page } = await supabaseAdmin
     .from("connected_pages").select("page_access_token").eq("user_id", user.id).eq("page_id", plan.page_id).maybeSingle();

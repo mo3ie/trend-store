@@ -54,7 +54,12 @@ export async function POST(req: NextRequest) {
   if (!pageId) return NextResponse.json({ error: "pageId مطلوب" }, { status: 400 });
 
   // Studio gate: admins + 3-day trial pass; afterwards a Studio subscription is required.
-  const entitled = await hasProduct(user.id, "studio", pageId).catch(() => false);
+  // Which platform this page belongs to decides the product — and the price.
+  const { data: ttAccount } = await supabaseAdmin
+    .from("tiktok_accounts").select("id")
+    .eq("user_id", user.id).eq("tiktok_account_id", pageId).is("revoked_at", null).maybeSingle();
+  const platform: "meta" | "tiktok" = ttAccount ? "tiktok" : "meta";
+  const entitled = await hasProduct(user.id, platform === "tiktok" ? "tiktok_studio" : "studio", pageId).catch(() => false);
   if (!entitled) return NextResponse.json({ error: "subscription_required", code: "subscribe", message: "انتهت التجربة المجانية — اشترك في «الموظف الذكي» للمتابعة" }, { status: 402 });
 
   const postsPerDay = Math.max(1, Math.min(10, Number(body.postsPerDay) || 3));
@@ -130,7 +135,7 @@ export async function POST(req: NextRequest) {
   const { data: plan, error: planErr } = await supabaseAdmin
     .from("studio_plans").insert({
       user_id: user.id, page_id: pageId, posts_per_day: postsPerDay, duration_days: durationDays,
-      start_date: startDate.toISOString().slice(0, 10), status: "draft",
+      start_date: startDate.toISOString().slice(0, 10), status: "draft", platform,
       summary: typeof parsed.summary === "string" ? parsed.summary : null,
     }).select().single();
   if (planErr || !plan) return NextResponse.json({ error: planErr?.message || "تعذّر إنشاء الخطة" }, { status: 500 });
@@ -145,7 +150,7 @@ export async function POST(req: NextRequest) {
     const prompt = ap.image_prompt || (prod ? `${prod.name} product photo, clean studio lighting` : "attractive product photo");
     const productImg = prod?.images?.[0];
     return {
-      plan_id: plan.id, user_id: user.id, page_id: pageId,
+      plan_id: plan.id, user_id: user.id, page_id: pageId, platform,
       scheduled_for: when.toISOString(),
       caption: ap.caption || "",
       hashtags: ap.hashtags || null,
