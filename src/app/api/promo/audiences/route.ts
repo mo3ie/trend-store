@@ -20,7 +20,10 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
   const { data } = await supabaseAdmin
     .from("ad_audiences").select("id, name, targeting, created_at")
-    .eq("user_id", user.id).order("created_at", { ascending: false });
+    // Meta audiences only: a TikTok audience holds TikTok location/interest ids, which
+    // the Graph API has never heard of.
+    .eq("user_id", user.id).eq("platform", "meta")
+    .order("created_at", { ascending: false });
   return NextResponse.json({ audiences: data || [] });
 }
 
@@ -32,7 +35,7 @@ export async function POST(req: Request) {
   if (!name || typeof name !== "string") return NextResponse.json({ error: "الاسم مطلوب" }, { status: 400 });
   const { data, error } = await supabaseAdmin
     .from("ad_audiences")
-    .insert({ user_id: user.id, name: name.slice(0, 80), targeting: targeting || {} })
+    .insert({ user_id: user.id, platform: "meta", name: name.slice(0, 80), targeting: targeting || {} })
     .select("id, name, targeting, created_at").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ audience: data });
