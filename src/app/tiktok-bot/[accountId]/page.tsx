@@ -12,6 +12,7 @@ import WalletModal from "@/components/WalletModal";
 import { useTheme } from "@/hooks/useTheme";
 import { botColors } from "@/lib/botTheme";
 import { BannedWordsEditor, CatalogPanel, ReplyGroupsEditor, type ReplyGroup } from "@/components/bot/ReplySettings";
+import { PostOverrideEditor, type PostOverrideValue } from "@/components/bot/PostOverrideEditor";
 
 // Same console shape as the Facebook bot — TikTok palette (pink/cyan).
 const PINK = "#ff0050", CYAN = "#00f2ea", GREEN = "#22c55e";
@@ -37,6 +38,7 @@ interface Config {
   like_comments: boolean | null; public_replies: string[] | null;
   default_public_reply: string | null;
   catalog_match: string | null; catalog_ambiguous_reply: string | null;
+  post_overrides?: Record<string, PostOverrideValue> | null;
 }
 interface Account {
   account_id: string; page_id: string; page_name: string; page_picture?: string;
@@ -221,7 +223,7 @@ export default function TikTokBotManage() {
 
         {tab === "rules" && <RulesTab configId={account.config.id} t={t} />}
         {tab === "settings" && <SettingsTab config={account.config} patch={patchConfig} onDisconnect={disconnect} scopes={account.granted_scopes} t={t} />}
-        {tab === "videos" && <VideosTab t={t} />}
+        {tab === "videos" && <VideosTab accountId={account.account_id} config={account.config} patch={patchConfig} t={t} />}
         {tab === "catalog" && (
           <CatalogTab config={account.config} pageId={account.page_id} patch={patchConfig} t={t} />
         )}
@@ -468,21 +470,101 @@ function RulesTab({ configId, t }: { configId: string; t: TF }) {
 }
 
 // ── Videos tab — placeholder shell (per-video replies land here later) ────────
-function VideosTab({ t }: { t: TF }) {
+interface VideoRow { id: string; caption: string; createdTime: number | null; thumbnail: string | null }
+
+function VideosTab({ accountId, config, patch, t }: {
+  accountId: string; config: Config; patch: (p: Partial<Config>) => Promise<boolean>; t: TF;
+}) {
   const { light } = useTheme();
   const c = botColors(light);
   const CARD = c.card;
   const BORDER = c.border;
-  return (
-    <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: 34, textAlign: "center" }}>
-      <Video size={36} color="#475569" style={{ marginBottom: 12 }} />
-      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>{t("ردود خاصة بكل فيديو", "Per-video replies")}</div>
-      <div style={{ fontSize: 13, color: c.muted, lineHeight: 1.8 }}>
-        {t(
-          "قريباً — اختر فيديو من حسابك وخصّص له ردّاً مختلفاً عن القاعدة العامة.",
-          "Coming soon — pick a video from your account and give it its own reply, separate from the general rules.",
-        )}
+  const [videos, setVideos] = useState<VideoRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [editing, setEditing] = useState<VideoRow | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/tiktok/videos?accountId=${encodeURIComponent(accountId)}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.error) setErr(d.message || d.error); else setVideos(d.videos || []); })
+      .catch(() => setErr(t("تعذّر جلب الفيديوهات", "Couldn't load videos")))
+      .finally(() => setLoading(false));
+  }, [accountId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const overrides = (config.post_overrides || {}) as Record<string, PostOverrideValue>;
+  const hasOverride = (id: string) => {
+    const o = overrides[id];
+    return !!o && ((o.groups?.length ?? 0) > 0 || !!(o.private_reply || "").trim()
+      || (o.public_replies?.some((s) => (s || "").trim()) ?? false) || !!o.ai);
+  };
+
+  async function saveOverride(videoId: string, v: PostOverrideValue) {
+    await patch({ post_overrides: { ...overrides, [videoId]: v } });
+    setEditing(null);
+  }
+
+  if (editing) {
+    return (
+      <PostOverrideEditor
+        initial={overrides[editing.id]}
+        unitLabel={t("الفيديو", "video")}
+        onSave={(v) => saveOverride(editing.id, v)}
+        onClose={() => setEditing(null)}
+        c={c} t={t} accent={PINK}
+      />
+    );
+  }
+
+  if (loading) {
+    return <div style={{ textAlign: "center", padding: 34 }}><Loader2 size={24} className="spin" color={PINK} /></div>;
+  }
+
+  if (err) {
+    return (
+      <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: 28, textAlign: "center" }}>
+        <AlertTriangle size={30} color="#f59e0b" style={{ marginBottom: 10 }} />
+        <div style={{ fontSize: 13.5, color: c.muted, lineHeight: 1.8 }}>{err}</div>
       </div>
+    );
+  }
+
+  return (
+    <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, padding: 20 }}>
+      <div style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.8, marginBottom: 14 }}>
+        {t("خصّص ردّاً لفيديو بعينه — يتقدّم على القواعد العامة ومجموعات الحساب.",
+           "Give one video its own reply — it takes priority over the general rules and the account's groups.")}
+      </div>
+      {videos.length === 0 ? (
+        <div style={{ fontSize: 13, color: c.muted, textAlign: "center", padding: 20 }}>
+          {t("لا فيديوهات في هذا الحساب بعد.", "No videos on this account yet.")}
+        </div>
+      ) : videos.map((v) => (
+        <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 11, background: c.surface, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 11, marginBottom: 9 }}>
+          {v.thumbnail ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={v.thumbnail} alt="" style={{ width: 46, height: 60, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+          ) : (
+            <div style={{ width: 46, height: 60, borderRadius: 8, background: c.card, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Video size={18} color={c.dim} />
+            </div>
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {v.caption || t("(فيديو بدون وصف)", "(video with no caption)")}
+            </div>
+            {hasOverride(v.id) && (
+              <span style={{ fontSize: 10.5, fontWeight: 800, color: GREEN, background: "rgba(34,197,94,0.15)", borderRadius: 100, padding: "2px 8px", display: "inline-block", marginTop: 5 }}>
+                {t("ردّ مخصّص", "custom reply")}
+              </span>
+            )}
+          </div>
+          <button onClick={() => setEditing(v)}
+            style={{ background: `${PINK}1f`, border: `1px solid ${PINK}55`, borderRadius: 9, padding: "7px 13px", color: PINK, fontWeight: 700, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+            {hasOverride(v.id) ? t("تعديل", "Edit") : t("تخصيص", "Customise")}
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
