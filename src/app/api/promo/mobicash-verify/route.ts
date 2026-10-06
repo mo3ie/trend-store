@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { launchPaidCampaign, campaignsPathFor } from "@/lib/adsLaunch";
 import { verifyOtp } from "@/lib/mobicash";
 
 async function getUser() {
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
 
   const { data: campaign } = await supabaseAdmin
     .from("ad_campaigns")
-    .select("id, status")
+    .select("id, status, platform")
     .eq("id", campaignId)
     .eq("user_id", user.id)
     .single();
@@ -69,11 +70,10 @@ export async function POST(req: Request) {
     .eq("id", campaignId);
 
   const base = process.env.NEXT_PUBLIC_BASE_URL || "https://trendstore-ly.com";
-  fetch(`${base}/api/promo/boost`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ campaignId }),
-  }).catch(() => {});
+  launchPaidCampaign(campaignId, campaign.platform);
 
-  return NextResponse.json({ success: true, redirect: `${base}/ads/campaigns?paid=1` });
+  return NextResponse.json({
+    success: true,
+    redirect: `${base}${campaignsPathFor(campaign.platform)}`,
+  });
 }

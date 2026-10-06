@@ -26,6 +26,7 @@ export async function POST() {
     .from("ad_campaigns")
     .select("id, external_campaign_id, external_ad_id, status")
     .eq("user_id", user.id)
+    .eq("platform", "meta")
     .not("external_campaign_id", "is", null)
     .in("status", ["in_review", "active", "paused", "issues", "creating"]);
 

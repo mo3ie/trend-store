@@ -26,7 +26,7 @@ import { siteUrl } from "@/lib/siteUrl";
  */
 
 function fail(code: string): NextResponse {
-  const res = NextResponse.redirect(siteUrl(`/tiktok?ads_error=${code}`));
+  const res = NextResponse.redirect(siteUrl(`/tiktok-ads?ads_error=${code}`));
   res.cookies.set(OAUTH_STATE_COOKIE, "", stateCookieOptions(0));
   return res;
 }
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
   if (!consumed.ok) return fail(codeFor(consumed.reason));
 
   const userId = consumed.userId;
-  const returnPath = consumed.redirectPath ?? "/tiktok";
+  const returnPath = consumed.redirectPath ?? "/tiktok-ads";
 
   try {
     // 3) Only now is it safe to exchange. Note the advertiser exchange takes app_id/secret and

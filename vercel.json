@@ -7,6 +7,10 @@
     {
       "path": "/api/subscriptions/cron/maintain",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/tiktok/ads/campaigns/daily-debit",
+      "schedule": "15 6 * * *"
     }
   ]
 }

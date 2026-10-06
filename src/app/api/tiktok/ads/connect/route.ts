@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   try {
     created = await createOAuthState({
       userId: user.id,
-      redirectPath: "/tiktok",
+      redirectPath: "/tiktok-ads",
       flow: "advertiser_connect",
     });
   } catch {

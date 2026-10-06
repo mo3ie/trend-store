@@ -42,9 +42,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (action !== "pause" && action !== "resume") return NextResponse.json({ error: "action غير صحيح" }, { status: 400 });
 
   const { data: camp } = await supabaseAdmin
-    .from("ad_campaigns").select("id, external_campaign_id, status, continuous, daily_price_lyd")
+    .from("ad_campaigns").select("id, external_campaign_id, status, continuous, daily_price_lyd, platform")
     .eq("id", id).eq("user_id", user.id).single();
   if (!camp) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
+  // This handler pauses through the Graph API, which cannot touch a TikTok campaign.
+  if (camp.platform === "tiktok") {
+    return NextResponse.json({
+      error: "wrong_platform",
+      message: "حملات تيك توك تُدار من صفحة حملات تيك توك.",
+    }, { status: 400 });
+  }
   if (!camp.external_campaign_id) return NextResponse.json({ error: "الحملة لم تُنشأ على فيسبوك بعد" }, { status: 400 });
 
   // Resuming a continuous campaign requires enough wallet balance for the next day.

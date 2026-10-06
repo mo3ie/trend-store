@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
   const { data: due, error } = await supabaseAdmin
     .from("ad_campaigns")
     .select("id, user_id, external_campaign_id, daily_price_lyd, next_charge_at, status")
+    .eq("platform", "meta")
     .eq("continuous", true)
     .in("status", ["active", "in_review"])
     .lte("next_charge_at", nowIso)

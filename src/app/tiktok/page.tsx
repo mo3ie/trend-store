@@ -44,7 +44,7 @@ const TOOLS = [
     icon: Megaphone,
     color: "#00f2ea",
     accent: "#00f2ea",
-    soon: true,
+    soon: false,
     features: [
       ["حملات حقيقية على تيك توك", "Real TikTok campaigns"],
       ["استهداف بالمدينة والعمر", "City & age targeting"],

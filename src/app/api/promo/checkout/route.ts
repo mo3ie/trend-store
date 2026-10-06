@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { initiateCardPayment } from "@/lib/mobicash";
+import { launchPaidCampaign, campaignsPathFor } from "@/lib/adsLaunch";
 
 async function getUser() {
   const store = await cookies();
@@ -81,15 +82,13 @@ export async function POST(req: Request) {
       .update({ status: "paid", updated_at: new Date().toISOString() })
       .eq("id", campaignId);
 
-    // Trigger boost async (fire-and-forget from client side)
-    const boostUrl = `${base}/api/promo/boost`;
-    fetch(boostUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ campaignId }),
-    }).catch(() => {});
+    // Create it on whichever platform this campaign belongs to (fire-and-forget).
+    launchPaidCampaign(campaignId, campaign.platform);
 
-    return NextResponse.json({ success: true, redirect: `${base}/ads/campaigns?paid=1` });
+    return NextResponse.json({
+      success: true,
+      redirect: `${base}${campaignsPathFor(campaign.platform)}`,
+    });
   }
 
   // MobiCash card payment — charge the card, bank sends the customer an OTP,

@@ -25,6 +25,8 @@ export async function GET() {
     .from("ad_campaigns")
     .select("*")
     .eq("user_id", user.id)
+    // Facebook campaigns only — TikTok has its own list at /api/tiktok/ads/campaigns.
+    .eq("platform", "meta")
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -118,6 +120,7 @@ export async function POST(req: Request) {
     .from("ad_campaigns")
     .insert({
       user_id:       user.id,
+      platform:      "meta",
       page_id:       pageId,
       page_name:     pageName || null,
       post_url:      postUrl || null,
