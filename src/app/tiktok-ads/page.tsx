@@ -55,6 +55,18 @@ export default function TikTokAdsPage() {
   const [st, setSt] = useState<Status | null>(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
+  const [linking, setLinking] = useState(false);
+
+  async function linkAccount() {
+    setLinking(true); setError("");
+    try {
+      const r = await fetch("/api/tiktok/connect");
+      const d = await r.json().catch(() => ({}));
+      if (d.url) { window.location.href = d.url; return; }
+      setError(d.message || d.error || t("تعذّر بدء الربط", "Could not start linking"));
+    } catch { setError(t("تعذّر الاتصال", "Connection failed")); }
+    setLinking(false);
+  }
   const [error, setError] = useState("");
   const [tier, setTier] = useState("first");
   const [days, setDays] = useState(3);
@@ -123,7 +135,9 @@ export default function TikTokAdsPage() {
 
         <AccountStrip
           account={st?.account ? { handle: st.account.handle, avatarUrl: st.account.avatarUrl } : null}
-          c={c} t={t} rtl={rtl} pending={!me?.configured}
+          c={c} t={t} rtl={rtl}
+          pending={st === null}
+          onLink={linkAccount} linking={linking}
         />
 
         {error && (

@@ -88,6 +88,7 @@ export default function TikTokStudioPage() {
   const [perDay, setPerDay] = useState(1);
   const [guidance, setGuidance] = useState("");
   const [busy, setBusy] = useState(false);
+  const [linking, setLinking] = useState(false);
 
   // Brand
   const [brand, setBrand] = useState<{ name: string; about: string; phone: string; links: string }>(
@@ -134,6 +135,29 @@ export default function TikTokStudioPage() {
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+
+  /**
+   * Starts TikTok's authorization. The portal issues the URL, so the only thing this
+   * adds is our opaque state — and a failure here is almost always configuration, not
+   * something the owner can fix by pressing again, so it says which.
+   */
+  async function startLink() {
+    setLinking(true); setError("");
+    try {
+      const r = await fetch("/api/tiktok/connect");
+      const d = await r.json().catch(() => ({}));
+      if (d.url) { window.location.href = d.url; return; }
+      setError(
+        d.error === "tiktok_not_configured" || r.status === 503
+          ? t("ربط حسابات تيك توك قيد التفعيل حالياً.", "TikTok account linking is being activated.")
+          : (d.message || d.error || t("تعذّر بدء الربط", "Could not start linking")),
+      );
+    } catch {
+      setError(t("تعذّر الاتصال", "Connection failed"));
+    }
+    setLinking(false);
+  }
 
   async function generate() {
     if (!pageId) return;
@@ -206,6 +230,7 @@ export default function TikTokStudioPage() {
         <AccountStrip
           account={st?.account ? { handle: st.account.handle, avatarUrl: st.account.avatarUrl } : null}
           c={c} t={t} rtl={rtl} pending={linkingPending}
+          onLink={startLink} linking={linking}
         />
 
         <TabStrip

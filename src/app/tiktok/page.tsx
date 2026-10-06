@@ -43,6 +43,18 @@ export default function TikTokToolsPage() {
   const [loading, setLoading] = useState(true);
   const [menu, setMenu] = useState(false);
   const [notified, setNotified] = useState(false);
+  const [linking, setLinking] = useState(false);
+
+  async function startLink() {
+    setLinking(true);
+    try {
+      const r = await fetch("/api/tiktok/connect");
+      const d = await r.json().catch(() => ({}));
+      if (d.url) { window.location.href = d.url; return; }
+    } catch { /* fall through to the tool screen, which reports why */ }
+    setLinking(false);
+    router.push("/tiktok-bot");
+  }
 
   useEffect(() => {
     fetch("/api/tiktok/status")
@@ -108,6 +120,8 @@ export default function TikTokToolsPage() {
               pending={linkingPending}
               onNotify={() => setNotified(true)}
               notifying={notified}
+              onLink={startLink}
+              linking={linking}
             />
 
             <div style={{ display: "grid", gap: 10 }}>

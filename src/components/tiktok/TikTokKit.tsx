@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, BellRing, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { Bell, BellRing, ChevronLeft, ChevronRight, Check, Link2, Loader2 } from "lucide-react";
 import {
   tt, ttCard, ttPrimary, ttTitleAccent, TT_PINK, TT_CYAN,
   type TikTokPalette,
@@ -27,7 +27,7 @@ export interface TikTokAccount {
 }
 
 export function AccountStrip({
-  account, c, t, rtl, pending, onNotify, notifying,
+  account, c, t, rtl, pending, onNotify, notifying, onLink, linking,
 }: {
   account: TikTokAccount | null;
   c: TikTokPalette; t: TF; rtl: boolean;
@@ -35,6 +35,9 @@ export function AccountStrip({
   pending?: boolean;
   onNotify?: () => void;
   notifying?: boolean;
+  /** Starts the TikTok authorization. Required whenever `pending` is false. */
+  onLink?: () => void;
+  linking?: boolean;
 }) {
   return (
     <div style={{
@@ -69,20 +72,35 @@ export function AccountStrip({
               </div>
             )}
           </div>
-          {pending && (
-            <span style={{
-              background: `${TT_PINK}1f`, border: `1px solid ${TT_PINK}55`, color: c.pinkInk,
-              borderRadius: 999, padding: "4px 10px", fontSize: 11.5, fontWeight: 700, whiteSpace: "nowrap",
-            }}>
-              {t("الربط قيد الإعداد", "Linking in setup")}
-            </span>
-          )}
-          {onNotify && (
-            <button onClick={onNotify} title={t("نبّهني عند التفعيل", "Notify me when it opens")}
-              style={{ background: "none", border: "none", cursor: "pointer", color: notifying ? c.pinkInk : c.muted, padding: 4, display: "flex" }}>
-              {notifying ? <BellRing size={17} /> : <Bell size={17} />}
+          {/*
+            Two different unlinked states, and the difference decides whether the user
+            can act at all. While linking is still being set up there is nothing to
+            press, so the strip says so and offers a reminder. Once it IS available the
+            strip MUST offer the button — an unlinked account with no way to link is a
+            dead end, which is exactly what shipped the first time.
+          */}
+          {pending ? (
+            <>
+              <span style={{
+                background: `${TT_PINK}1f`, border: `1px solid ${TT_PINK}55`, color: c.pinkInk,
+                borderRadius: 999, padding: "4px 10px", fontSize: 11.5, fontWeight: 700, whiteSpace: "nowrap",
+              }}>
+                {t("الربط قيد الإعداد", "Linking in setup")}
+              </span>
+              {onNotify && (
+                <button onClick={onNotify} title={t("نبّهني عند التفعيل", "Notify me when it opens")}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: notifying ? c.pinkInk : c.muted, padding: 4, display: "flex" }}>
+                  {notifying ? <BellRing size={17} /> : <Bell size={17} />}
+                </button>
+              )}
+            </>
+          ) : onLink ? (
+            <button onClick={onLink} disabled={linking}
+              style={{ ...ttPrimary(rtl, linking), padding: "9px 15px", fontSize: 13.5, whiteSpace: "nowrap" }}>
+              {linking ? <Loader2 size={15} className="spin" /> : <Link2 size={15} />}
+              {t("اربط الحساب", "Link account")}
             </button>
-          )}
+          ) : null}
         </>
       )}
     </div>

@@ -74,6 +74,7 @@ function TikTokBotInner() {
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
   const [draft, setDraft] = useState(false);
+  const [linking, setLinking] = useState(false);
 
   // Simulator
   const [probe, setProbe] = useState("");
@@ -173,6 +174,29 @@ function TikTokBotInner() {
     setTimeout(() => setFlash(""), 1800);
   }
 
+
+  /**
+   * Starts TikTok's authorization. The portal issues the URL, so the only thing this
+   * adds is our opaque state — and a failure here is almost always configuration, not
+   * something the owner can fix by pressing again, so it says which.
+   */
+  async function startLink() {
+    setLinking(true); setError("");
+    try {
+      const r = await fetch("/api/tiktok/connect");
+      const d = await r.json().catch(() => ({}));
+      if (d.url) { window.location.href = d.url; return; }
+      setError(
+        d.error === "tiktok_not_configured" || r.status === 503
+          ? t("ربط حسابات تيك توك قيد التفعيل حالياً.", "TikTok account linking is being activated.")
+          : (d.message || d.error || t("تعذّر بدء الربط", "Could not start linking")),
+      );
+    } catch {
+      setError(t("تعذّر الاتصال", "Connection failed"));
+    }
+    setLinking(false);
+  }
+
   /** One writer for every editor on this screen, draft or live. */
   async function patch(fields: Record<string, unknown>): Promise<boolean> {
     if (!config) return false;
@@ -247,6 +271,7 @@ function TikTokBotInner() {
         <AccountStrip
           account={st?.account ? { handle: st.account.handle, avatarUrl: st.account.avatarUrl } : null}
           c={c} t={t} rtl={rtl} pending={linkingPending}
+          onLink={startLink} linking={linking}
         />
 
         {flash && (
