@@ -24,7 +24,7 @@ export async function GET() {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
 
-  const [account, configs, plans, campaigns, prices, adsGrant] = await Promise.all([
+  const [account, configs, plans, campaigns, prices, adsGrant, botSub] = await Promise.all([
     supabaseAdmin.from("tiktok_accounts")
       .select("id, tiktok_account_id, display_name, avatar_url")
       .eq("user_id", user.id).is("revoked_at", null)
@@ -46,6 +46,12 @@ export async function GET() {
       .eq("active", true).eq("months", 1),
     supabaseAdmin.from("tiktok_ads_authorizations")
       .select("id").eq("user_id", user.id).eq("status", "active").maybeSingle(),
+    // The legacy per-account subscription, which is what actually carries an expiry
+    // date. Entitlement answers "may they run it"; this answers "until when".
+    supabaseAdmin.from("bot_subscriptions")
+      .select("status, expires_at")
+      .eq("user_id", user.id).eq("platform", "tiktok")
+      .order("expires_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   // Whether this owner may already RUN each tool. Admins and trial users pass, so
@@ -94,6 +100,12 @@ export async function GET() {
       enabled: (configs.data || []).some((c) => c.enabled),
       rules: ruleCount,
       entitled: entBot,
+      subscription: botSub.data
+        ? { status: botSub.data.status, expiresAt: botSub.data.expires_at }
+        : null,
+      // An admin or trial user may run the bot without a subscription row at all, so
+      // the screen must distinguish "entitled by role" from "paid until a date".
+      entitledWithoutSub: entBot && !botSub.data,
       priceLyd: priceFor("tiktok_bot"),
     },
     studio: {

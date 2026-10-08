@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Loader2, Settings2, Plus, Trash2, Save,
-  AlertCircle, CheckCircle, Radio, Video, Sparkles, ShieldBan, Package,
+  AlertCircle, CheckCircle, Radio, Video, Sparkles, ShieldBan, Package, Power,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
@@ -36,7 +36,12 @@ import { botColors } from "@/lib/botTheme";
 interface Status {
   linking: { organic: boolean };
   account: { id: string; openId: string; handle: string; avatarUrl: string | null } | null;
-  bot: { configured: boolean; enabled: boolean; rules: number; entitled: boolean; priceLyd: number | null };
+  bot: {
+    configured: boolean; enabled: boolean; rules: number; entitled: boolean;
+    subscription: { status: string; expiresAt: string | null } | null;
+    entitledWithoutSub: boolean;
+    priceLyd: number | null;
+  };
 }
 
 interface LogRow {
@@ -388,6 +393,50 @@ function TikTokBotInner() {
         {error && (
           <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: `${c.danger}18`, border: `1px solid ${c.danger}55`, borderRadius: 11, padding: "10px 13px", marginBottom: 13, fontSize: 13, lineHeight: 1.6 }}>
             <AlertCircle size={16} color={c.danger} style={{ flexShrink: 0, marginTop: 1 }} /> {error}
+          </div>
+        )}
+
+        {/*
+          The two facts an owner checks before anything else: am I subscribed, and is
+          it running. They were buried in a tab, so neither was visible on arrival.
+        */}
+        {config && (
+          <div style={{ ...ttCard(c), padding: 14, marginBottom: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <Power size={18} color={config.enabled ? c.ok : c.muted} />
+            <div style={{ flex: 1, minWidth: 140 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700 }}>
+                {st?.bot.entitledWithoutSub
+                  ? t("وصول مفتوح", "Full access")
+                  : st?.bot.subscription?.status === "active"
+                    ? t("مشترك", "Subscribed")
+                    : t("غير مشترك", "Not subscribed")}
+                {" — "}
+                <span style={{ color: config.enabled ? c.ok : c.muted }}>
+                  {config.enabled ? t("البوت يعمل", "bot is running") : t("البوت متوقف", "bot is stopped")}
+                </span>
+              </div>
+              <div style={{ fontSize: 11.5, color: c.muted, marginTop: 3 }}>
+                {st?.bot.entitledWithoutSub
+                  ? t("حسابك يملك كل الأدوات بلا اشتراك", "Your account has every tool without a subscription")
+                  : st?.bot.subscription?.expiresAt
+                    ? `${t("ينتهي الاشتراك", "Expires")}: ${new Date(st.bot.subscription.expiresAt).toLocaleDateString(rtl ? "ar-LY" : "en-GB")}`
+                    : t("فعّل البوت ليبدأ الردّ على التعليقات", "Turn the bot on to start answering comments")}
+              </div>
+            </div>
+            <button
+              onClick={() => patch({ enabled: !config.enabled })}
+              aria-label={config.enabled ? t("أوقف البوت", "Stop the bot") : t("شغّل البوت", "Start the bot")}
+              style={{
+                width: 52, height: 30, borderRadius: 999, border: "none", cursor: "pointer", padding: 0,
+                background: config.enabled ? c.ok : c.surface2, position: "relative", flexShrink: 0,
+                transition: "background .15s",
+              }}>
+              <span style={{
+                position: "absolute", top: 3, insetInlineStart: config.enabled ? 25 : 3,
+                width: 24, height: 24, borderRadius: "50%", background: "#fff",
+                transition: "inset-inline-start .15s",
+              }} />
+            </button>
           </div>
         )}
 
@@ -801,34 +850,33 @@ function TikTokBotInner() {
                   </div>
                 </div>
 
+                {/* Each switch says what it DOES, not just what it is called — the
+                    difference between "likes comments" and knowing the bot will
+                    publicly like every comment it answers. */}
                 {([
-                  ["reply_public", t("الردّ على التعليقات", "Reply to comments")],
-                  ["like_comments", t("إعجاب بالتعليقات", "Like comments")],
-                  ["mention_author", t("ابدأ الردّ باسم صاحب التعليق", "Open the reply with the commenter's name")],
-                  ["once_per_user", t("ردّ واحد لكل شخص في الفيديو", "One reply per person per video")],
-                  ["enabled", t("البوت يعمل", "Bot is running")],
-                ] as const).map(([k, label]) => (
-                  <label key={k} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer" }}>
+                  ["reply_public",
+                    t("الردّ العلني على التعليق", "Public reply on the comment"),
+                    t("ينشر ردّاً ظاهراً تحت التعليق", "Posts a visible reply under the comment")],
+                  ["like_comments",
+                    t("الإعجاب بالتعليق", "Like the comment"),
+                    t("يضيف إعجاباً على كل تعليق يردّ عليه", "Likes every comment it answers")],
+                  ["mention_author",
+                    t("ابدأ الردّ باسم صاحب التعليق", "Open with the commenter's name"),
+                    t("يجعل الردّ شخصياً بدل أن يبدو آلياً", "Makes the reply personal instead of robotic")],
+                  ["once_per_user",
+                    t("ردّ واحد لكل شخص في الفيديو", "One reply per person per video"),
+                    t("من يعلّق خمس مرات يأخذ ردّاً واحداً", "Someone who comments five times gets one reply")],
+                ] as const).map(([k, label, hint]) => (
+                  <label key={k} style={{ display: "flex", alignItems: "flex-start", gap: 11, cursor: "pointer" }}>
                     <input type="checkbox" checked={!!config[k as keyof Config]}
-                      onChange={async (e) => {
-                        const next = { ...config, [k]: e.target.checked } as Config;
-                        setConfig(next);
-                        const res = await fetch("/api/tiktok/configs", {
-                          method: "PATCH", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ id: config.id, [k]: e.target.checked }),
-                        }).catch(() => null);
-                        // Turning the bot ON needs an active subscription, so a
-                        // refused toggle must snap back rather than lie about state.
-                        if (!res || !res.ok) {
-                          const d = await res?.json().catch(() => ({}));
-                          setConfig(config);
-                          setError(d?.message || t("تعذّر التغيير", "Could not change that"));
-                        }
-                      }} />
-                    {label}
+                      style={{ marginTop: 3, flexShrink: 0 }}
+                      onChange={(e) => patch({ [k]: e.target.checked })} />
+                    <span>
+                      <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: c.text }}>{label}</span>
+                      <span style={{ display: "block", fontSize: 11.5, color: c.muted, marginTop: 2, lineHeight: 1.6 }}>{hint}</span>
+                    </span>
                   </label>
                 ))}
-
               </div>
             ) : (
               <div style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.7 }}>

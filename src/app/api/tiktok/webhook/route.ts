@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { tiktokClientSecret } from "@/services/tiktok";
 import {
@@ -84,15 +84,27 @@ export async function POST(req: NextRequest) {
   }
 
   if (result.outcome === "queued" && result.target) {
-    // Fast path: try to answer now so the customer sees a reply in seconds rather than at
-    // the next drain. Detached on purpose — the durable row is what guarantees delivery.
-    void processQueuedComment(result.target, {
-      comment_id: event.commentId,
-      post_id: event.videoId,
-      comment_message: event.text,
-    }).catch(() => {
-      // Left `queued`/`processing` for the drain; no secret material in this log line.
-      console.error("tiktok_webhook_inline_processing_failed");
+    // Fast path: answer now, so the customer sees a reply in seconds rather than at the
+    // next drain.
+    //
+    // This MUST be `after()`, not a detached promise. On serverless the instance is
+    // frozen the moment the response is returned, so an un-awaited promise is killed
+    // mid-flight — which is exactly what happened: comments arrived, were durably
+    // queued, and then sat at `queued` forever because the drain that was supposed to
+    // rescue them runs daily on this plan. `after()` keeps the invocation alive until
+    // the work finishes, while still acknowledging TikTok immediately.
+    const target = result.target;
+    after(async () => {
+      try {
+        await processQueuedComment(target, {
+          comment_id: event.commentId,
+          post_id: event.videoId,
+          comment_message: event.text,
+        });
+      } catch {
+        // Left `queued`/`processing` for the drain; no secret material in this line.
+        console.error("tiktok_webhook_inline_processing_failed");
+      }
     });
   }
 
