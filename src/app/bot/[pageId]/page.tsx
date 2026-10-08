@@ -6,6 +6,7 @@ import {
   ArrowLeft, ArrowRight, Loader2, Bot, MessageSquare, Users, Activity,
   Settings2, Plus, Trash2, Save, AlertTriangle, Upload, X, Package,
   Sparkles, CreditCard, Power, Clock, Newspaper, Star, CheckCircle2, RefreshCw, Pencil,
+  Play,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
@@ -74,7 +75,7 @@ export default function BotManage() {
   const [config, setConfig] = useState<Config | null>(null);
   const [sub, setSub] = useState<Sub | null>(null);
   const [price, setPrice] = useState(50);
-  const [tab, setTab] = useState<"settings" | "rules" | "posts" | "catalog" | "accounts" | "activity">("rules");
+  const [tab, setTab] = useState<"try" | "settings" | "rules" | "posts" | "catalog" | "accounts" | "activity">("try");
   const [toast, setToast] = useState("");
   const [subscribing, setSubscribing] = useState(false);
   const [pay, setPay] = useState<{ amount: number; label: string } | null>(null);
@@ -195,6 +196,7 @@ export default function BotManage() {
         {/* Tabs */}
         <div style={{ display: "flex", gap: 6, marginBottom: 18, overflowX: "auto" }}>
           {([
+            ["try", Play, t("جرّب", "Try it")],
             ["rules", MessageSquare, t("القواعد", "Rules")],
             ["settings", Settings2, t("الإعدادات", "Settings")],
             ["posts", Newspaper, t("المنشورات", "Posts")],
@@ -209,6 +211,7 @@ export default function BotManage() {
           ))}
         </div>
 
+        {config && tab === "try" && <TryTab pageId={pageId} t={t} />}
         {config && tab === "rules" && <RulesTab configId={config.id} flash={flash} t={t} />}
         {config && tab === "settings" && <SettingsTab config={config} patch={patchConfig} t={t} />}
         {config && tab === "posts" && <PostsTab config={config} pageId={pageId} patch={patchConfig} flash={flash} t={t} />}
@@ -241,6 +244,103 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
       style={{ width: 52, height: 30, borderRadius: 20, border: "none", cursor: "pointer", background: on ? GREEN : "#334155", position: "relative", transition: "background .2s", flexShrink: 0 }}>
       <span style={{ position: "absolute", top: 3, insetInlineStart: on ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "inset-inline-start .2s" }} />
     </button>
+  );
+}
+
+/**
+ * The live try-out. Type a comment as a visitor would and see the reply the bot would
+ * actually post — using this Page's real rules, groups and catalog prices.
+ *
+ * It answers the question an owner cannot otherwise answer without risking a real
+ * customer: do my rules actually catch what people ask? Both halves are shown,
+ * because which one carries the price is usually the thing being checked.
+ */
+function TryTab({ pageId, t }: { pageId: string; t: TF }) {
+  const { light } = useTheme();
+  const c = botColors(light);
+  const [text, setText] = useState("");
+  const [res, setRes] = useState<{
+    reply: string | null; privateReply?: string | null; source: string | null;
+    message?: string; label?: string | null; aiWouldAnswer?: boolean;
+  } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // Debounced: this hits the server, and an owner types faster than a round trip.
+  useEffect(() => {
+    if (!text.trim()) { setRes(null); return; }
+    setBusy(true);
+    const id = setTimeout(async () => {
+      try {
+        const r = await fetch("/api/bot/simulate", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pageId, text }),
+        });
+        setRes(await r.json());
+      } catch { /* keep the previous answer */ }
+      setBusy(false);
+    }, 350);
+    return () => clearTimeout(id);
+  }, [text, pageId]);
+
+  const SOURCES: Record<string, [string, string]> = {
+    group: ["مجموعة كلمات", "Keyword group"],
+    flat: ["ردّ هذا المنشور", "This post's reply"],
+    rule: ["قاعدة", "Rule"],
+    catalog: ["مطابقة المنتج", "Product match"],
+    ai: ["الذكاء الاصطناعي", "AI"],
+    default: ["الردّ الافتراضي", "Default reply"],
+    banned: ["كلمة محظورة", "Banned word"],
+  };
+  const label = res?.source ? SOURCES[res.source] : null;
+
+  return (
+    <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 16, padding: 20 }}>
+      <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 6px", color: c.text }}>
+        {t("جرّب قبل أن يجرّب زبون", "Try it before a customer does")}
+      </h3>
+      <p style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.8, margin: "0 0 14px" }}>
+        {t("اكتب تعليقاً كما يكتبه زائر، وشاهد الردّ الذي سينشره البوت فعلاً — بقواعدك وأسعارك الحقيقية. لا يُرسل شيء.",
+           "Type a comment the way a visitor would and see the reply the bot would really post — with your own rules and prices. Nothing is sent.")}
+      </p>
+
+      <input value={text} onChange={(e) => setText(e.target.value)}
+        placeholder={t("مثال: بكم السعر؟", "e.g. how much is it?")}
+        style={{ width: "100%", boxSizing: "border-box", background: c.input, border: `1px solid ${c.border}`, borderRadius: 11, padding: "12px 14px", color: c.text, fontSize: 14, fontFamily: "inherit" }} />
+
+      {text.trim() && (
+        <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
+          <div style={{ background: c.surface, borderRadius: 12, padding: "12px 14px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: c.dim, marginBottom: 6 }}>
+              {t("الردّ العلني تحت التعليق", "Public reply under the comment")}
+            </div>
+            <div style={{ fontSize: 13.5, color: c.text, lineHeight: 1.8, minHeight: 20 }}>
+              {busy ? "…" : res?.reply || <span style={{ color: c.dim }}>{res?.message || t("لا ردّ مطابق.", "No match.")}</span>}
+            </div>
+          </div>
+
+          {res?.privateReply && (
+            <div style={{ background: c.surface, borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: c.dim, marginBottom: 6 }}>
+                {t("الرسالة الخاصة", "Private message")}
+              </div>
+              <div style={{ fontSize: 13.5, color: c.text, lineHeight: 1.8 }}>{res.privateReply}</div>
+            </div>
+          )}
+
+          {label && (
+            <div style={{ fontSize: 11.5, color: BLUE, fontWeight: 700 }}>
+              {t(label[0], label[1])}{res?.label ? ` · ${res.label}` : ""}
+            </div>
+          )}
+          {res?.aiWouldAnswer && (
+            <div style={{ fontSize: 11.5, color: c.muted, lineHeight: 1.7 }}>
+              {t("لا قاعدة تطابقه — سيتولّاه الذكاء الاصطناعي إن كان مفعّلاً. (لا يُستدعى هنا حتى لا يُحتسب عليك.)",
+                 "No rule matches — the AI would handle it if enabled. (Not called here, so it costs you nothing.)")}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

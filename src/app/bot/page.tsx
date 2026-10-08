@@ -93,15 +93,14 @@ export default function BotDashboard() {
             )}
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-            {[
+            {([
               [MessageSquare, t("رد علني + رسالة خاصة", "Public reply + private DM")],
               [Zap, t("تبديل تلقائي بين الحسابات ضد الحظر", "Auto account-switch anti-block")],
               [Sparkles, t("ردود ذكية بالذكاء الاصطناعي", "Smart AI replies")],
               [ShieldCheck, t("صلاحيات فيسبوك رسمية", "Official Facebook permissions")],
-            ].map(([Icon, label], i) => (
+            ] as Array<[React.ComponentType<{ size?: number; color?: string }>, string]>).map(([Icon, label], i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#e2e8f0" }}>
-                {/* @ts-expect-error lucide icon element */}
-                <Icon size={16} color={BLUE} /> {label as string}
+                <Icon size={16} color={BLUE} /> {label}
               </div>
             ))}
           </div>

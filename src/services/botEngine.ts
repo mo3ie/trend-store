@@ -5,6 +5,12 @@
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { throttleGate, isItemTargeted } from "@/services/botThrottle";
+
+/**
+ * The most replies this bot will post under ONE post in an hour. A ceiling, not a
+ * target: it exists so a runaway is bounded even when every other guard fails.
+ */
+const REPLIES_PER_POST_PER_HOUR = 25;
 import {
   replyToComment,
   sendPrivateReply,
@@ -425,6 +431,33 @@ export async function deliverComment(config: BotConfig, ev: CommentEvent): Promi
       sent_at: new Date().toISOString(), moderation: action, error: "banned_word",
     }).eq("comment_id", ev.commentId);
     return "banned_word";
+  }
+
+  /*
+   * Circuit breaker — a ceiling on replies under ONE post in an hour.
+   *
+   * The per-minute throttle paces delivery but does not bound a runaway: at 20 a
+   * minute, a loop still reaches a thousand replies in an hour. The TikTok bot proved
+   * that is not theoretical — it answered its own replies 100 times before anyone
+   * noticed. This bot has the guard that one lacked (`skipped_self` above), so the
+   * same cause cannot occur here; this bounds every OTHER cause.
+   *
+   * Normal traffic on a single post does not approach the ceiling. A runaway crosses
+   * it in a minute.
+   */
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count: recentOnPost } = await supabaseAdmin
+    .from("bot_reply_log")
+    .select("id", { count: "exact", head: true })
+    .eq("config_id", config.id)
+    .eq("post_id", ev.postId)
+    .eq("public_status", "sent")
+    .gte("sent_at", since);
+  if ((recentOnPost ?? 0) >= REPLIES_PER_POST_PER_HOUR) {
+    await supabaseAdmin.from("bot_reply_log")
+      .update({ public_status: "skipped", private_status: "skipped", error: "post_reply_ceiling" })
+      .eq("comment_id", ev.commentId);
+    return "post_reply_ceiling";
   }
 
   // One reply per person per post: someone who comments five times gets one answer,
