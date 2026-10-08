@@ -1,0 +1,35 @@
+# Sweeps TikTok for comments the webhook never delivered.
+#
+# Deliberately FIFTEEN minutes, not five. TikTok's rate limit is an app-wide ceiling
+# shared by every account we onboard, so this sweep competes with real replies for the
+# same budget — the route's own documentation asks for 15-30 minutes. The webhook is
+# the real-time path and answers in seconds; this only has to catch what it missed,
+# and catching it fifteen minutes later is the whole point of a backstop.
+
+name: TikTok — reconciliation sweep
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: tiktok-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Sweep for missed comments
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE: ${{ vars.SITE_URL || 'https://www.trendstore-ly.com' }}
+        run: |
+          set -u
+          code=$(curl -sS -o /tmp/out.txt -w '%{http_code}' --max-time 120 \
+            -H "authorization: Bearer ${CRON_SECRET}" \
+            "${BASE}/api/tiktok/cron/poll")
+          echo "HTTP ${code}"; cat /tmp/out.txt; echo
+          [ "${code}" = "200" ]

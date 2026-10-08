@@ -1,0 +1,42 @@
+# Delivers Facebook comment replies that the anti-block rate limiter held back.
+#
+# Vercel's Hobby plan allows only DAILY cron expressions. That is fine for the billing
+# jobs, but a comment deferred by the per-minute cap would then wait until the next
+# day — on a post that is getting attention, which is exactly when a slow answer costs
+# a sale. This repository is public, so scheduled GitHub Actions are free, which makes
+# this cheaper than upgrading the host for the same result.
+#
+# The endpoint is the same one Vercel calls, protected by the same CRON_SECRET and
+# fail-closed without it. It is a safety net behind the webhook, which still delivers
+# replies in seconds; nothing here is the primary path.
+
+name: Facebook — drain deferred replies
+
+on:
+  schedule:
+    # Every 5 minutes; GitHub's minimum granularity is 5.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: fb-drain
+  cancel-in-progress: false
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Drain the deferred comment queue
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE: ${{ vars.SITE_URL || 'https://www.trendstore-ly.com' }}
+        run: |
+          set -u
+          # Fail the step on a non-2xx, so a wrong or missing secret shows up in the
+          # Actions log instead of looking like "there was nothing to do".
+          code=$(curl -sS -o /tmp/out.txt -w '%{http_code}' --max-time 60 \
+            -H "authorization: Bearer ${CRON_SECRET}" \
+            "${BASE}/api/bot/cron/drain")
+          echo "HTTP ${code}"; cat /tmp/out.txt; echo
+          [ "${code}" = "200" ]
