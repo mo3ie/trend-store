@@ -12,7 +12,7 @@ export default function PrivacyPage() {
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
           <div>
             <h1 style={{ fontSize: 32, fontWeight: 900, color: "#fff", marginBottom: 8 }}>{t("سياسة الخصوصية", "Privacy Policy")}</h1>
-            <p style={{ color: "#64748b", fontSize: 14, marginBottom: 48 }}>{t("آخر تحديث: يونيو 2025", "Last updated: June 2025")}</p>
+            <p style={{ color: "#64748b", fontSize: 14, marginBottom: 48 }}>{t("آخر تحديث: أكتوبر 2026", "Last updated: October 2026")}</p>
           </div>
           <LangToggle />
         </div>
@@ -28,8 +28,8 @@ export default function PrivacyPage() {
           {
             title: ["كيف نستخدم المعلومات", "How we use information"],
             body: [
-              "نستخدم بياناتك لمعالجة الطلبات وتقديم خدمة الإعلانات الرقمية وإدارة الحملات الإعلانية على Meta نيابةً عنك. لا نبيع بياناتك الشخصية لأي طرف ثالث.",
-              "We use your data to process orders, provide the digital advertising service, and manage Meta ad campaigns on your behalf. We do not sell your personal data to any third party.",
+              "نستخدم بياناتك لمعالجة الطلبات وتقديم خدمات التسويق التي تشترك فيها — الإعلانات والرد الآلي والموظف الذكي — على المنصات التي تربطها بنفسك. لا نبيع بياناتك الشخصية، ولا نستخدمها لأي غرض خارج الخدمة التي طلبتها.",
+              "We use your data to process orders and to provide the marketing services you subscribe to — ads, auto-reply and the AI Employee — on the platforms you connect yourself. We do not sell your personal data, and we do not use it for any purpose beyond the service you asked for.",
             ],
           },
           {
@@ -42,36 +42,43 @@ export default function PrivacyPage() {
           {
             title: ["بوت الرد الآلي (فيسبوك وتيك توك)", "Auto-reply bot (Facebook & TikTok)"],
             body: [
-              "عند اشتراكك في خدمة بوت الرد الآلي، تمنحنا صلاحية قراءة التعليقات المنشورة على صفحاتك أو فيديوهاتك أنت فقط، والرد عليها نيابةً عنك — علنياً أو برسالة خاصة (فيسبوك فقط). لا نقرأ رسائلك الخاصة ولا تعليقات حسابات لا تملكها. نحفظ نص التعليق ومعرّفه لغرض واحد: منع تكرار الرد وعرض سجل النشاط لك. يمكنك إيقاف البوت أو إلغاء الصلاحيات في أي وقت.",
-              "When you subscribe to the auto-reply bot, you grant us permission to read comments posted on your own Pages or videos only, and to reply to them on your behalf — publicly or by private message (Facebook only). We do not read your private messages, nor comments on accounts you do not own. We store the comment text and its ID for one purpose: preventing duplicate replies and showing you an activity log. You can turn the bot off or revoke permissions at any time.",
+              "عند اشتراكك في خدمة بوت الرد الآلي، تمنحنا صلاحية قراءة التعليقات المنشورة على صفحاتك أو فيديوهاتك أنت فقط، والرد عليها نيابةً عنك. يكون الرد علنياً تحت التعليق، وقد يُرسَل أيضاً في محادثة خاصة حين تسمح المنصة بذلك — وذلك وفق قواعد كل منصة: على فيسبوك نرد على صاحب التعليق مباشرة، وعلى تيك توك لا تُرسَل رسالة خاصة إلا ضمن محادثة تسمح المنصة بفتحها. لا نقرأ رسائلك الخاصة ولا تعليقات حسابات لا تملكها، ولا نبدأ محادثة مع أي شخص لم يتفاعل مع حسابك. نحفظ نص التعليق ومعرّفه لغرض واحد: منع تكرار الرد وعرض سجل النشاط لك. يمكنك إيقاف البوت أو إلغاء الصلاحيات في أي وقت.",
+              "When you subscribe to the auto-reply bot, you grant us permission to read comments posted on your own Pages or videos only, and to reply to them on your behalf. The reply is public, under the comment, and may also be sent in a private conversation where the platform allows it — subject to each platform's rules: on Facebook we reply to the commenter directly; on TikTok a private message is only sent within a conversation the platform permits opening. We do not read your private messages, nor comments on accounts you do not own, and we never start a conversation with someone who has not engaged with your account. We store the comment text and its ID for one purpose: preventing duplicate replies and showing you an activity log. You can turn the bot off or revoke permissions at any time.",
             ],
           },
           {
             title: ["تيك توك", "TikTok"],
             body: [
-              "عند ربط حساب تيك توك التجاري الخاص بك، نستخدم صلاحيات تيك توك الرسمية لقراءة فيديوهاتك وتعليقاتها والرد عليها علنياً فقط، وذلك حصراً على الحساب الذي ربطته بنفسك. لا نستخدم بياناتك لأي غرض آخر، ولا نشاركها مع أي طرف ثالث.",
-              "When you connect your TikTok Business account, we use TikTok's official permissions to read your videos and their comments and to reply publicly — exclusively on the account you connected yourself. We do not use your data for any other purpose, and we do not share it with any third party.",
+              "عند ربط حساب تيك توك التجاري الخاص بك، نستخدم صلاحيات تيك توك الرسمية لقراءة فيديوهاتك وتعليقاتها والرد عليها، وذلك حصراً على الحساب الذي ربطته بنفسك. الرد علني تحت التعليق. وإذا مُنحت صلاحية الرسائل التجارية (Business Messaging) وسمحت إعدادات المنصة، فقد نرد أيضاً داخل محادثة خاصة — ولا نبدأ محادثة مع مستخدم لم يبدأها هو أو لم تسمح المنصة بفتحها له. ننشر الفيديوهات نيابةً عنك فقط حين تطلب ذلك صراحةً من لوحة التحكم. لا نستخدم بياناتك لأي غرض آخر ولا نبيعها.",
+              "When you connect your TikTok Business account, we use TikTok's official permissions to read your videos and their comments and to reply to them — exclusively on the account you connected yourself. The reply is public, under the comment. If Business Messaging permission is granted and the platform's settings allow it, we may also reply inside a private conversation — we never start a conversation with a user who has not started one, or where the platform does not permit opening one. We publish videos on your behalf only when you explicitly request it from the dashboard. We do not use your data for any other purpose and we do not sell it.",
             ],
           },
           {
             title: ["حفظ البيانات وحمايتها", "Data storage & protection"],
             body: [
-              "نحفظ بياناتك بشكل آمن على خوادم Supabase. رموز الوصول الخاصة بصفحاتك مشفرة ولا يمكن الوصول إليها إلا من خلال النظام المصرّح.",
-              "We store your data securely on Supabase servers. Your page access tokens are encrypted and accessible only through the authorized system.",
+              "تُحفظ بياناتك في قاعدة بيانات Supabase على خوادم داخل الاتحاد الأوروبي (أيرلندا). رموز الوصول الخاصة بحساباتك مشفّرة في قاعدة البيانات بمعيار AES-256-GCM، ولا تظهر في المتصفح إطلاقاً ولا تُسجَّل في أي سجل. كل الاتصالات عبر HTTPS حصراً. الوصول إلى بياناتك محصور بحسابك بعد تسجيل دخول موثّق. عند فك ربط أي حساب نُبطل الرمز لدى المنصة ونحذفه من قاعدة بياناتنا. يُحفظ سجل الردود لعرض النشاط لك ومنع تكرار الرد، ويمكنك طلب حذفه في أي وقت.",
+              "Your data is stored in a Supabase database on servers within the European Union (Ireland). Your account access tokens are encrypted at rest with AES-256-GCM, never reach the browser, and are never written to any log. All traffic is HTTPS only. Access to your data is limited to your own authenticated account. When an account is disconnected we revoke the token with the platform and delete it from our database. The reply log is kept to show you your activity and prevent duplicate replies, and you can request its deletion at any time.",
+            ],
+          },
+          {
+            title: ["مزوّدو الخدمة (معالجو البيانات)", "Service providers (data processors)"],
+            body: [
+              "لتشغيل الخدمة نستعين بمزوّدين محدودين، ولا يستخدم أيٌّ منهم بياناتك لأغراضه: Supabase لقاعدة البيانات والاستضافة (الاتحاد الأوروبي)، وVercel لتشغيل الموقع، وGroq لتوليد نص الردود الذكية عند تفعيلها، وبوّابات الدفع المحلية لمعالجة المدفوعات. نرسل إلى مزوّد الذكاء الاصطناعي نص التعليق وبيانات منتجاتك المعلنة فقط لتوليد الرد — ولا نرسل بياناتك الشخصية ولا رموز الوصول. نحن لا نبيع بياناتك ولا نشاركها لأغراض إعلانية.",
+              "We rely on a limited set of providers to run the service, none of whom use your data for their own purposes: Supabase for the database and hosting (EU), Vercel for running the site, Groq for generating smart-reply text when you enable it, and local payment gateways for processing payments. We send the AI provider only the comment text and your published product details in order to generate a reply — never your personal data and never access tokens. We do not sell your data and we do not share it for advertising purposes.",
             ],
           },
           {
             title: ["حقوقك", "Your rights"],
             body: [
-              "يحق لك طلب حذف بياناتك أو تصحيحها في أي وقت. للتواصل معنا أرسل رسالة عبر واتساب أو راسلنا على البريد الإلكتروني الرسمي للمتجر.",
-              "You have the right to request deletion or correction of your data at any time. To contact us, message us on WhatsApp or email the store's official address.",
+              "يحق لك طلب نسخة من بياناتك أو تصحيحها أو حذفها في أي وقت. تحذف وحدك معظمها فوراً: فك ربط أي حساب يُبطل رمز الوصول لدى المنصة ويحذفه من قاعدة بياناتنا، وإيقاف البوت يوقف كل معالجة. ولما تبقّى، راسلنا على privacy@trendstore-ly.com ونستجيب خلال ثلاثين يوماً.",
+              "You have the right to request a copy of your data, its correction, or its deletion at any time. Most of it you can delete yourself immediately: disconnecting an account revokes the access token with the platform and deletes it from our database, and turning the bot off stops all processing. For anything else, write to privacy@trendstore-ly.com and we will respond within thirty days.",
             ],
           },
           {
             title: ["التواصل", "Contact"],
             body: [
-              "لأي استفسار بشأن سياسة الخصوصية، تواصل معنا عبر الموقع أو صفحة ترند ستور على فيسبوك.",
-              "For any questions about this privacy policy, contact us via the website or the Trend Store Facebook page.",
+              "لأي استفسار بشأن هذه السياسة أو حماية البيانات: privacy@trendstore-ly.com — ترند للإلكترونيات، بنغازي، ليبيا.",
+              "For any question about this policy or about data protection: privacy@trendstore-ly.com — Trend Electronics, Benghazi, Libya.",
             ],
           },
         ].map((s) => (
@@ -82,7 +89,7 @@ export default function PrivacyPage() {
         ))}
 
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 32, marginTop: 16, textAlign: "center", color: "#475569", fontSize: 13 }}>
-          {t("© 2025 ترند للإلكترونيات — جميع الحقوق محفوظة", "© 2025 Trend Electronics — All rights reserved")}
+          {t("© 2026 ترند للإلكترونيات — جميع الحقوق محفوظة", "© 2026 Trend Electronics — All rights reserved")}
         </div>
       </div>
     </div>
