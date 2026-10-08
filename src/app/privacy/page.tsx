@@ -70,15 +70,15 @@ export default function PrivacyPage() {
           {
             title: ["حقوقك", "Your rights"],
             body: [
-              "يحق لك طلب نسخة من بياناتك أو تصحيحها أو حذفها في أي وقت. تحذف وحدك معظمها فوراً: فك ربط أي حساب يُبطل رمز الوصول لدى المنصة ويحذفه من قاعدة بياناتنا، وإيقاف البوت يوقف كل معالجة. ولما تبقّى، راسلنا على privacy@trendstore-ly.com ونستجيب خلال ثلاثين يوماً.",
-              "You have the right to request a copy of your data, its correction, or its deletion at any time. Most of it you can delete yourself immediately: disconnecting an account revokes the access token with the platform and deletes it from our database, and turning the bot off stops all processing. For anything else, write to privacy@trendstore-ly.com and we will respond within thirty days.",
+              "يحق لك طلب نسخة من بياناتك أو تصحيحها أو حذفها في أي وقت. تحذف وحدك معظمها فوراً: فك ربط أي حساب يُبطل رمز الوصول لدى المنصة ويحذفه من قاعدة بياناتنا، وإيقاف البوت يوقف كل معالجة. ولما تبقّى، راسلنا على trend@trendstore-ly.com ونستجيب خلال ثلاثين يوماً.",
+              "You have the right to request a copy of your data, its correction, or its deletion at any time. Most of it you can delete yourself immediately: disconnecting an account revokes the access token with the platform and deletes it from our database, and turning the bot off stops all processing. For anything else, write to trend@trendstore-ly.com and we will respond within thirty days.",
             ],
           },
           {
             title: ["التواصل", "Contact"],
             body: [
-              "لأي استفسار بشأن هذه السياسة أو حماية البيانات: privacy@trendstore-ly.com — ترند للإلكترونيات، بنغازي، ليبيا.",
-              "For any question about this policy or about data protection: privacy@trendstore-ly.com — Trend Electronics, Benghazi, Libya.",
+              "لأي استفسار بشأن هذه السياسة أو حماية البيانات: trend@trendstore-ly.com — ترند للإلكترونيات، بنغازي، ليبيا.",
+              "For any question about this policy or about data protection: trend@trendstore-ly.com — Trend Electronics, Benghazi, Libya.",
             ],
           },
         ].map((s) => (

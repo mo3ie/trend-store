@@ -15,9 +15,17 @@
 export function launchPaidCampaign(campaignId: string, platform: string | null | undefined): void {
   const base = process.env.NEXT_PUBLIC_BASE_URL || "https://trendstore-ly.com";
   const path = platform === "tiktok" ? "/api/tiktok/ads/launch" : "/api/promo/boost";
+  // This hop leaves our process and comes back in over the public internet, so it
+  // carries a shared secret. The launch routes are not user-facing — their only other
+  // gate is the campaign's own `paid` status, which says a launch is legitimate but
+  // not who asked for it.
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const secret = (process.env.CRON_SECRET || "").trim();
+  if (secret) headers.authorization = `Bearer ${secret}`;
+
   fetch(`${base}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ campaignId }),
   }).catch(() => {});
 }

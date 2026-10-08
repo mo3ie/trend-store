@@ -6,6 +6,14 @@ import { boostPost, extractPostId, getPagePicture } from "@/services/meta";
 // Body: { campaignId }
 // Called internally after payment success (fire-and-forget)
 export async function POST(req: NextRequest) {
+  // Internal-only: called by the payment paths once a campaign is paid, never by a
+  // browser. Fail closed when a secret is configured — the campaign's `paid` status
+  // tells us a launch is legitimate, not who requested it.
+  const secret = (process.env.CRON_SECRET || "").trim();
+  if (secret && (req.headers.get("authorization") || "") !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const { campaignId } = await req.json();
   if (!campaignId) return NextResponse.json({ error: "campaignId مطلوب" }, { status: 400 });
 
