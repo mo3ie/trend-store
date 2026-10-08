@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
-import { publishPagePhoto, publishPageVideo, boostPost, getSystemPageToken } from "@/services/meta";
+import {
+  publishPagePhoto, publishPageVideo, boostPost, getSystemPageToken, canPublishToPage,
+} from "@/services/meta";
 import { hasProduct } from "@/lib/entitlements";
 import { getValidAccessToken } from "@/lib/tiktokTokens";
 import { businessIdFromOpenId, canPublish, publishVideo } from "@/services/tiktok";
@@ -126,6 +128,22 @@ export async function POST(req: NextRequest) {
   if (!token) token = (await getSystemPageToken(plan.page_id)) || undefined;
   if (!token) return NextResponse.json({ error: "تعذّر الوصول لرمز الصفحة — أعد ربط الصفحة" }, { status: 400 });
 
+  /*
+   * Pre-flight: can this token publish at all?
+   *
+   * A Page token carries the permissions it was minted with and never gains more, so
+   * a Page connected before `pages_manage_posts` was approved fails every post with a
+   * generic "(#200) Permissions error". That is how 42 posts failed here one at a
+   * time. One check up front replaces N identical failures with an instruction.
+   */
+  const publishable = await canPublishToPage(token);
+  if (publishable === false) {
+    return NextResponse.json({
+      error: "reconnect_required",
+      message: "هذه الصفحة مرتبطة قبل اعتماد صلاحية النشر. أعد ربطها من زر «ربط صفحة» ثم أعد النشر — خطتك محفوظة كما هي.",
+    }, { status: 409 });
+  }
+
   const { data: posts } = await supabaseAdmin
     .from("studio_posts").select("*").eq("plan_id", planId)
     .in("status", ["approved", "scheduled", "failed"]);
@@ -218,7 +236,11 @@ export async function POST(req: NextRequest) {
         overridesTouched = true;
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Meta error";
+      const raw = e instanceof Error ? e.message : "Meta error";
+      // "(#200) Permissions error" says nothing an owner can act on. Name the cause.
+      const msg = /#200|permission/i.test(raw)
+        ? "صلاحية النشر غير متوفرة لهذه الصفحة — أعد ربط الصفحة ثم أعد المحاولة."
+        : raw;
       await supabaseAdmin.from("studio_posts").update({ status: "failed", error: msg.slice(0, 300) }).eq("id", p.id);
       failed++;
     }

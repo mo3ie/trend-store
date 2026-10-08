@@ -66,10 +66,50 @@ export function buildOAuthUrl(redirectUri: string, state: string): string {
     // without which no comment is ever delivered, and pages_read_user_content reads
     // the visitor comments themselves. In production the config_id (Login for
     // Business) carries the permission set — keep the dashboard config in sync.
-    params.set("scope", "pages_manage_ads,pages_read_engagement,pages_show_list,ads_management,pages_manage_engagement,pages_messaging,pages_manage_metadata,pages_read_user_content");
+    params.set("scope", "pages_manage_ads,pages_read_engagement,pages_show_list,ads_management,pages_manage_engagement,pages_messaging,pages_manage_metadata,pages_read_user_content,pages_manage_posts");
   }
 
   return `https://www.facebook.com/dialog/oauth?${params}`;
+}
+
+/**
+ * The permissions a stored Page token actually carries.
+ *
+ * A token is minted with whatever was approved on the day it was issued, and it does
+ * NOT gain permissions later: approving a scope grants it to the app, while existing
+ * tokens keep the set they were born with. So a Page connected before an approval
+ * keeps failing afterwards, and the failure arrives one post at a time with a generic
+ * "(#200) Permissions error" — which is how 42 scheduled posts failed here before
+ * anyone could see why.
+ *
+ * Asking the token what it can do turns that into a single, answerable question.
+ * Returns null when the check itself cannot run, so a caller can tell "no publishing
+ * permission" apart from "could not find out".
+ */
+export async function pageTokenScopes(pageToken: string): Promise<string[] | null> {
+  const appId = cleanEnv(process.env.META_APP_ID) || cleanEnv(process.env.NEXT_PUBLIC_META_APP_ID);
+  const appSecret = cleanEnv(process.env.META_APP_SECRET);
+  if (!appId || !appSecret || !pageToken) return null;
+
+  try {
+    const res = await fetch(
+      `${BASE}/debug_token?input_token=${encodeURIComponent(pageToken)}` +
+      `&access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`,
+      { cache: "no-store" },
+    );
+    const json = await res.json();
+    const scopes = json?.data?.scopes;
+    return Array.isArray(scopes) ? scopes.map(String) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether this token may publish to the Page. Null means "could not determine". */
+export async function canPublishToPage(pageToken: string): Promise<boolean | null> {
+  const scopes = await pageTokenScopes(pageToken);
+  if (scopes === null) return null;
+  return scopes.includes("pages_manage_posts");
 }
 
 export async function exchangeCodeForToken(

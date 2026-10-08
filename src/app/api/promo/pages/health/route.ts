@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { isPageTokenAlive } from "@/services/meta";
+import { isPageTokenAlive, canPublishToPage } from "@/services/meta";
 
 async function getUser() {
   const store = await cookies();
@@ -15,9 +15,19 @@ async function getUser() {
   return user;
 }
 
-// GET — check each connected Page's stored token. Returns { statuses: { pageId: "alive"|"dead" } }.
-// "dead" means the OAuth token was invalidated (usually the Facebook account lost its
-// admin role on the Page, or a password change) → the Page must be re-authorized.
+/*
+ * GET — what each connected Page's stored token can still do.
+ *
+ * Two different problems, which need two different answers from the owner:
+ *
+ *   "dead"       — the token was invalidated (the Facebook account usually lost its
+ *                  admin role on the Page, or the password changed) → re-authorize.
+ *   canPublish   — the token is alive but was minted before `pages_manage_posts` was
+ *                  approved. A token never gains permissions after it is issued, so
+ *                  publishing keeps failing until the Page is RE-CONNECTED. Without
+ *                  this check that shows up one post at a time as a generic
+ *                  "(#200) Permissions error".
+ */
 export async function GET() {
   const user = await getUser();
   if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
@@ -29,12 +39,28 @@ export async function GET() {
 
   const list = pages || [];
   const results = await Promise.all(list.map(async (p) => {
-    const alive = await isPageTokenAlive(p.page_id, p.page_access_token as string | null);
-    return [p.page_id, alive ? "alive" : "dead"] as const;
+    const token = p.page_access_token as string | null;
+    const alive = await isPageTokenAlive(p.page_id, token);
+    // Only worth asking of a live token — a dead one needs re-authorizing anyway.
+    const canPublish = alive && token ? await canPublishToPage(token) : null;
+    return { pageId: p.page_id, alive, canPublish };
   }));
 
   const statuses: Record<string, string> = {};
-  for (const [id, st] of results) statuses[id] = st;
-  const dead = results.filter(([, st]) => st === "dead").length;
-  return NextResponse.json({ statuses, total: list.length, dead });
+  const publishing: Record<string, boolean | null> = {};
+  for (const r of results) {
+    statuses[r.pageId] = r.alive ? "alive" : "dead";
+    publishing[r.pageId] = r.canPublish;
+  }
+
+  const dead = results.filter((r) => !r.alive).length;
+  // Alive, but cannot publish: the specific case that re-connecting fixes.
+  const needsReconnect = results.filter((r) => r.alive && r.canPublish === false).length;
+
+  return NextResponse.json({
+    statuses, publishing, total: list.length, dead, needsReconnect,
+    message: needsReconnect > 0
+      ? "بعض الصفحات مرتبطة قبل اعتماد صلاحية النشر — أعد ربطها ليعمل نشر الموظف الذكي."
+      : null,
+  });
 }
