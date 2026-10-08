@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { ensureCommentWebhook } from "@/services/tiktokWebhookSetup";
 import { getAuthUser } from "@/lib/authUser";
 import {
   exchangeAuthCode, getProfile, businessIdFromOpenId, TikTokError, tiktokConfigured,
@@ -134,6 +135,14 @@ export async function GET(req: NextRequest) {
       // existed) is dropped rather than left to confuse the next lookup.
       if (draft) await supabaseAdmin.from("bot_configs").delete().eq("id", draft.id);
     }
+
+    // 7) Turn on real-time delivery without asking. The webhook is APP-level — one
+    //    registration serves every account that will ever link — and it is the
+    //    difference between a reply in seconds and a reply on tomorrow's sweep. Making
+    //    an owner find a switch for that was a worse default than just doing it.
+    //    Idempotent, and deliberately not awaited: a registration hiccup must not cost
+    //    the owner the link they just completed. The daily sweep remains the backstop.
+    void ensureCommentWebhook().catch(() => {});
 
     const res = NextResponse.redirect(siteUrl(`${returnPath}?success=1`));
     res.cookies.set(OAUTH_STATE_COOKIE, "", stateCookieOptions(0));

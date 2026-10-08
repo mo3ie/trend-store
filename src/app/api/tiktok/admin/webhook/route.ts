@@ -3,8 +3,9 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireAdmin } from "@/lib/apiAuth";
 import { tiktokWebhookUrl } from "@/lib/siteUrl";
 import {
-  updateWebhookConfig, listWebhookConfigs, deleteWebhookConfig, tiktokConfigured, TikTokError,
+  listWebhookConfigs, deleteWebhookConfig, tiktokConfigured, TikTokError,
 } from "@/services/tiktok";
+import { ensureCommentWebhook } from "@/services/tiktokWebhookSetup";
 
 /**
  * Admin-only management of the APP-LEVEL TikTok webhook configuration.
@@ -62,27 +63,13 @@ export async function POST() {
   const guard = configuredGuard();
   if (guard) return guard;
 
-  const callbackUrl = tiktokWebhookUrl();
-  try {
-    const config = await updateWebhookConfig(EVENT_TYPE, callbackUrl);
-    await supabaseAdmin.from("tiktok_webhook_config").upsert({
-      id: 1,
-      event_type: EVENT_TYPE,
-      callback_url: config.callbackUrl,
-      subscribed: true,
-      last_error: null,
-      updated_at: new Date().toISOString(),
-    });
-    return NextResponse.json({ ok: true, callback_url: config.callbackUrl, event_type: config.eventType });
-  } catch (err) {
-    const note = err instanceof TikTokError ? `${err.kind}:${err.ttCode ?? ""}` : "internal";
-    if (err instanceof TikTokError) console.error(err.toLogLine());
-    await supabaseAdmin.from("tiktok_webhook_config").upsert({
-      id: 1, event_type: EVENT_TYPE, callback_url: callbackUrl,
-      subscribed: false, last_error: note, updated_at: new Date().toISOString(),
-    });
-    return NextResponse.json({ error: "subscribe_failed" }, { status: 502 });
+  // `force`, because an operator pressing this is re-registering on purpose — after a
+  // URL change or a failure — and should not be told "already done".
+  const result = await ensureCommentWebhook(true);
+  if (!result.ok) {
+    return NextResponse.json({ error: "subscribe_failed", reason: result.reason }, { status: 502 });
   }
+  return NextResponse.json({ ok: true, callback_url: tiktokWebhookUrl(), event_type: EVENT_TYPE });
 }
 
 /** DELETE — unsubscribe the app from comment webhooks. */

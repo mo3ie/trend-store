@@ -7,6 +7,9 @@ import { listTikTokAccounts, tokenStatusFor, disconnectTikTokAccount } from "@/l
 
 const EDITABLE = [
   "enabled", "reply_public", "ai_enabled", "ai_persona", "throttle_per_min",
+  // The human-like pause between replies. The engine reads these; nothing could set
+  // them, so the anti-block pacing was fixed at its defaults with no way to tune it.
+  "min_delay_sec", "max_delay_sec", "post_filter", "post_filter_enabled",
   // Same reply configuration as the Facebook bot — one `bot_configs` row, one
   // decision engine, so the editable surface has to match too.
   "reply_groups", "banned_words", "banned_action", "mention_author", "once_per_user",

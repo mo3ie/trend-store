@@ -65,6 +65,10 @@ interface Config {
   reply_groups: ReplyGroup[] | null;
   ai_enabled: boolean;
   ai_persona: string | null;
+  reply_public: boolean;
+  throttle_per_min: number | null;
+  min_delay_sec: number | null;
+  max_delay_sec: number | null;
 }
 
 function TikTokBotInner() {
@@ -731,36 +735,75 @@ function TikTokBotInner() {
               <Settings2 size={16} color={c.pinkInk} /> {t("الإعدادات", "Settings")}
             </div>
             {/*
-              The single most consequential switch on this screen, so it sits at the
-              top of the settings rather than among the checkboxes: it decides whether
-              a customer waits seconds or until tomorrow for an answer.
+              Real-time delivery is registered automatically when an account links —
+              it is app-level and benefits every account, so making each owner find a
+              switch for it was the wrong default. This reports the state, and only
+              offers a button when the automatic registration did not take.
             */}
-            <div style={{ background: webhook?.subscribed ? `${c.ok}14` : c.surface2, border: `1px solid ${webhook?.subscribed ? `${c.ok}55` : c.border}`, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+            <div style={{ background: webhook?.subscribed ? `${c.ok}14` : `${c.warn}14`, border: `1px solid ${webhook?.subscribed ? `${c.ok}55` : `${c.warn}55`}`, borderRadius: 12, padding: 14, marginBottom: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, fontWeight: 700 }}>
-                <Radio size={15} color={webhook?.subscribed ? c.ok : c.muted} />
+                <Radio size={15} color={webhook?.subscribed ? c.ok : c.warn} />
                 {webhook?.subscribed
-                  ? t("الردّ الفوري مُفعّل", "Instant replies are on")
+                  ? t("الردّ الفوري مُفعّل تلقائياً", "Instant replies are on")
                   : t("الردّ الفوري غير مُفعّل", "Instant replies are off")}
               </div>
               <p style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.75, margin: "8px 0 0" }}>
                 {webhook?.subscribed
-                  ? t("يصل التعليق لحظة نشره، فيردّ البوت خلال ثوانٍ.",
-                       "A comment reaches us the moment it is posted, and the bot answers within seconds.")
-                  : t("بدونه لا يرى البوت التعليقات إلا في المسح اليومي. فعّله ليردّ خلال ثوانٍ.",
-                       "Without it the bot only sees comments on the daily sweep. Turn it on to answer within seconds.")}
+                  ? t("يصل التعليق لحظة نشره فيردّ البوت خلال ثوانٍ. لا يحتاج أي ضبط منك.",
+                       "A comment reaches us the moment it is posted and the bot answers within seconds. Nothing for you to set.")
+                  : t("تعذّر التفعيل التلقائي. المسح اليومي يغطّيك مؤقتاً — أعد المحاولة لتعود الردود فورية.",
+                       "Automatic setup did not take. The daily sweep covers you meanwhile — retry to get replies back to seconds.")}
               </p>
               {!webhook?.subscribed && (
                 <button onClick={enableInstant} disabled={hooking}
                   style={{ ...ttPrimary(rtl, hooking), width: "100%", marginTop: 12, padding: "10px 0", fontSize: 14 }}>
                   {hooking ? <Loader2 size={15} className="spin" /> : <Radio size={15} />}
-                  {t("فعّل الردّ الفوري", "Enable instant replies")}
+                  {t("أعد المحاولة", "Retry")}
                 </button>
               )}
             </div>
 
             {config ? (
               <div style={{ display: "grid", gap: 12 }}>
+                {/*
+                  Pacing. These exist in the engine and always have, but nothing could
+                  set them — so every account ran on the defaults. They are the
+                  anti-block controls, which is why they are stated in those terms
+                  rather than as bare numbers.
+                */}
+                <div style={{ background: c.surface2, borderRadius: 12, padding: 13 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+                    {t("التهدئة — الحماية من الحظر", "Pacing — anti-block protection")}
+                  </div>
+                  <p style={{ fontSize: 11.5, color: c.muted, lineHeight: 1.7, margin: "0 0 11px" }}>
+                    {t("الردّ الفوري على عشرات التعليقات دفعةً واحدة هو ما يوقف الحسابات. البوت ينتظر قليلاً بين ردّ وآخر، ويتوقّف عند سقف الدقيقة.",
+                       "Answering dozens of comments at once is what gets accounts stopped. The bot waits a little between replies and stops at the per-minute cap.")}
+                  </p>
+                  <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
+                    <label style={{ flex: "1 1 92px", fontSize: 11.5, color: c.muted }}>
+                      {t("أقلّ انتظار (ثانية)", "Min wait (s)")}
+                      <input type="number" min={0} max={60} defaultValue={config.min_delay_sec ?? 2}
+                        onBlur={(e) => patch({ min_delay_sec: Number(e.target.value) })}
+                        style={{ ...ttInput(c), marginTop: 5 }} />
+                    </label>
+                    <label style={{ flex: "1 1 92px", fontSize: 11.5, color: c.muted }}>
+                      {t("أكثر انتظار (ثانية)", "Max wait (s)")}
+                      <input type="number" min={0} max={120} defaultValue={config.max_delay_sec ?? 6}
+                        onBlur={(e) => patch({ max_delay_sec: Number(e.target.value) })}
+                        style={{ ...ttInput(c), marginTop: 5 }} />
+                    </label>
+                    <label style={{ flex: "1 1 110px", fontSize: 11.5, color: c.muted }}>
+                      {t("سقف الردود بالدقيقة", "Replies per minute")}
+                      <input type="number" min={1} max={60} defaultValue={config.throttle_per_min ?? 20}
+                        onBlur={(e) => patch({ throttle_per_min: Number(e.target.value) })}
+                        style={{ ...ttInput(c), marginTop: 5 }} />
+                    </label>
+                  </div>
+                </div>
+
                 {([
+                  ["reply_public", t("الردّ على التعليقات", "Reply to comments")],
+                  ["like_comments", t("إعجاب بالتعليقات", "Like comments")],
                   ["mention_author", t("ابدأ الردّ باسم صاحب التعليق", "Open the reply with the commenter's name")],
                   ["once_per_user", t("ردّ واحد لكل شخص في الفيديو", "One reply per person per video")],
                   ["enabled", t("البوت يعمل", "Bot is running")],
@@ -785,10 +828,7 @@ function TikTokBotInner() {
                     {label}
                   </label>
                 ))}
-                <div style={{ fontSize: 11.5, color: c.muted, lineHeight: 1.7, marginTop: 4 }}>
-                  {t("يتهدّأ البوت تلقائياً بين الردود حتى لا يُحظر الحساب — لا يحتاج ضبطاً.",
-                     "The bot paces itself between replies so the account isn't blocked — nothing to configure.")}
-                </div>
+
               </div>
             ) : (
               <div style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.7 }}>
