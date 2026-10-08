@@ -14,11 +14,11 @@
     },
     {
       "path": "/api/tiktok/cron/poll",
-      "schedule": "*/5 * * * *"
+      "schedule": "30 5 * * *"
     },
     {
       "path": "/api/bot/cron/drain",
-      "schedule": "*/2 * * * *"
+      "schedule": "45 5 * * *"
     }
   ]
 }

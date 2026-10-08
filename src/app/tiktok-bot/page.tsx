@@ -85,6 +85,8 @@ function TikTokBotInner() {
   const [tab, setTab] = useState<"try" | "videos" | "rules" | "smart" | "activity" | "settings">("try");
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [webhook, setWebhook] = useState<{ subscribed: boolean; last_event_at: string | null } | null>(null);
+  const [hooking, setHooking] = useState(false);
   const [videos, setVideos] = useState<VideoRow[]>([]);
   const [videosLoading, setVideosLoading] = useState(false);
   const [videosMsg, setVideosMsg] = useState("");
@@ -119,6 +121,7 @@ function TikTokBotInner() {
 
     const d = await fetch("/api/tiktok/configs").then((r) => r.json()).catch(() => ({}));
     let cfg: Config | null = (d.accounts || []).map((a: { config: Config | null }) => a.config).find(Boolean) ?? null;
+    if (d.webhook) setWebhook(d.webhook);
 
     // No linked account yet → work on a draft, so the whole editor surface is usable
     // now and moves onto the real account the moment it links.
@@ -197,6 +200,29 @@ function TikTokBotInner() {
       .finally(() => setLogsLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, config?.id]);
+
+  /**
+   * Turns on the real-time path. Without it the bot only sees comments on the daily
+   * sweep; with it TikTok pushes each comment as it is posted and the reply goes out
+   * in seconds. It is an app-level registration, so one call serves every account.
+   */
+  async function enableInstant() {
+    setHooking(true); setError("");
+    try {
+      const r = await fetch("/api/tiktok/admin/webhook", { method: "POST" });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) {
+        setWebhook({ subscribed: true, last_event_at: null });
+        setFlash(t("فُعّل الردّ الفوري", "Instant replies enabled"));
+        setTimeout(() => setFlash(""), 2000);
+      } else {
+        setError(d.message || d.error || t("تعذّر التفعيل", "Could not enable"));
+      }
+    } catch {
+      setError(t("تعذّر الاتصال", "Connection failed"));
+    }
+    setHooking(false);
+  }
 
   async function loadMoreVideos() {
     if (!st?.account?.id || videosLoading) return;
@@ -704,6 +730,34 @@ function TikTokBotInner() {
             <div style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
               <Settings2 size={16} color={c.pinkInk} /> {t("الإعدادات", "Settings")}
             </div>
+            {/*
+              The single most consequential switch on this screen, so it sits at the
+              top of the settings rather than among the checkboxes: it decides whether
+              a customer waits seconds or until tomorrow for an answer.
+            */}
+            <div style={{ background: webhook?.subscribed ? `${c.ok}14` : c.surface2, border: `1px solid ${webhook?.subscribed ? `${c.ok}55` : c.border}`, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, fontWeight: 700 }}>
+                <Radio size={15} color={webhook?.subscribed ? c.ok : c.muted} />
+                {webhook?.subscribed
+                  ? t("الردّ الفوري مُفعّل", "Instant replies are on")
+                  : t("الردّ الفوري غير مُفعّل", "Instant replies are off")}
+              </div>
+              <p style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.75, margin: "8px 0 0" }}>
+                {webhook?.subscribed
+                  ? t("يصل التعليق لحظة نشره، فيردّ البوت خلال ثوانٍ.",
+                       "A comment reaches us the moment it is posted, and the bot answers within seconds.")
+                  : t("بدونه لا يرى البوت التعليقات إلا في المسح اليومي. فعّله ليردّ خلال ثوانٍ.",
+                       "Without it the bot only sees comments on the daily sweep. Turn it on to answer within seconds.")}
+              </p>
+              {!webhook?.subscribed && (
+                <button onClick={enableInstant} disabled={hooking}
+                  style={{ ...ttPrimary(rtl, hooking), width: "100%", marginTop: 12, padding: "10px 0", fontSize: 14 }}>
+                  {hooking ? <Loader2 size={15} className="spin" /> : <Radio size={15} />}
+                  {t("فعّل الردّ الفوري", "Enable instant replies")}
+                </button>
+              )}
+            </div>
+
             {config ? (
               <div style={{ display: "grid", gap: 12 }}>
                 {([
