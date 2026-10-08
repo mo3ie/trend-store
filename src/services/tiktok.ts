@@ -280,6 +280,14 @@ export interface Page<T> { items: T[]; cursor?: number; hasMore: boolean; }
 export const MAX_PAGE_SIZE = 30;
 
 /**
+ * `/business/video/list/` caps `max_count` at 20 — stricter than the comment
+ * endpoints — and rejects anything larger outright with code 40002 rather than
+ * clamping it. Asking for more is how a working video grid turned into an error
+ * message. Reaching older videos is the cursor's job, not a bigger page.
+ */
+export const MAX_VIDEO_PAGE_SIZE = 20;
+
+/**
  * GET /business/video/list/ — owned posts. `fields` must include "item_id" when requesting
  * more than the default. Permission: Business Media (scope `video.list`).
  * No filter fields are sent: their schema is not verified, and guessing is not allowed.
@@ -296,7 +304,7 @@ export async function listVideos(
       business_id: businessId,
       fields: ["item_id", "caption", "create_time", "thumbnail_url"],
       cursor: opts.cursor,
-      max_count: opts.maxCount ? Math.min(opts.maxCount, MAX_PAGE_SIZE) : undefined,
+      max_count: opts.maxCount ? Math.min(opts.maxCount, MAX_VIDEO_PAGE_SIZE) : undefined,
     },
   });
   return {

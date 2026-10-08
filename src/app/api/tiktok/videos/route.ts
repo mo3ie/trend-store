@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
 import { getValidAccessToken } from "@/lib/tiktokTokens";
-import { businessIdFromOpenId, listVideos, TikTokError } from "@/services/tiktok";
+import {
+  businessIdFromOpenId, listVideos, TikTokError, MAX_VIDEO_PAGE_SIZE,
+} from "@/services/tiktok";
 
 export const maxDuration = 30;
 
@@ -37,12 +39,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // 20 was an arbitrary first page with no way to reach the rest, so an account
-    // with more than twenty videos simply could not give the later ones their own
-    // reply. The cursor is passed through now and the page size raised.
+    // A page is 20 because that is TikTok's hard limit for this endpoint, not a
+    // choice: it rejects anything larger instead of clamping. Older videos are reached
+    // through the cursor, which is what was actually missing before.
     const cursorParam = req.nextUrl.searchParams.get("cursor");
     const page = await listVideos(token, businessIdFromOpenId(account.tiktok_account_id), {
-      maxCount: 40,
+      maxCount: MAX_VIDEO_PAGE_SIZE,
       cursor: cursorParam ? Number(cursorParam) : undefined,
     });
     const videos = (page.items || []).map((v) => ({
