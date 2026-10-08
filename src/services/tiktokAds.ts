@@ -66,12 +66,32 @@ export function adsConfigured(): boolean {
   return !!adsAppId() && !!adsAppSecret() && !!adsAuthorizeBaseUrl();
 }
 
+
+/**
+ * Appends our opaque state to a portal-issued authorization URL.
+ *
+ * The portal shows these URLs with a PLACEHOLDER state already in them
+ * (`state=your_custom_params`), and it is copied along with the rest. Appending ours
+ * on top produced a URL with two `state` parameters, which TikTok rejects as a
+ * parameter error on the consent screen — after the owner has already signed in, so
+ * it reads as "the app is broken" rather than "the URL is wrong".
+ *
+ * Any existing `state` is therefore dropped, not merged: ours is the only one that
+ * can be verified on the way back.
+ */
+function withState(base: string, state: string): string {
+  const [path, query = ""] = base.split("?");
+  const params = new URLSearchParams(query);
+  params.delete("state");
+  params.set("state", state);
+  return `${path}?${params.toString()}`;
+}
+
 /** Appends only the opaque state to the portal-issued URL. No secret ever goes in a URL. */
 export function buildAdvertiserAuthorizeUrl(state: string): string {
   const base = adsAuthorizeBaseUrl();
   if (!base) throw new TikTokAdsError("not_configured", "TIKTOK_ADS_AUTH_URL is not set");
-  const sep = base.includes("?") ? "&" : "?";
-  return `${base}${sep}state=${encodeURIComponent(state)}`;
+  return withState(base, state);
 }
 
 // ── Errors ────────────────────────────────────────────────────────────────────

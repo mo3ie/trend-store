@@ -43,8 +43,13 @@ export function tiktokConfigured(): boolean {
 export function buildTikTokAuthorizeUrl(state: string): string {
   const base = tiktokAuthorizeBaseUrl();
   if (!base) throw new TikTokError("tiktok_not_configured", "TIKTOK_AUTH_URL is not set");
-  const sep = base.includes("?") ? "&" : "?";
-  return `${base}${sep}state=${encodeURIComponent(state)}`;
+  // Same placeholder hazard as the advertiser URL: the portal ships these with
+  // `state=your_custom_params` already set, and two `state` values are rejected.
+  const [path, query = ""] = base.split("?");
+  const params = new URLSearchParams(query);
+  params.delete("state");
+  params.set("state", state);
+  return `${path}?${params.toString()}`;
 }
 
 // ── Errors & transport ────────────────────────────────────────────────────────
