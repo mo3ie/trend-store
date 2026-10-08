@@ -44,6 +44,10 @@ function ConnectPageInner() {
   const [deleting, setDeleting] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [health, setHealth] = useState<Record<string, string>>({});
+  // Whether each Page's token can publish. A token carries the permissions it was
+  // minted with and never gains more, so a Page connected before the publish
+  // permission was approved stays unable to post until it is re-connected.
+  const [publishing, setPublishing] = useState<Record<string, boolean | null>>({});
   const [checking, setChecking] = useState(false);
   const [removingDead, setRemovingDead] = useState(false);
   const [notAuthed, setNotAuthed] = useState(false);
@@ -82,7 +86,10 @@ function ConnectPageInner() {
     try {
       const r = await fetch("/api/promo/pages/health");
       const d = await r.json();
-      if (r.ok) setHealth(d.statuses || {});
+      if (r.ok) {
+        setHealth(d.statuses || {});
+        setPublishing(d.publishing || {});
+      }
     } catch { /* ignore */ }
     setChecking(false);
   }
@@ -211,6 +218,27 @@ function ConnectPageInner() {
         </div>
 
         {/* Dead-pages warning + cleanup */}
+        {(() => {
+          // Alive but unable to publish — a different problem from a dead token, and
+          // one that re-connecting fixes. Unsaid, the owner only discovers it as a
+          // failed post, one post at a time.
+          const stale = pages.filter(
+            (p) => health[p.page_id] !== "dead" && publishing[p.page_id] === false,
+          );
+          if (stale.length === 0) return null;
+          return (
+            <div style={{ background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#f59e0b" }}>
+                {t(`${stale.length} صفحة لا تستطيع النشر`, `${stale.length} Page(s) cannot publish`)}
+              </div>
+              <div style={{ fontSize: 12.5, color: c.muted, marginTop: 6, lineHeight: 1.8 }}>
+                {t("ارتبطت قبل اعتماد صلاحية النشر. أعد ربطها من زر «ربط صفحة» ليعمل نشر الموظف الذكي — لا يضيع شيء من خططك أو إعداداتك.",
+                   "They were connected before the publish permission was approved. Re-connect them with the Connect button to enable AI Employee publishing — nothing in your plans or settings is lost.")}
+              </div>
+            </div>
+          );
+        })()}
+
         {(() => {
           const dead = pages.filter((p) => health[p.page_id] === "dead");
           if (dead.length === 0) return null;
