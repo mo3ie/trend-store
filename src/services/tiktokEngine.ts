@@ -275,7 +275,7 @@ async function like(target: TikTokTarget, commentId: string): Promise<void> {
  */
 async function sendReply(
   target: TikTokTarget, videoId: string, commentId: string, text: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; replyCommentId?: string | null }> {
   const appLimit = await checkAppRateLimit("comment_reply_create");
   if (!appLimit.allowed) return { ok: false, error: "app_rate_limited" };
 
@@ -286,8 +286,13 @@ async function sendReply(
   if (!token) return { ok: false, error: "no_valid_token" };
 
   try {
-    await replyToComment(token, businessIdFromOpenId(target.openId), videoId, commentId, text);
-    return { ok: true };
+    // The id of the comment WE just created. TikTok will deliver a webhook for it like
+    // any other comment, and this is what lets the next delivery recognise it as ours
+    // instead of answering it.
+    const created = await replyToComment(
+      token, businessIdFromOpenId(target.openId), videoId, commentId, text,
+    );
+    return { ok: true, replyCommentId: created.commentId };
   } catch (err) {
     if (err instanceof TikTokError) {
       console.error(err.toLogLine(target.accountId));
@@ -332,6 +337,31 @@ export async function processClaimedComment(
       await finishComment(comment.commentId, { ...patch, public_status: "skipped", error: "already_replied_to_user" });
       return;
     }
+  }
+
+  /*
+   * Circuit breaker.
+   *
+   * The id guard in `enqueueCommentEvent` is the real fix for the self-reply loop, but
+   * a loop costs the customer their account's standing, so it should not rest on a
+   * single test being correct. Any runaway — this cause or another — shows up as an
+   * implausible number of replies under one video in a short window, and that is
+   * cheap to check. Normal traffic on a single video does not approach this; a loop
+   * crosses it in a minute.
+   */
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count: recentOnVideo } = await supabaseAdmin
+    .from("bot_reply_log")
+    .select("id", { count: "exact", head: true })
+    .eq("config_id", target.configId)
+    .eq("post_id", comment.videoId)
+    .eq("public_status", "sent")
+    .gte("sent_at", since);
+  if ((recentOnVideo ?? 0) >= REPLIES_PER_VIDEO_PER_HOUR) {
+    await finishComment(comment.commentId, {
+      ...patch, public_status: "skipped", error: "video_reply_ceiling",
+    });
+    return;
   }
 
   // Video targeting: an owner who listed specific videos expects silence on the rest.
@@ -389,11 +419,18 @@ export async function processClaimedComment(
     ...patch,
     public_status: sent.ok ? "sent" : "failed",
     match_signal: decision.source,
+    reply_comment_id: sent.replyCommentId ?? null,
     error: sent.error ?? (decision.label ? `group:${decision.label}` : decision.source),
   });
 }
 
 // ── BACKSTOP path: reconciliation poll ────────────────────────────────────────
+
+/**
+ * The most replies the bot will post under ONE video in an hour. A ceiling, not a
+ * target: it exists so a runaway is bounded even if the loop guard fails.
+ */
+const REPLIES_PER_VIDEO_PER_HOUR = 25;
 
 /** How far back the reconciliation sweep looks. Older comments are assumed handled. */
 const RECONCILE_WINDOW_SEC = 3 * 60 * 60;

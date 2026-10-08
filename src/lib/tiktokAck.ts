@@ -30,7 +30,12 @@ export type EnqueueOutcome =
   /** The payload was signed but structurally unusable — retrying cannot help. */
   | "unparseable"
   /** The durable store rejected the write. The event is VALID and must be retried. */
-  | "storage_unavailable";
+  | "storage_unavailable"
+  /**
+   * The comment is one the BOT posted. Acknowledged and dropped: answering it starts
+   * a loop in which every reply produces another event to reply to.
+   */
+  | "own_reply";
 
 export interface AckDecision {
   status: number;

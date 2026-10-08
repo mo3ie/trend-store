@@ -54,6 +54,27 @@ export async function enqueueCommentEvent(event: CommentUpdateEvent): Promise<En
   if (!target) return { outcome: "unknown_account" };
   if (!target.replyPublic) return { outcome: "not_actionable", target };
 
+  /*
+   * NEVER answer our own reply.
+   *
+   * TikTok delivers `comment.update` for every comment on an owned video, and the
+   * bot's replies are comments on an owned video. Without this the bot answers
+   * itself, that answer comes back as another event, and it answers that too — an
+   * unbounded loop that spams the video and is exactly what gets an account
+   * restricted. It is not hypothetical: it happened in production.
+   *
+   * The test is exact rather than heuristic. We store the id of every comment we
+   * create, so the question is simply "did we write this one?" — no guessing from the
+   * author name, which TikTok hashes, or from the text, which a customer could repeat.
+   */
+  const { data: ours } = await supabaseAdmin
+    .from("bot_reply_log")
+    .select("id")
+    .eq("reply_comment_id", event.commentId)
+    .limit(1)
+    .maybeSingle();
+  if (ours) return { outcome: "own_reply", target };
+
   const { error } = await supabaseAdmin.from("bot_reply_log").insert({
     config_id: target.configId,
     page_id: target.openId,          // == open_id == business_id
