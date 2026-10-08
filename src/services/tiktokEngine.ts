@@ -23,6 +23,7 @@ import { matchRule, overrideHasContent, type BotRule } from "@/services/botEngin
 import { generateAiReply, aiAvailable } from "@/services/botAi";
 import { getValidAccessToken } from "@/lib/tiktokTokens";
 import { hasProduct } from "@/lib/entitlements";
+import { canMessage, findConversationFor, sendMessage } from "@/services/tiktokMessaging";
 import { checkAppRateLimit, checkAccountRateLimit } from "@/lib/rateLimit";
 import {
   listComments, listVideos, replyToComment, likeComment, hideComment, deleteComment,
@@ -59,6 +60,8 @@ export interface TikTokTarget {
   mentionAuthor: boolean;
   oncePerUser: boolean;
   likeComments: boolean;
+  /** True when the grant includes a Business Messaging scope. */
+  canMessage: boolean;
   publicReplies: string[] | null;
   defaultPublicReply: string | null;
   defaultPrivateReply: string | null;
@@ -71,7 +74,7 @@ export interface TikTokTarget {
 export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
   const { data: account } = await supabaseAdmin
     .from("tiktok_accounts")
-    .select("id, user_id, tiktok_account_id")
+    .select("id, user_id, tiktok_account_id, granted_scopes")
     .eq("tiktok_account_id", openId)
     .is("revoked_at", null)
     .maybeSingle();
@@ -121,6 +124,7 @@ export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
     mentionAuthor: config.mention_author !== false,
     oncePerUser: config.once_per_user !== false,
     likeComments: !!config.like_comments,
+    canMessage: canMessage(account.granted_scopes as string[] | null),
     publicReplies: (config.public_replies as string[] | null) ?? null,
     defaultPublicReply: config.default_public_reply,
     defaultPrivateReply: config.default_private_reply,
@@ -311,6 +315,26 @@ async function sendReply(
  * durable enqueue and the reconciliation poll — and both then land here, so a reply is
  * produced by one code path regardless of how the comment was discovered.
  */
+/**
+ * Sends the private half of a reply. Never throws: a failed DM must not cost the
+ * customer the public answer, which is the one they are guaranteed to see.
+ */
+async function sendPrivate(
+  target: TikTokTarget, participantId: string, text: string,
+): Promise<boolean> {
+  try {
+    const token = await getValidAccessToken(target.accountId);
+    if (!token) return false;
+    const businessId = businessIdFromOpenId(target.openId);
+    const conversationId = await findConversationFor(token, businessId, participantId);
+    if (!conversationId) return false;   // no thread yet — answer publicly instead
+    await sendMessage(token, businessId, conversationId, text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function processClaimedComment(
   target: TikTokTarget,
   comment: { commentId: string; videoId: string; text: string; username?: string },
@@ -397,9 +421,28 @@ export async function processClaimedComment(
     return;
   }
 
-  // TikTok has no organic private reply, so the richer text — the one carrying the
-  // price — becomes the public answer rather than being dropped on the floor.
-  const reply = decision.privateText || decision.publicText;
+  /*
+   * Where the private text goes.
+   *
+   * With Business Messaging granted, the Facebook shape is available at last: a short
+   * public reply under the comment, and the detail — the price — sent privately. The
+   * private side is best-effort, because TikTok can only message a conversation that
+   * already exists, and one exists only once Comment-to-Message has moved the
+   * commenter into a thread.
+   *
+   * Without the scope, or without a conversation, the behaviour is unchanged and for
+   * the same reason as before: the richer text becomes the PUBLIC answer rather than
+   * being dropped, since there is nowhere private for the price to go.
+   */
+  let privateSent = false;
+  if (target.canMessage && decision.privateText && comment.username) {
+    privateSent = await sendPrivate(target, comment.username, decision.privateText);
+  }
+  if (privateSent) patch.private_status = "sent";
+
+  const reply = privateSent
+    ? (decision.publicText || decision.privateText)
+    : (decision.privateText || decision.publicText);
   if (!reply || !target.replyPublic) {
     await finishComment(comment.commentId, {
       ...patch, public_status: "skipped",
