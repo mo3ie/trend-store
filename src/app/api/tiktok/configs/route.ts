@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hasProduct } from "@/lib/entitlements";
 import { getAuthUser } from "@/lib/authUser";
 import { checkRateLimit, rateLimitedJson, identifierFor, RATE_RULES } from "@/lib/rateLimit";
 import { listTikTokAccounts, tokenStatusFor, disconnectTikTokAccount } from "@/lib/tiktokTokens";
@@ -86,15 +87,23 @@ export async function PATCH(req: NextRequest) {
     .select("*").eq("id", id).eq("user_id", user.id).eq("platform", "tiktok").single();
   if (!config) return NextResponse.json({ error: "الإعداد غير موجود" }, { status: 404 });
 
-  // Turning the bot on requires an active subscription (same gate as Meta).
+  // Turning the bot on requires entitlement — and it must be the SAME test the engine
+  // applies when it decides whether to answer. It was not: this gate read only the
+  // legacy `bot_subscriptions` row while the engine accepts entitlements v2 OR that
+  // row, so an admin or a trial user passed the engine and was refused by the switch.
+  // The switch has to agree with the thing it switches on.
   if (body.enabled === true && !config.enabled) {
+    const entitledV2 = await hasProduct(user.id, "tiktok_bot", config.page_id).catch(() => false);
     const { data: sub } = await supabaseAdmin.from("bot_subscriptions")
       .select("status, expires_at")
       .eq("user_id", user.id).eq("page_id", config.page_id).eq("platform", "tiktok").maybeSingle();
-    const active = sub && sub.status === "active" &&
+    const legacyActive = !!sub && sub.status === "active" &&
       (!sub.expires_at || new Date(sub.expires_at).getTime() > Date.now());
-    if (!active) {
-      return NextResponse.json({ error: "no_subscription", message: "يلزم اشتراك فعّال لتشغيل البوت" }, { status: 402 });
+    if (!entitledV2 && !legacyActive) {
+      return NextResponse.json({
+        error: "no_subscription",
+        message: "يلزم اشتراك فعّال لتشغيل البوت",
+      }, { status: 402 });
     }
   }
 

@@ -9,7 +9,9 @@ import {
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import LangToggle from "@/components/LangToggle";
-import { tt, ttCard, ttPrimary, ttSecondary, ttInput } from "@/lib/tiktokTheme";
+import {
+  tt, ttCard, ttPrimary, ttSecondary, ttInput, ttStage, TT_SCRIM, TT_PINK,
+} from "@/lib/tiktokTheme";
 import {
   AccountStrip, ScreenTitle, TabStrip, SubscribeBar, Chip,
 } from "@/components/tiktok/TikTokKit";
@@ -17,6 +19,7 @@ import { ReplySimulator, ReplyThread, type ThreadValue } from "@/components/tikt
 import {
   BannedWordsEditor, CatalogPanel, ReplyGroupsEditor, type ReplyGroup,
 } from "@/components/bot/ReplySettings";
+import { PostOverrideEditor, type PostOverrideValue } from "@/components/bot/PostOverrideEditor";
 import { botColors } from "@/lib/botTheme";
 
 /**
@@ -36,6 +39,8 @@ interface Status {
   bot: { configured: boolean; enabled: boolean; rules: number; priceLyd: number | null };
 }
 
+interface VideoRow { id: string; caption: string; thumbnail: string | null; createdTime: number | null }
+
 interface Rule { id: string; keywords: string[]; public_reply: string | null; enabled: boolean; priority: number }
 
 interface Config {
@@ -50,6 +55,7 @@ interface Config {
   banned_action: string | null;
   catalog_match: string | null;
   catalog_ambiguous_reply: string | null;
+  post_overrides: Record<string, PostOverrideValue> | null;
   reply_groups: ReplyGroup[] | null;
   ai_enabled: boolean;
   ai_persona: string | null;
@@ -70,7 +76,11 @@ function TikTokBotInner() {
   const [config, setConfig] = useState<Config | null>(null);
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"try" | "rules" | "smart" | "settings">("try");
+  const [tab, setTab] = useState<"try" | "videos" | "rules" | "smart" | "settings">("try");
+  const [videos, setVideos] = useState<VideoRow[]>([]);
+  const [videosLoading, setVideosLoading] = useState(false);
+  const [videosMsg, setVideosMsg] = useState("");
+  const [editingVideo, setEditingVideo] = useState<VideoRow | null>(null);
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
   const [draft, setDraft] = useState(false);
@@ -148,6 +158,29 @@ function TikTokBotInner() {
     }, 350);
     return () => clearTimeout(id);
   }, [probe, pageId]);
+
+  // Loaded when the tab is opened rather than on mount: it is a live TikTok call, and
+  // an owner who never opens the tab should not pay for it on every page view.
+  useEffect(() => {
+    if (tab !== "videos" || !st?.account?.id || videos.length || videosLoading) return;
+    setVideosLoading(true); setVideosMsg("");
+    fetch(`/api/tiktok/videos?accountId=${encodeURIComponent(st.account.id)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setVideos(d.videos || []);
+        if (d.message) setVideosMsg(d.message);
+      })
+      .catch(() => setVideosMsg(t("تعذّر الاتصال", "Connection failed")))
+      .finally(() => setVideosLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, st?.account?.id]);
+
+  async function saveVideoOverride(videoId: string, v: PostOverrideValue) {
+    const overrides = { ...((config?.post_overrides as Record<string, PostOverrideValue>) || {}) };
+    overrides[videoId] = v;
+    const ok = await patch({ post_overrides: overrides });
+    if (ok) setEditingVideo(null);
+  }
 
   async function saveThread() {
     if (!config) {
@@ -289,6 +322,7 @@ function TikTokBotInner() {
           c={c} value={tab} onChange={setTab}
           tabs={[
             { key: "try" as const,      label: t("التجربة والردّ", "Try it & reply") },
+            { key: "videos" as const,   label: t("الفيديوهات", "Videos") },
             { key: "rules" as const,    label: `${t("القواعد", "Rules")}${rules.length ? ` (${rules.length})` : ""}` },
             { key: "smart" as const,    label: t("الردّ الذكي", "Smart reply") },
             { key: "settings" as const, label: t("الإعدادات", "Settings") },
@@ -375,6 +409,85 @@ function TikTokBotInner() {
         )}
 
         {/* ── SETTINGS ─────────────────────────────────────────────────────── */}
+        {/* ── VIDEOS: a reply of its own for each video ─────────────── */}
+        {tab === "videos" && (
+          <>
+            {!st?.account ? (
+              <div style={{ ...ttCard(c), padding: 24, textAlign: "center" }}>
+                <Video size={22} color={c.muted} />
+                <div style={{ fontSize: 13.5, fontWeight: 700, marginTop: 10 }}>
+                  {t("اربط حسابك لتظهر فيديوهاتك", "Link your account to see your videos")}
+                </div>
+                <div style={{ fontSize: 12.5, color: c.muted, marginTop: 6, lineHeight: 1.7 }}>
+                  {t("بعدها يمكنك إعطاء كل فيديو ردّاً خاصاً به.",
+                     "Then you can give each video a reply of its own.")}
+                </div>
+              </div>
+            ) : videosLoading ? (
+              <div style={{ display: "flex", justifyContent: "center", padding: 34 }}>
+                <Loader2 size={22} className="spin" color={c.pinkInk} />
+              </div>
+            ) : videos.length === 0 ? (
+              <div style={{ ...ttCard(c), padding: 24, textAlign: "center" }}>
+                <Video size={22} color={c.muted} />
+                <div style={{ fontSize: 13, color: c.muted, marginTop: 10, lineHeight: 1.8 }}>
+                  {videosMsg || t("لا توجد فيديوهات بعد.", "No videos yet.")}
+                </div>
+              </div>
+            ) : (
+              <>
+                <p style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.75, margin: "0 0 12px" }}>
+                  {t("اضغط فيديو لتكتب له ردّاً خاصاً. الفيديو بلا ردّ خاص يأخذ الردّ الافتراضي.",
+                     "Tap a video to write a reply just for it. A video without one uses the default reply.")}
+                </p>
+                {/* A TikTok profile grid: three columns, hairline gutters. */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 2 }}>
+                  {videos.map((v) => {
+                    const o = (config?.post_overrides || {})[v.id];
+                    const custom = !!o && !o.disabled && (
+                      (o.groups?.length ?? 0) > 0 ||
+                      (o.public_replies?.some((x) => (x || "").trim()) ?? false) ||
+                      !!o.ai
+                    );
+                    return (
+                      <button key={v.id} onClick={() => setEditingVideo(v)}
+                        style={{ ...ttStage(), borderRadius: 4, padding: 0, border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                        {v.thumbnail
+                          ? <img src={v.thumbnail} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                          : <div style={{ position: "absolute", inset: 0, padding: 7, fontSize: 10, color: "rgba(255,255,255,.72)", textAlign: "start" }}>{v.caption.slice(0, 50)}</div>}
+                        <div style={{ position: "absolute", inset: 0, background: TT_SCRIM }} />
+                        {custom && (
+                          <span style={{ position: "absolute", top: 5, insetInlineEnd: 5, display: "inline-flex", alignItems: "center", gap: 3, background: "rgba(0,0,0,.55)", borderRadius: 3, padding: "2px 5px", fontSize: 8.5, fontWeight: 800, color: "#fff" }}>
+                            <span style={{ width: 5, height: 5, borderRadius: 999, background: TT_PINK }} />
+                            {t("ردّ خاص", "Custom")}
+                          </span>
+                        )}
+                        {v.caption && (
+                          <span style={{ position: "absolute", bottom: 5, insetInlineStart: 5, insetInlineEnd: 5, fontSize: 9.5, color: "#fff", textShadow: "0 1px 2px #000", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "start" }}>
+                            {v.caption}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {editingVideo && (
+              <div style={{ marginTop: 14 }}>
+                <PostOverrideEditor
+                  initial={(config?.post_overrides || {})[editingVideo.id]}
+                  onSave={(v) => saveVideoOverride(editingVideo.id, v)}
+                  onClose={() => setEditingVideo(null)}
+                  c={bot} t={t} accent={c.pinkInk}
+                  unitLabel={t("الفيديو", "video")}
+                />
+              </div>
+            )}
+          </>
+        )}
+
         {/* ── SMART REPLY: keyword groups, banned words, catalog, AI ─────── */}
         {tab === "smart" && config && (
           <div style={{ display: "grid", gap: 14 }}>
