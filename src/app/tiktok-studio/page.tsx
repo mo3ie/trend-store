@@ -36,7 +36,7 @@ import {
 interface Status {
   linking: { organic: boolean };
   account: { openId: string; handle: string; avatarUrl: string | null } | null;
-  studio: { hasPlan: boolean; planDays: number | null; planStatus: string | null; priceLyd: number | null };
+  studio: { hasPlan: boolean; planDays: number | null; planStatus: string | null; entitled: boolean; priceLyd: number | null };
 }
 
 interface Scene { t?: string; do?: string; text?: string }
@@ -101,7 +101,8 @@ export default function TikTokStudioPage() {
   // A price only exists once a plan for this product is active. With none, there is
   // nothing to subscribe to yet, so the bar stays hidden rather than inviting a
   // purchase that cannot be completed.
-  const sellable = st?.studio.priceLyd !== null && st?.studio.priceLyd !== undefined;
+  const sellable =
+    st?.studio.priceLyd !== null && st?.studio.priceLyd !== undefined && !st?.studio.entitled;
 
   const loadPlan = useCallback(async (pid: string) => {
     const d = await fetch(`/api/studio/plan?pageId=${encodeURIComponent(pid)}`).then((r) => r.json()).catch(() => ({}));

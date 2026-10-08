@@ -37,7 +37,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const page = await listVideos(token, businessIdFromOpenId(account.tiktok_account_id), { maxCount: 20 });
+    // 20 was an arbitrary first page with no way to reach the rest, so an account
+    // with more than twenty videos simply could not give the later ones their own
+    // reply. The cursor is passed through now and the page size raised.
+    const cursorParam = req.nextUrl.searchParams.get("cursor");
+    const page = await listVideos(token, businessIdFromOpenId(account.tiktok_account_id), {
+      maxCount: 40,
+      cursor: cursorParam ? Number(cursorParam) : undefined,
+    });
     const videos = (page.items || []).map((v) => ({
       id: v.videoId,
       caption: v.caption || "",
@@ -50,6 +57,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       videos,
       hasMore: page.hasMore ?? false,
+      cursor: page.cursor ?? null,
       empty: videos.length === 0,
       message: videos.length === 0
         ? "لا توجد فيديوهات على هذا الحساب بعد — انشر فيديو على تيك توك ثم حدّث الصفحة."

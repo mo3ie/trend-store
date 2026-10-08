@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
 import { tiktokConfigured } from "@/services/tiktok";
 import { adsConfigured } from "@/services/tiktokAds";
+import { hasProduct } from "@/lib/entitlements";
 
 export const maxDuration = 30;
 
@@ -47,6 +48,14 @@ export async function GET() {
       .select("id").eq("user_id", user.id).eq("status", "active").maybeSingle(),
   ]);
 
+  // Whether this owner may already RUN each tool. Admins and trial users pass, so
+  // showing them a subscribe bar — which then fails — was never right.
+  const [entBot, entStudio, entAds] = await Promise.all([
+    hasProduct(user.id, "tiktok_bot").catch(() => false),
+    hasProduct(user.id, "tiktok_studio").catch(() => false),
+    hasProduct(user.id, "tiktok_ads").catch(() => false),
+  ]);
+
   // Rules are counted per config, so one query covers however many accounts exist.
   const configIds = (configs.data || []).map((c) => c.id);
   let ruleCount = 0;
@@ -84,18 +93,21 @@ export async function GET() {
       configured: (configs.data || []).length > 0,
       enabled: (configs.data || []).some((c) => c.enabled),
       rules: ruleCount,
+      entitled: entBot,
       priceLyd: priceFor("tiktok_bot"),
     },
     studio: {
       hasPlan: !!plan,
       planDays: plan?.duration_days ?? null,
       planStatus: plan?.status ?? null,
+      entitled: entStudio,
       priceLyd: priceFor("tiktok_studio"),
     },
     ads: {
       connected: !!adsGrant.data,
       total: camps.length,
       live: camps.filter((c) => ["active", "in_review"].includes(c.status)).length,
+      entitled: entAds,
       priceLyd: priceFor("tiktok_ads"),
     },
   });

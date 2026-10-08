@@ -36,7 +36,13 @@ import { botColors } from "@/lib/botTheme";
 interface Status {
   linking: { organic: boolean };
   account: { id: string; openId: string; handle: string; avatarUrl: string | null } | null;
-  bot: { configured: boolean; enabled: boolean; rules: number; priceLyd: number | null };
+  bot: { configured: boolean; enabled: boolean; rules: number; entitled: boolean; priceLyd: number | null };
+}
+
+interface LogRow {
+  id: string; comment_message: string | null; commenter_name: string | null;
+  public_status: string | null; error: string | null; sent_at: string | null;
+  match_signal: string | null;
 }
 
 interface VideoRow { id: string; caption: string; thumbnail: string | null; createdTime: number | null }
@@ -76,11 +82,15 @@ function TikTokBotInner() {
   const [config, setConfig] = useState<Config | null>(null);
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"try" | "videos" | "rules" | "smart" | "settings">("try");
+  const [tab, setTab] = useState<"try" | "videos" | "rules" | "smart" | "activity" | "settings">("try");
+  const [logs, setLogs] = useState<LogRow[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
   const [videos, setVideos] = useState<VideoRow[]>([]);
   const [videosLoading, setVideosLoading] = useState(false);
   const [videosMsg, setVideosMsg] = useState("");
   const [editingVideo, setEditingVideo] = useState<VideoRow | null>(null);
+  const [videosCursor, setVideosCursor] = useState<number | null>(null);
+  const [videosMore, setVideosMore] = useState(false);
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
   const [draft, setDraft] = useState(false);
@@ -168,12 +178,43 @@ function TikTokBotInner() {
       .then((r) => r.json())
       .then((d) => {
         setVideos(d.videos || []);
+        setVideosCursor(d.cursor ?? null);
+        setVideosMore(!!d.hasMore);
         if (d.message) setVideosMsg(d.message);
       })
       .catch(() => setVideosMsg(t("تعذّر الاتصال", "Connection failed")))
       .finally(() => setVideosLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, st?.account?.id]);
+
+  useEffect(() => {
+    if (tab !== "activity" || !config?.id || logs.length || logsLoading) return;
+    setLogsLoading(true);
+    fetch(`/api/bot/logs?configId=${config.id}`)
+      .then((r) => r.json())
+      .then((d) => setLogs(d.logs || []))
+      .catch(() => {})
+      .finally(() => setLogsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, config?.id]);
+
+  async function loadMoreVideos() {
+    if (!st?.account?.id || videosLoading) return;
+    setVideosLoading(true);
+    try {
+      const q = new URLSearchParams({ accountId: st.account.id });
+      if (videosCursor !== null) q.set("cursor", String(videosCursor));
+      const d = await fetch(`/api/tiktok/videos?${q}`).then((r) => r.json());
+      // Appended, not replaced — and de-duplicated, because a cursor page can overlap.
+      setVideos((prev) => {
+        const seen = new Set(prev.map((v) => v.id));
+        return [...prev, ...((d.videos || []) as VideoRow[]).filter((v) => !seen.has(v.id))];
+      });
+      setVideosCursor(d.cursor ?? null);
+      setVideosMore(!!d.hasMore);
+    } catch { /* keep what is already shown */ }
+    setVideosLoading(false);
+  }
 
   async function saveVideoOverride(videoId: string, v: PostOverrideValue) {
     const overrides = { ...((config?.post_overrides as Record<string, PostOverrideValue>) || {}) };
@@ -273,9 +314,11 @@ function TikTokBotInner() {
   }
 
   const linkingPending = !!st && !st.linking.organic;
-  // Shown only once an active plan gives this product a price — otherwise there is
-  // nothing to buy and the bar would invite a purchase that cannot complete.
-  const sellable = st?.bot.priceLyd !== null && st?.bot.priceLyd !== undefined;
+  // Shown only when there is something to buy AND the owner cannot already run the
+  // tool. Admins and trial users pass the entitlement check, so offering them a
+  // subscription was both pointless and — since the purchase then failed — misleading.
+  const sellable =
+    st?.bot.priceLyd !== null && st?.bot.priceLyd !== undefined && !st?.bot.entitled;
 
   if (loading) {
     return (
@@ -325,6 +368,7 @@ function TikTokBotInner() {
             { key: "videos" as const,   label: t("الفيديوهات", "Videos") },
             { key: "rules" as const,    label: `${t("القواعد", "Rules")}${rules.length ? ` (${rules.length})` : ""}` },
             { key: "smart" as const,    label: t("الردّ الذكي", "Smart reply") },
+            { key: "activity" as const, label: t("النشاط", "Activity") },
             { key: "settings" as const, label: t("الإعدادات", "Settings") },
           ]}
         />
@@ -360,12 +404,11 @@ function TikTokBotInner() {
               </button>
             </div>
 
-            {st?.account && (
-              <button onClick={() => router.push(`/tiktok-bot/${st.account!.id}`)}
-                style={{ ...ttSecondary(c), width: "100%", marginTop: 12 }}>
-                <Video size={16} /> {t("ردود مخصّصة لكل فيديو", "Per-video custom replies")}
-              </button>
-            )}
+            {/*
+              The per-video editor used to live on a second screen reached from here.
+              It is a tab now, so this button is gone: two doors to the same room read
+              as two different rooms, which is exactly how it was reported.
+            */}
           </>
         )}
 
@@ -403,6 +446,51 @@ function TikTokBotInner() {
                 <button onClick={addRule} style={{ ...ttSecondary(c), width: "100%" }}>
                   <Plus size={16} /> {t("أضف قاعدة", "Add a rule")}
                 </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── ACTIVITY: what the bot actually did ────────────────── */}
+        {tab === "activity" && (
+          <div>
+            <p style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.75, margin: "0 0 12px" }}>
+              {t("كل تعليق وصل، وماذا فعل البوت به ولماذا.",
+                 "Every comment that arrived, what the bot did with it and why.")}
+            </p>
+            {logsLoading ? (
+              <div style={{ display: "flex", justifyContent: "center", padding: 30 }}>
+                <Loader2 size={20} className="spin" color={c.pinkInk} />
+              </div>
+            ) : logs.length === 0 ? (
+              <div style={{ ...ttCard(c), padding: 22, textAlign: "center", fontSize: 12.5, color: c.muted, lineHeight: 1.8 }}>
+                {t("لا نشاط بعد. يبدأ التسجيل فور تشغيل البوت ووصول أول تعليق.",
+                   "No activity yet. Logging starts once the bot is running and the first comment arrives.")}
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 8 }}>
+                {logs.slice(0, 50).map((l) => {
+                  const sent = l.public_status === "sent";
+                  const failed = l.public_status === "failed";
+                  const tone = sent ? c.ok : failed ? c.danger : c.muted;
+                  return (
+                    <div key={l.id} style={{ ...ttCard(c), padding: 12 }}>
+                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 9 }}>
+                        <span style={{ fontSize: 12.5, color: c.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {l.comment_message || "—"}
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: tone, whiteSpace: "nowrap" }}>
+                          {sent ? t("رُدّ", "replied") : failed ? t("فشل", "failed") : t("تُخطّي", "skipped")}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, color: c.muted, marginTop: 5 }}>
+                        {l.commenter_name || t("مشاهد", "viewer")}
+                        {l.sent_at ? ` · ${new Date(l.sent_at).toLocaleString(rtl ? "ar-LY" : "en-GB")}` : ""}
+                        {l.error ? ` · ${l.error}` : ""}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -471,18 +559,46 @@ function TikTokBotInner() {
                     );
                   })}
                 </div>
+                {videosMore && (
+                  <button onClick={loadMoreVideos} disabled={videosLoading}
+                    style={{ ...ttSecondary(c), width: "100%", marginTop: 12 }}>
+                    {videosLoading ? <Loader2 size={15} className="spin" /> : null}
+                    {t("حمّل المزيد", "Load more")}
+                  </button>
+                )}
               </>
             )}
 
+            {/*
+              A sheet over the grid rather than a block appended to the page. Tapping a
+              video and then having to scroll to the bottom to find its settings is the
+              kind of thing that makes an owner give up on the feature.
+            */}
             {editingVideo && (
-              <div style={{ marginTop: 14 }}>
-                <PostOverrideEditor
-                  initial={(config?.post_overrides || {})[editingVideo.id]}
-                  onSave={(v) => saveVideoOverride(editingVideo.id, v)}
-                  onClose={() => setEditingVideo(null)}
-                  c={bot} t={t} accent={c.pinkInk}
-                  unitLabel={t("الفيديو", "video")}
-                />
+              <div
+                onClick={() => setEditingVideo(null)}
+                style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 80, display: "flex", alignItems: "flex-end" }}>
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ background: c.surface, borderRadius: "16px 16px 0 0", width: "100%", maxWidth: 680, margin: "0 auto", maxHeight: "88vh", overflowY: "auto", padding: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
+                    <div style={{ ...ttStage(), width: 46, flexShrink: 0, borderRadius: 7 }}>
+                      {editingVideo.thumbnail && (
+                        <img src={editingVideo.thumbnail} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                      )}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1, fontSize: 13, color: c.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {editingVideo.caption || t("فيديو", "Video")}
+                    </div>
+                  </div>
+                  <PostOverrideEditor
+                    initial={(config?.post_overrides || {})[editingVideo.id]}
+                    onSave={(v) => saveVideoOverride(editingVideo.id, v)}
+                    onClose={() => setEditingVideo(null)}
+                    c={bot} t={t} accent={c.pinkInk}
+                    unitLabel={t("الفيديو", "video")}
+                  />
+                </div>
               </div>
             )}
           </>

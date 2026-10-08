@@ -11,6 +11,14 @@
     {
       "path": "/api/tiktok/ads/campaigns/daily-debit",
       "schedule": "15 6 * * *"
+    },
+    {
+      "path": "/api/tiktok/cron/poll",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/bot/cron/drain",
+      "schedule": "*/2 * * * *"
     }
   ]
 }
