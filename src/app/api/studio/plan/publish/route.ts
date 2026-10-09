@@ -101,7 +101,13 @@ async function publishToTikTok(
 export async function POST(req: NextRequest) {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
-  const { planId } = await req.json();
+  const { planId, postIds } = await req.json();
+  // A subset, when the owner picked specific posts. Publishing is N separate calls to
+  // Facebook and a dropped connection halfway through leaves the rest unsent with no
+  // way to resume just those — so they can send a few at a time and see each land.
+  const only: string[] | null = Array.isArray(postIds) && postIds.length
+    ? postIds.map(String)
+    : null;
   if (!planId) return NextResponse.json({ error: "planId مطلوب" }, { status: 400 });
 
   const { data: plan } = await supabaseAdmin
@@ -144,11 +150,20 @@ export async function POST(req: NextRequest) {
     }, { status: 409 });
   }
 
-  const { data: posts } = await supabaseAdmin
-    .from("studio_posts").select("*").eq("plan_id", planId)
-    .in("status", ["approved", "scheduled", "failed"]);
+  let postQuery = supabaseAdmin
+    .from("studio_posts").select("*").eq("plan_id", planId);
+  // A chosen subset is published whatever its status — the owner picked it on purpose,
+  // including to retry one that failed. Without a selection, only the ones waiting.
+  if (only) postQuery = postQuery.in("id", only);
+  else postQuery = postQuery.in("status", ["approved", "scheduled", "failed"]);
+  const { data: posts } = await postQuery;
 
-  await supabaseAdmin.from("studio_plans").update({ auto_publish: true, status: "active" }).eq("id", planId);
+  // Publishing a hand-picked few is not "turn this plan on": that switch belongs to
+  // publishing the plan, not to sending three posts to test the connection.
+  if (!only) {
+    await supabaseAdmin.from("studio_plans")
+      .update({ auto_publish: true, status: "active" }).eq("id", planId);
+  }
 
   // Bot config for this page — per-post reply settings are written into its
   // post_overrides so the reply bot uses each post's custom reply once it's live.
@@ -157,8 +172,44 @@ export async function POST(req: NextRequest) {
   const overrides: Record<string, unknown> = { ...((botCfg?.post_overrides as Record<string, unknown>) || {}) };
   let overridesTouched = false;
 
+  /**
+   * Attaches a post's custom reply to the bot, keyed by its Facebook id.
+   *
+   * This used to live inside the publish attempt, which meant it only ever ran when
+   * a post published successfully ON THAT RUN. Three ways that lost the owner's work
+   * silently: the post failed to publish (as 42 did), the post was already live so
+   * the loop skipped it, or the reply was written AFTER publishing. In each case the
+   * owner had written a reply, pressed save, and the bot never knew about it.
+   *
+   * It is a separate step now, applied to every post we know the id of.
+   */
+  function bindReply(post: Record<string, unknown>, externalId: string | null): boolean {
+    const rc = post.reply_config as {
+      enabled?: boolean; public_replies?: string[]; private_reply?: string; like?: boolean;
+    } | null;
+    if (!botCfg || !rc || !externalId) return false;
+
+    const numeric = externalId.includes("_") ? externalId.split("_")[1] : externalId;
+    overrides[numeric] = rc.enabled === false
+      ? { disabled: true }
+      : {
+          public_replies: (rc.public_replies || []).filter((x) => (x || "").trim()),
+          private_reply:  rc.private_reply || "",
+          like:           rc.like,
+        };
+    return true;
+  }
+
   const now = Math.floor(Date.now() / 1000);
-  let published = 0, scheduled = 0, failed = 0;
+  let published = 0, scheduled = 0, failed = 0, bound = 0;
+
+  // Posts already on Facebook: nothing to publish, but their reply may be new or
+  // changed since, and binding it is the whole point of writing one.
+  for (const p of posts || []) {
+    if (!p.external_post_id) continue;
+    if (bindReply(p, p.external_post_id)) { overridesTouched = true; bound++; }
+  }
+
   for (const p of posts || []) {
     if (p.external_post_id) continue; // already on Facebook
     const caption = [p.caption, p.hashtags].filter(Boolean).join("\n\n");
@@ -222,19 +273,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Bind this post's reply settings to the bot (keyed by the numeric post id).
-      const rc = p.reply_config as { enabled?: boolean; public_replies?: string[]; private_reply?: string; like?: boolean } | null;
-      if (botCfg && rc && externalId) {
-        const numeric = externalId.includes("_") ? externalId.split("_")[1] : externalId;
-        overrides[numeric] = rc.enabled === false
-          ? { disabled: true }
-          : {
-              public_replies: (rc.public_replies || []).filter((s) => (s || "").trim()),
-              private_reply:  rc.private_reply || "",
-              like:           rc.like,
-            };
-        overridesTouched = true;
-      }
+      if (bindReply(p, externalId)) { overridesTouched = true; bound++; }
     } catch (e) {
       const raw = e instanceof Error ? e.message : "Meta error";
       // "(#200) Permissions error" says nothing an owner can act on. Name the cause.
@@ -252,5 +291,17 @@ export async function POST(req: NextRequest) {
 
   const { data: updated } = await supabaseAdmin
     .from("studio_posts").select("*").eq("plan_id", planId).order("scheduled_for", { ascending: true });
-  return NextResponse.json({ ok: true, published, scheduled, failed, posts: updated || [] });
+
+  // A reply written for a post that never reached Facebook has nothing to attach to.
+  // Saying so beats letting the owner assume the bot is armed when it is not.
+  const unbound = (updated || []).filter(
+    (p) => p.reply_config && !p.external_post_id,
+  ).length;
+
+  return NextResponse.json({
+    ok: true, published, scheduled, failed,
+    repliesBound: bound,
+    repliesUnbound: unbound,
+    posts: updated || [],
+  });
 }

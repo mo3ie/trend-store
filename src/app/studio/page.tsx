@@ -6,7 +6,7 @@ import {
   ArrowLeft, ArrowRight, Loader2, Store, Package, CalendarDays, Plus, Trash2, X,
   Image as ImageIcon, Save, CheckCircle, Sparkles, ChevronDown, Bot,
   Copy, RefreshCw, Clock, Pencil, Search, CheckSquare, Square, CircleCheck, CircleX,
-  Brain, Globe, DollarSign, Bell, AlertTriangle, AlertCircle, MessageSquareReply, ThumbsUp, Upload,
+  Brain, Globe, DollarSign, Bell, AlertTriangle, AlertCircle, MessageSquareReply, ThumbsUp, Upload, Send,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
@@ -153,6 +153,7 @@ export default function StudioPage() {
   const [publishMsg, setPublishMsg] = useState("");
   const [editPost, setEditPost] = useState<PlanPost | null>(null);
   const [savingPost, setSavingPost] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [copiedId, setCopiedId] = useState("");
   // Employee "brain" / style memory
   const [brainStyle, setBrainStyle] = useState("");
@@ -430,32 +431,95 @@ export default function StudioPage() {
     setApproving(false);
     if (r.ok && d.plan) { setPlan(d.plan); setPlanPosts((ps) => ps.map((p) => (p.status === "draft" ? { ...p, status: "approved" } : p))); }
   }
-  async function publishPlan() {
+  /**
+   * Publishes the plan, or just the posts the owner selected.
+   *
+   * Publishing is one call to Facebook per post, so a dropped connection halfway
+   * through leaves the rest unsent — and before this there was no way to send only
+   * those. Sending a chosen few at a time makes that recoverable, and lets an owner
+   * try one post before committing a month of them.
+   */
+  async function publishPlan(selectedOnly = false) {
     if (!plan) return;
-    if (!confirm(t("نشر وجدولة كل منشورات الخطة على فيسبوك؟", "Publish & schedule all plan posts to Facebook?"))) return;
+    const ids = selectedOnly ? Array.from(selectedPlanPosts) : [];
+    if (selectedOnly && ids.length === 0) return;
+
+    const ask = selectedOnly
+      ? t(`نشر ${ids.length} منشوراً محدّداً على فيسبوك؟`, `Publish ${ids.length} selected post(s) to Facebook?`)
+      : t("نشر وجدولة كل منشورات الخطة على فيسبوك؟", "Publish & schedule all plan posts to Facebook?");
+    if (!confirm(ask)) return;
+
     setPublishing(true); setPublishMsg("");
-    const r = await fetch("/api/studio/plan/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ planId: plan.id }) });
-    const d = await r.json();
-    setPublishing(false);
-    if (!r.ok) { setPublishMsg(d.error || t("تعذّر النشر", "Publish failed")); return; }
-    setPlanPosts(d.posts || planPosts);
-    setPublishMsg(t(`تم: ${d.published} منشوراً نُشر، ${d.scheduled} مجدول${d.failed ? `، ${d.failed} فشل` : ""}.`, `Done: ${d.published} published, ${d.scheduled} scheduled${d.failed ? `, ${d.failed} failed` : ""}.`));
+    try {
+      const r = await fetch("/api/studio/plan/publish", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(selectedOnly ? { planId: plan.id, postIds: ids } : { planId: plan.id }),
+      });
+      const d = await r.json().catch(() => ({}));
+      setPublishing(false);
+      if (!r.ok) { setPublishMsg(d.message || d.error || t("تعذّر النشر", "Publish failed")); return; }
+
+      setPlanPosts(d.posts || planPosts);
+      if (selectedOnly) { setSelectedPlanPosts(new Set()); setPostSelectMode(false); }
+
+      // The reply count matters as much as the publish count: an owner who wrote a
+      // custom reply needs to know the bot actually received it.
+      const replies = d.repliesBound
+        ? t(` · رُبط ${d.repliesBound} ردّاً بالبوت`, ` · ${d.repliesBound} repl(ies) attached to the bot`)
+        : "";
+      setPublishMsg(t(
+        `تم: ${d.published} منشوراً نُشر، ${d.scheduled} مجدول${d.failed ? `، ${d.failed} فشل` : ""}${replies}.`,
+        `Done: ${d.published} published, ${d.scheduled} scheduled${d.failed ? `, ${d.failed} failed` : ""}${replies}.`));
+    } catch {
+      setPublishing(false);
+      // The posts that DID go out are already recorded server-side; a refresh shows
+      // exactly how far it got, which is the point of publishing in batches.
+      setPublishMsg(t("انقطع الاتصال أثناء النشر — حدّث الصفحة لترى ما نُشر، ثم أعد إرسال الباقي.",
+                      "The connection dropped mid-publish — refresh to see what went out, then send the rest."));
+    }
   }
   async function discardPlan() {
     if (!plan || !confirm(t("حذف هذه الخطة كاملة؟", "Delete this entire plan?"))) return;
     await fetch(`/api/studio/plan?id=${plan.id}`, { method: "DELETE" });
     setPlan(null); setPlanPosts([]);
   }
+  /**
+   * Saves one post's edits.
+   *
+   * A failure here used to be SILENT: no error, no retry, and the editor simply sat
+   * there — so an owner who lost their connection mid-save believed their rewrite was
+   * stored, published, and watched the original text go out instead. The edit was
+   * never saved; nothing "reverted".
+   *
+   * So a failure now says so and keeps the editor open with the text still in it,
+   * because the one thing that must not happen is losing what they wrote.
+   */
+  // A stale error from a previous post would be read as a failure of this one.
+  useEffect(() => { setSaveError(""); }, [editPost?.id]);
+
   async function savePost(fields: Partial<PlanPost> & { regenerate?: boolean }) {
     if (!editPost) return;
     setSavingPost(true);
-    const r = await fetch("/api/studio/plan/post", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editPost.id, ...fields }) });
-    const d = await r.json();
-    setSavingPost(false);
-    if (r.ok && d.post) {
+    setSaveError("");
+    try {
+      const r = await fetch("/api/studio/plan/post", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editPost.id, ...fields }),
+      });
+      const d = await r.json().catch(() => ({}));
+      setSavingPost(false);
+
+      if (!r.ok || !d.post) {
+        setSaveError(d.error || t("تعذّر الحفظ — نصّك ما زال هنا، حاول مجدداً.", "Could not save — your text is still here, try again."));
+        return;
+      }
+
       setPlanPosts((ps) => ps.map((p) => (p.id === d.post.id ? d.post : p)));
       setEditPost(d.post);
       if (fields.regenerate === undefined && !("image_url" in fields)) setEditPost(null); // close on a full save
+    } catch {
+      setSavingPost(false);
+      setSaveError(t("انقطع الاتصال — نصّك ما زال هنا، حاول مجدداً.", "Connection lost — your text is still here, try again."));
     }
   }
   async function deletePlanPost(id: string) {
@@ -953,6 +1017,11 @@ export default function StudioPage() {
                           <span style={{ fontSize: 12.5, color: c.muted, fontWeight: 700 }}>{t(`محدّد: ${selectedPlanPosts.size}`, `Selected: ${selectedPlanPosts.size}`)}</span>
                           <div style={{ marginInlineStart: "auto", display: "flex", gap: 6, flexWrap: "wrap" }}>
                             <button onClick={() => setShowBulkBoost(true)} disabled={selectedPlanPosts.size === 0} style={{ background: PINK_BG, border: `1px solid ${PINK}55`, borderRadius: 9, padding: "6px 11px", color: PINK, fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}><DollarSign size={13} /> {t("تمويل", "Boost")}</button>
+                            <button onClick={() => publishPlan(true)} disabled={selectedPlanPosts.size === 0 || publishing}
+                              title={t("انشر المحدّد فقط — مفيد إن انقطع الاتصال أثناء نشر دفعة كبيرة", "Publish only the selected — useful when a big batch was cut short")}
+                              style={{ background: "rgba(109,40,217,0.16)", border: "1px solid rgba(109,40,217,0.45)", borderRadius: 9, padding: "6px 11px", color: light ? "#6d28d9" : "#c4b5fd", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 || publishing ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                              {publishing ? <Loader2 size={13} className="spin" /> : <Send size={13} />} {t("انشر المحدّد", "Publish selected")}
+                            </button>
                             <button onClick={() => bulkPostAction("approve")} disabled={selectedPlanPosts.size === 0} style={{ background: "rgba(34,197,94,0.14)", border: "1px solid #22c55e55", borderRadius: 9, padding: "6px 11px", color: "#22c55e", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}><CircleCheck size={13} /> {t("اعتماد", "Approve")}</button>
                             {/* Spend the month's paid-AI allowance on the selected posts only. */}
                             <button onClick={upgradeSelected} disabled={selectedPlanPosts.size === 0 || upgrading} style={{ background: "rgba(168,85,247,0.14)", border: "1px solid rgba(168,85,247,0.35)", borderRadius: 9, padding: "6px 11px", color: "#a855f7", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 || upgrading ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}>
@@ -1017,7 +1086,7 @@ export default function StudioPage() {
                           {t("ينشر الموظف المنشورات المعتمدة ويجدولها على فيسبوك في أوقاتها. يتطلب صلاحية النشر من فيسبوك (قيد الطلب) — سيعمل فور اعتمادها.", "The employee publishes & schedules approved posts to Facebook at their times. Requires the Facebook publishing permission (being requested) — it works the moment it's approved.")}
                         </p>
                         {publishMsg && <div style={{ fontSize: 12.5, color: publishMsg.includes(t("فشل", "failed")) ? "#f59e0b" : "#22c55e", marginBottom: 10, lineHeight: 1.6 }}>{publishMsg}</div>}
-                        <button onClick={publishPlan} disabled={publishing} style={{ width: "100%", background: G_HERO, border: "none", borderRadius: 13, padding: "14px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: publishing ? 0.7 : 1 }}>
+                        <button onClick={() => publishPlan()} disabled={publishing} style={{ width: "100%", background: G_HERO, border: "none", borderRadius: 13, padding: "14px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: publishing ? 0.7 : 1 }}>
                           {publishing ? <Loader2 size={17} className="spin" /> : <CalendarDays size={17} />} {t("نشر وجدولة على فيسبوك", "Publish & schedule to Facebook")}
                         </button>
                       </div>
@@ -1395,6 +1464,13 @@ export default function StudioPage() {
                 </div>
               );
             })()}
+
+            {saveError && (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 9, background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.32)", borderRadius: 12, padding: "11px 13px", marginBottom: 12 }}>
+                <AlertCircle size={16} color="#ef4444" style={{ flexShrink: 0, marginTop: 2 }} />
+                <div style={{ fontSize: 12.5, color: c.text, lineHeight: 1.7 }}>{saveError}</div>
+              </div>
+            )}
 
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
               <button onClick={() => savePost({ caption: editPost.caption, hashtags: editPost.hashtags, cta: editPost.cta, scheduled_for: editPost.scheduled_for, boost: editPost.boost, boost_budget_usd: editPost.boost_budget_usd, boost_days: editPost.boost_days, reply_config: editPost.reply_config })} disabled={savingPost} style={{ flex: 1, background: G_HERO, border: "none", borderRadius: 13, padding: "13px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", opacity: savingPost ? 0.7 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
