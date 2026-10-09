@@ -268,6 +268,58 @@ export async function publishPageVideo(
 }
 
 // Large profile picture URL for a Page — used as the image on a Page-likes ad.
+export interface PostStats {
+  postId: string;
+  likes: number;
+  comments: number;
+  shares: number;
+  /** Unique people who saw it. Needs page_read_engagement; 0 when unavailable. */
+  reach: number;
+  permalink: string | null;
+}
+
+/**
+ * How a published post actually did.
+ *
+ * Counts come from the summary blocks rather than separate calls, and `insights`
+ * carries reach — which is the number an owner actually cares about and the one most
+ * likely to be refused, since it depends on the Page's own permissions. A refusal
+ * must not cost the whole row, so reach degrades to 0 while the rest still returns.
+ *
+ * Returns null only when the post itself cannot be read (deleted, or the token lost
+ * access), which is a different thing from "it has no engagement yet" and the report
+ * shows it differently.
+ */
+export async function getPostStats(postId: string, pageToken: string): Promise<PostStats | null> {
+  try {
+    const fields = [
+      "permalink_url",
+      "likes.summary(true).limit(0)",
+      "comments.summary(true).limit(0)",
+      "shares",
+      "insights.metric(post_impressions_unique)",
+    ].join(",");
+    const res = await fetch(
+      `${BASE}/${postId}?fields=${encodeURIComponent(fields)}&access_token=${encodeURIComponent(pageToken)}`,
+      { cache: "no-store" },
+    );
+    const d = await res.json();
+    if (d?.error) return null;
+
+    const reach = Number(d?.insights?.data?.[0]?.values?.[0]?.value ?? 0);
+    return {
+      postId,
+      likes: Number(d?.likes?.summary?.total_count ?? 0),
+      comments: Number(d?.comments?.summary?.total_count ?? 0),
+      shares: Number(d?.shares?.count ?? 0),
+      reach: Number.isFinite(reach) ? reach : 0,
+      permalink: d?.permalink_url ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function getPagePicture(pageId: string, pageToken?: string): Promise<string | null> {
   try {
     const data = await graph<{ data?: { url?: string } }>(

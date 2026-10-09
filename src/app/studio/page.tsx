@@ -6,7 +6,7 @@ import {
   ArrowLeft, ArrowRight, Loader2, Store, Package, CalendarDays, Plus, Trash2, X,
   Image as ImageIcon, Save, CheckCircle, Sparkles, ChevronDown, Bot,
   Copy, RefreshCw, Clock, Pencil, Search, CheckSquare, Square, CircleCheck, CircleX,
-  Brain, Globe, DollarSign, Bell, AlertTriangle, AlertCircle, MessageSquareReply, ThumbsUp, Upload, Send,
+  Brain, Globe, DollarSign, Bell, AlertTriangle, AlertCircle, MessageSquareReply, ThumbsUp, Upload, Send, BarChart3, Link2,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
@@ -101,7 +101,23 @@ export default function StudioPage() {
   const [pageSearch, setPageSearch] = useState("");
   const [loadingPages, setLoadingPages] = useState(true);
   const [notAuthed, setNotAuthed] = useState(false);
-  const [tab, setTab] = useState<"brand" | "catalog" | "plan" | "alerts">("brand");
+  const [tab, setTab] = useState<"brand" | "catalog" | "plan" | "report" | "alerts">("brand");
+
+  // ── Report tab ──────────────────────────────────────────────────────────────
+  interface ReportRow {
+    id: string; caption: string; scheduledFor: string | null; publishedAt: string | null;
+    status: string; error: string | null; externalPostId: string | null;
+    hasReply: boolean; replyBound: boolean; repliesSent: number; boost: boolean;
+    stats: { likes: number; comments: number; shares: number; reach: number; permalink: string | null } | null;
+  }
+  const [report, setReport] = useState<{
+    rows: ReportRow[];
+    summary: { total: number; published: number; scheduled: number; draft: number; failed: number; repliesUnbound: number; repliesSent: number };
+    statsIncluded: boolean;
+  } | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [bindingReplies, setBindingReplies] = useState(false);
+  const [reportMsg, setReportMsg] = useState("");
   const [alerts, setAlerts] = useState<{ id: string; severity: string; area: string; title: string; detail?: string; at?: string }[]>([]);
   const [botInfo, setBotInfo] = useState<BotInfo | null>(null);
 
@@ -439,6 +455,54 @@ export default function StudioPage() {
    * those. Sending a chosen few at a time makes that recoverable, and lets an owner
    * try one post before committing a month of them.
    */
+  async function loadReport(withStats = false) {
+    if (!selectedPage) return;
+    setReportLoading(true); setReportMsg("");
+    try {
+      const q = new URLSearchParams({ pageId: selectedPage });
+      if (withStats) q.set("stats", "1");
+      const d = await fetch(`/api/studio/report?${q}`).then((r) => r.json());
+      if (d.rows) setReport(d);
+      else setReportMsg(d.message || d.error || t("تعذّر جلب التقرير", "Could not load the report"));
+    } catch {
+      setReportMsg(t("تعذّر الاتصال", "Connection failed"));
+    }
+    setReportLoading(false);
+  }
+
+  /**
+   * Repairs replies that were written but never reached the bot — without
+   * republishing anything, which is why it is not the publish button.
+   */
+  async function bindReplies() {
+    if (!selectedPage) return;
+    setBindingReplies(true); setReportMsg("");
+    try {
+      const r = await fetch("/api/studio/report", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pageId: selectedPage }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) setReportMsg(d.message || d.error || t("تعذّر الربط", "Could not attach"));
+      else {
+        setReportMsg(t(`رُبط ${d.bound} ردّاً بالبوت.`, `${d.bound} repl(ies) attached to the bot.`));
+        await loadReport(report?.statsIncluded);
+      }
+    } catch {
+      setReportMsg(t("تعذّر الاتصال", "Connection failed"));
+    }
+    setBindingReplies(false);
+  }
+
+  // Loaded when the tab is opened, not on mount: it is several queries and a join.
+  useEffect(() => {
+    if (tab === "report" && selectedPage && !report) loadReport(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, selectedPage]);
+
+  // A report belongs to one Page; keeping the previous Page's rows would be a lie.
+  useEffect(() => { setReport(null); }, [selectedPage]);
+
   async function publishPlan(selectedOnly = false) {
     if (!plan) return;
     const ids = selectedOnly ? Array.from(selectedPlanPosts) : [];
@@ -667,6 +731,7 @@ export default function StudioPage() {
     { id: "brand" as const,   icon: Store,        label: t("المتجر", "Store") },
     { id: "catalog" as const, icon: Package,      label: t("الأصناف", "Catalog") },
     { id: "plan" as const,    icon: CalendarDays, label: t("الخطة", "Plan") },
+    { id: "report" as const,  icon: BarChart3,    label: t("التقارير", "Reports") },
     { id: "alerts" as const,  icon: Bell,         label: t("التنبيهات", "Alerts"), badge: alerts.length },
   ];
 
@@ -1097,6 +1162,116 @@ export default function StudioPage() {
             )}
 
             {/* ALERTS TAB */}
+            {tab === "report" && (
+              <div style={{ display: "grid", gap: 14 }}>
+                {report && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(88px,1fr))", gap: 8 }}>
+                    {([
+                      [t("منشور", "Published"), report.summary.published, "#22c55e"],
+                      [t("مجدول", "Scheduled"), report.summary.scheduled, "#3b82f6"],
+                      [t("مسوّدة", "Draft"), report.summary.draft, c.muted],
+                      [t("فشل", "Failed"), report.summary.failed, "#ef4444"],
+                      [t("ردود البوت", "Bot replies"), report.summary.repliesSent, "#a855f7"],
+                    ] as const).map(([label, n, col], i) => (
+                      <div key={i} style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: "11px 12px" }}>
+                        <div style={{ fontSize: 20, fontWeight: 900, color: col as string, fontVariantNumeric: "tabular-nums" }}>{n}</div>
+                        <div style={{ fontSize: 11, color: c.muted, marginTop: 2 }}>{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {report && report.summary.repliesUnbound > 0 && (
+                  <div style={{ background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.38)", borderRadius: 14, padding: "14px 16px" }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: "#f59e0b" }}>
+                      {t(`${report.summary.repliesUnbound} ردّاً كتبتَه لم يصل البوت`, `${report.summary.repliesUnbound} repl(ies) you wrote never reached the bot`)}
+                    </div>
+                    <div style={{ fontSize: 12.5, color: c.muted, marginTop: 6, lineHeight: 1.8 }}>
+                      {t("نُشرت هذه المنشورات قبل أن يصبح ربط الردّ خطوة مستقلة، فلم يستلم البوت ردودها. الربط لا ينشر شيئاً ولا يغيّر المنشورات.",
+                         "These went out before attaching the reply was its own step, so the bot never received them. Attaching publishes nothing and changes no post.")}
+                    </div>
+                    <button onClick={bindReplies} disabled={bindingReplies}
+                      style={{ marginTop: 12, background: G_HERO, border: "none", borderRadius: 11, padding: "10px 18px", color: "#fff", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 8, opacity: bindingReplies ? 0.7 : 1 }}>
+                      {bindingReplies ? <Loader2 size={15} className="spin" /> : <Link2 size={15} />}
+                      {t("اربط الردود بالبوت", "Attach the replies")}
+                    </button>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <button onClick={() => loadReport(true)} disabled={reportLoading}
+                    style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 11, padding: "9px 15px", color: c.text, fontWeight: 800, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 7 }}>
+                    {reportLoading ? <Loader2 size={14} className="spin" /> : <BarChart3 size={14} />}
+                    {t("اجلب النتائج من فيسبوك", "Fetch results from Facebook")}
+                  </button>
+                  {reportMsg && <span style={{ fontSize: 12.5, color: c.muted }}>{reportMsg}</span>}
+                </div>
+
+                {reportLoading && !report ? (
+                  <div style={{ textAlign: "center", padding: 30 }}><Loader2 size={22} className="spin" color={c.muted} /></div>
+                ) : !report?.rows.length ? (
+                  <div style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 14, padding: 26, textAlign: "center", fontSize: 13, color: c.muted, lineHeight: 1.8 }}>
+                    {t("لا منشورات بعد لهذه الصفحة.", "No posts yet for this Page.")}
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {report.rows.map((r) => {
+                      const tone = r.status === "published" ? "#22c55e"
+                        : r.status === "failed" ? "#ef4444"
+                        : r.status === "scheduled" ? "#3b82f6" : c.muted;
+                      const label = r.status === "published" ? t("منشور", "published")
+                        : r.status === "failed" ? t("فشل", "failed")
+                        : r.status === "scheduled" ? t("مجدول", "scheduled")
+                        : t("مسوّدة", "draft");
+                      return (
+                        <div key={r.id} style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 13, padding: 13 }}>
+                          <div style={{ display: "flex", gap: 10, alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap" }}>
+                            <div style={{ fontSize: 13, color: c.text, lineHeight: 1.7, flex: "1 1 200px", minWidth: 0 }}>
+                              {(r.caption || "").slice(0, 110) || t("(بلا نص)", "(no caption)")}
+                            </div>
+                            <span style={{ background: `${tone}22`, border: `1px solid ${tone}66`, color: tone, borderRadius: 100, padding: "3px 10px", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" }}>{label}</span>
+                          </div>
+
+                          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 9, fontSize: 11.5, color: c.muted }}>
+                            {r.scheduledFor && <span>{new Date(r.scheduledFor).toLocaleString(rtl ? "ar-LY" : "en-GB")}</span>}
+                            {r.boost && <span style={{ color: "#f0b429" }}>{t("مموّل", "boosted")}</span>}
+                            {r.repliesSent > 0 && (
+                              <span style={{ color: "#a855f7" }}>
+                                <MessageSquareReply size={11} style={{ verticalAlign: "-1px" }} /> {r.repliesSent} {t("ردّ", "replies")}
+                              </span>
+                            )}
+                            {r.hasReply && r.externalPostId && (
+                              <span style={{ color: r.replyBound ? "#22c55e" : "#f59e0b" }}>
+                                {r.replyBound ? t("الردّ مربوط", "reply attached") : t("الردّ غير مربوط", "reply NOT attached")}
+                              </span>
+                            )}
+                          </div>
+
+                          {r.stats && (
+                            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 10, paddingTop: 10, borderTop: `1px solid ${c.border}`, fontSize: 12 }}>
+                              <span style={{ color: c.text }}><ThumbsUp size={12} style={{ verticalAlign: "-1px" }} /> {r.stats.likes}</span>
+                              <span style={{ color: c.text }}><MessageSquareReply size={12} style={{ verticalAlign: "-1px" }} /> {r.stats.comments}</span>
+                              <span style={{ color: c.text }}>&#8599; {r.stats.shares}</span>
+                              {r.stats.reach > 0 && <span style={{ color: c.muted }}>{t("وصل", "reach")} {r.stats.reach.toLocaleString()}</span>}
+                              {r.stats.permalink && (
+                                <a href={r.stats.permalink} target="_blank" rel="noreferrer" style={{ color: "#3b82f6", textDecoration: "none", fontWeight: 700 }}>
+                                  {t("افتح", "open")}
+                                </a>
+                              )}
+                            </div>
+                          )}
+
+                          {r.error && (
+                            <div style={{ fontSize: 11.5, color: "#ef4444", marginTop: 8, lineHeight: 1.7 }}>{r.error}</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {tab === "alerts" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ fontSize: 13, color: c.muted, lineHeight: 1.7, marginBottom: 2 }}>{t("تنبيهات الأخطاء والمشاكل عبر الإعلانات، الموظف الذكي، وبوت الرد لهذه الصفحة.", "Error & issue alerts across Ads, the AI Employee, and the reply bot for this Page.")}</div>
