@@ -268,6 +268,73 @@ export async function publishPageVideo(
 }
 
 // Large profile picture URL for a Page — used as the image on a Page-likes ad.
+/**
+ * Changing a post after it was created — the controls an owner expects to have over
+ * their own content, and did not.
+ *
+ * What Facebook allows differs between a scheduled post and a live one, and the
+ * difference is not obvious, so each function says which it applies to. All of these
+ * need `pages_manage_posts`, approved 2026-10-08.
+ */
+
+/** Edits a post's text. Works whether it is scheduled or already live. */
+export async function editPostMessage(
+  postId: string, pageToken: string, message: string,
+): Promise<void> {
+  const res = await fetch(`${BASE}/${postId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, access_token: pageToken }),
+  });
+  const d = await res.json();
+  if (d?.error) throw new Error(d.error.message || "edit failed");
+}
+
+/**
+ * Moves a scheduled post to a different time.
+ *
+ * Only for a post that has NOT gone out — a published post has no schedule left to
+ * change, and Facebook rejects the attempt rather than un-publishing it.
+ */
+export async function reschedulePost(
+  postId: string, pageToken: string, whenUnix: number,
+): Promise<void> {
+  const res = await fetch(`${BASE}/${postId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scheduled_publish_time: whenUnix, access_token: pageToken }),
+  });
+  const d = await res.json();
+  if (d?.error) throw new Error(d.error.message || "reschedule failed");
+}
+
+/** Publishes a scheduled post immediately, instead of waiting for its time. */
+export async function publishScheduledNow(postId: string, pageToken: string): Promise<void> {
+  const res = await fetch(`${BASE}/${postId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ is_published: true, access_token: pageToken }),
+  });
+  const d = await res.json();
+  if (d?.error) throw new Error(d.error.message || "publish failed");
+}
+
+/**
+ * Removes a post from Facebook.
+ *
+ * For a scheduled post this cancels it before anyone sees it. For a live one it is a
+ * real deletion — the post, its likes and its comments go, and nothing brings them
+ * back. Callers must confirm before reaching this.
+ */
+export async function deletePagePost(postId: string, pageToken: string): Promise<void> {
+  const res = await fetch(
+    `${BASE}/${postId}?access_token=${encodeURIComponent(pageToken)}`,
+    { method: "DELETE" },
+  );
+  const d = await res.json();
+  if (d?.error) throw new Error(d.error.message || "delete failed");
+}
+
 export interface PostStats {
   postId: string;
   likes: number;

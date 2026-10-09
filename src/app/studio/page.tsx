@@ -118,6 +118,7 @@ export default function StudioPage() {
   const [reportLoading, setReportLoading] = useState(false);
   const [bindingReplies, setBindingReplies] = useState(false);
   const [reportMsg, setReportMsg] = useState("");
+  const [controlBusy, setControlBusy] = useState("");
   const [alerts, setAlerts] = useState<{ id: string; severity: string; area: string; title: string; detail?: string; at?: string }[]>([]);
   const [botInfo, setBotInfo] = useState<BotInfo | null>(null);
 
@@ -502,6 +503,48 @@ export default function StudioPage() {
 
   // A report belongs to one Page; keeping the previous Page's rows would be a lie.
   useEffect(() => { setReport(null); }, [selectedPage]);
+
+  /**
+   * Acts on a post that is already on Facebook.
+   *
+   * Destructive actions confirm here rather than in the API, because the person who
+   * needs the warning is the one looking at the post — and "cancel a scheduled post"
+   * and "delete a live post" deserve different warnings, which only the caller knows
+   * how to phrase.
+   */
+  async function controlPost(
+    row: ReportRow,
+    action: "edit" | "reschedule" | "publish_now" | "cancel" | "delete",
+    payload?: { message?: string; scheduledFor?: string },
+  ) {
+    const confirms: Partial<Record<typeof action, string>> = {
+      publish_now: t("نشر هذا المنشور الآن بدل موعده؟", "Publish this now instead of at its scheduled time?"),
+      cancel: t("إلغاء النشر المجدول؟ لن يراه أحد، ونصّه يبقى محفوظاً هنا.",
+                "Cancel this scheduled post? Nobody will see it, and its text stays saved here."),
+      delete: t("حذف المنشور من فيسبوك نهائياً؟ تذهب معه إعجاباته وتعليقاته ولا يمكن استرجاعها.",
+                "Delete this post from Facebook permanently? Its likes and comments go with it and cannot be recovered."),
+    };
+    const ask = confirms[action];
+    if (ask && !confirm(ask)) return;
+
+    setControlBusy(row.id);
+    setReportMsg("");
+    try {
+      const r = await fetch("/api/studio/plan/post/control", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: row.id, action, ...payload }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) setReportMsg(d.message || d.error || t("تعذّر التنفيذ", "Action failed"));
+      else {
+        setReportMsg(t("تم.", "Done."));
+        await loadReport(report?.statsIncluded);
+      }
+    } catch {
+      setReportMsg(t("تعذّر الاتصال", "Connection failed"));
+    }
+    setControlBusy("");
+  }
 
   async function publishPlan(selectedOnly = false) {
     if (!plan) return;
@@ -1261,6 +1304,73 @@ export default function StudioPage() {
                             </div>
                           )}
 
+
+                          {r.externalPostId && (
+                            <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 11, paddingTop: 10, borderTop: `1px solid ${c.border}` }}>
+                              {(() => {
+                                const busy = controlBusy === r.id;
+                                const btn = (bg: string, fg: string, brd: string): React.CSSProperties => ({
+                                  background: bg, border: `1px solid ${brd}`, borderRadius: 9,
+                                  padding: "6px 11px", color: fg, fontWeight: 800, fontSize: 11.5,
+                                  cursor: busy ? "default" : "pointer", fontFamily: "inherit",
+                                  opacity: busy ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5,
+                                });
+                                const live = r.status === "published";
+                                return (
+                                  <>
+                                    <button disabled={busy} style={btn(c.inputBg, c.text, c.border)}
+                                      onClick={() => {
+                                        const next = prompt(t("نصّ المنشور الجديد:", "New post text:"), r.caption || "");
+                                        if (next && next.trim() && next !== r.caption) {
+                                          controlPost(r, "edit", { message: next.trim() });
+                                        }
+                                      }}>
+                                      <Pencil size={11} /> {t("عدّل النص", "Edit text")}
+                                    </button>
+
+                                    {!live && (
+                                      <>
+                                        <button disabled={busy} style={btn(c.inputBg, c.text, c.border)}
+                                          onClick={() => {
+                                            const cur = r.scheduledFor ? new Date(r.scheduledFor) : new Date();
+                                            const next = prompt(
+                                              t("الموعد الجديد (سنة-شهر-يوم ساعة:دقيقة):", "New time (YYYY-MM-DD HH:mm):"),
+                                              `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")} ${String(cur.getHours()).padStart(2, "0")}:${String(cur.getMinutes()).padStart(2, "0")}`,
+                                            );
+                                            if (next) {
+                                              const when = new Date(next.replace(" ", "T"));
+                                              if (isNaN(when.getTime())) { setReportMsg(t("صيغة الموعد غير صحيحة", "Invalid date format")); return; }
+                                              controlPost(r, "reschedule", { scheduledFor: when.toISOString() });
+                                            }
+                                          }}>
+                                          <CalendarDays size={11} /> {t("غيّر الموعد", "Reschedule")}
+                                        </button>
+
+                                        <button disabled={busy} style={btn("rgba(34,197,94,0.14)", "#22c55e", "#22c55e55")}
+                                          onClick={() => controlPost(r, "publish_now")}>
+                                          <Send size={11} /> {t("انشر الآن", "Publish now")}
+                                        </button>
+
+                                        <button disabled={busy} style={btn("rgba(245,158,11,0.12)", "#f59e0b", "#f59e0b55")}
+                                          onClick={() => controlPost(r, "cancel")}>
+                                          <X size={11} /> {t("ألغِ الجدولة", "Cancel")}
+                                        </button>
+                                      </>
+                                    )}
+
+                                    {live && (
+                                      <button disabled={busy} style={btn("rgba(239,68,68,0.12)", "#ef4444", "#ef444455")}
+                                        onClick={() => controlPost(r, "delete")}>
+                                        <Trash2 size={11} /> {t("احذف من فيسبوك", "Delete from Facebook")}
+                                      </button>
+                                    )}
+
+                                    {busy && <Loader2 size={13} className="spin" color={c.muted} />}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
                           {r.error && (
                             <div style={{ fontSize: 11.5, color: "#ef4444", marginTop: 8, lineHeight: 1.7 }}>{r.error}</div>
                           )}
