@@ -21,7 +21,8 @@ export const maxDuration = 30;
  * visible to customers; a database that disagrees with reality is recoverable, a
  * post that silently stayed up is not.
  *
- *   edit        — rewrite the text (scheduled or live)
+ *   edit        — rewrite the caption and hashtags (scheduled or live)
+ *   reply       — change this post's bot reply, and push it to the bot immediately
  *   reschedule  — move a scheduled post to another time
  *   publish_now — send a scheduled post immediately
  *   cancel      — remove a SCHEDULED post before anyone sees it
@@ -31,14 +32,14 @@ export async function POST(req: NextRequest) {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "غير مسجل" }, { status: 401 });
 
-  const { postId, action, message, scheduledFor } = await req.json();
+  const { postId, action, message, hashtags, scheduledFor, replyConfig } = await req.json();
   if (!postId || !action) {
     return NextResponse.json({ error: "postId و action مطلوبان" }, { status: 400 });
   }
 
   const { data: post } = await supabaseAdmin
     .from("studio_posts")
-    .select("id, page_id, external_post_id, status, caption, scheduled_for")
+    .select("id, page_id, external_post_id, status, caption, hashtags, scheduled_for")
     .eq("id", postId).eq("user_id", user.id).maybeSingle();
   if (!post) return NextResponse.json({ error: "المنشور غير موجود" }, { status: 404 });
 
@@ -63,12 +64,62 @@ export async function POST(req: NextRequest) {
   try {
     switch (action) {
       case "edit": {
-        const text = String(message ?? "").trim();
-        if (!text) return NextResponse.json({ error: "النص مطلوب" }, { status: 400 });
+        /*
+         * A post's text on Facebook is the caption AND the hashtags, joined — that is
+         * how it was published. Sending only the caption would therefore have SILENTLY
+         * STRIPPED the hashtags from the live post, which is worse than refusing the
+         * edit. Both are sent together, and either may be left out of the request to
+         * keep its current value.
+         */
+        const nextCaption = message === undefined ? (post.caption || "") : String(message).trim();
+        const nextTags = hashtags === undefined ? (post.hashtags || "") : String(hashtags).trim();
+        if (!nextCaption && !nextTags) {
+          return NextResponse.json({ error: "النص مطلوب" }, { status: 400 });
+        }
+        const text = [nextCaption, nextTags].filter(Boolean).join("\n\n");
+
         await editPostMessage(external, token, text);
         await supabaseAdmin.from("studio_posts")
-          .update({ caption: text, error: null }).eq("id", post.id);
-        return NextResponse.json({ ok: true, action, caption: text });
+          .update({ caption: nextCaption, hashtags: nextTags || null, error: null })
+          .eq("id", post.id);
+        return NextResponse.json({ ok: true, action, caption: nextCaption, hashtags: nextTags });
+      }
+
+      case "reply": {
+        /*
+         * The custom reply is ours, not Facebook's — nothing is sent to the platform.
+         * It is saved on the post AND pushed straight into the bot, because a reply
+         * edited here that waits for a republish to take effect is the same silent
+         * failure that left 18 replies unattached.
+         */
+        const rc = (replyConfig ?? null) as {
+          enabled?: boolean; public_replies?: string[]; private_reply?: string; like?: boolean;
+        } | null;
+        await supabaseAdmin.from("studio_posts")
+          .update({ reply_config: rc }).eq("id", post.id);
+
+        const { data: cfg } = await supabaseAdmin
+          .from("bot_configs").select("id, post_overrides")
+          .eq("user_id", user.id).eq("page_id", post.page_id).eq("platform", "meta").maybeSingle();
+        if (cfg) {
+          const overrides = { ...((cfg.post_overrides || {}) as Record<string, unknown>) };
+          const numeric = external.includes("_") ? external.split("_")[1] : external;
+          if (!rc) {
+            delete overrides[numeric];
+            delete overrides[external];
+          } else {
+            overrides[numeric] = rc.enabled === false
+              ? { disabled: true }
+              : {
+                  public_replies: (rc.public_replies || []).filter((x) => (x || "").trim()),
+                  private_reply: rc.private_reply || "",
+                  like: rc.like,
+                };
+          }
+          await supabaseAdmin.from("bot_configs")
+            .update({ post_overrides: overrides }).eq("id", cfg.id);
+        }
+        return NextResponse.json({ ok: true, action, bound: !!cfg });
       }
 
       case "reschedule": {

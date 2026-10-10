@@ -22,6 +22,10 @@ type Row = {
   id: string;
   planId: string;
   caption: string;
+  hashtags: string;
+  /** The reply as the owner wrote it, so the editor opens on it. */
+  replyPublic: string[];
+  replyPrivate: string;
   scheduledFor: string | null;
   publishedAt: string | null;
   status: string;
@@ -48,7 +52,7 @@ export async function GET(req: NextRequest) {
 
   let q = supabaseAdmin
     .from("studio_posts")
-    .select("id, plan_id, caption, scheduled_for, published_at, status, error, external_post_id, reply_config, boost")
+    .select("id, plan_id, caption, hashtags, scheduled_for, published_at, status, error, external_post_id, reply_config, boost")
     .eq("user_id", user.id).eq("page_id", pageId)
     .order("scheduled_for", { ascending: false });
   if (planId) q = q.eq("plan_id", planId);
@@ -88,6 +92,9 @@ export async function GET(req: NextRequest) {
     id: p.id,
     planId: p.plan_id,
     caption: p.caption || "",
+    hashtags: p.hashtags || "",
+    replyPublic: ((p.reply_config as { public_replies?: string[] } | null)?.public_replies) || [],
+    replyPrivate: ((p.reply_config as { private_reply?: string } | null)?.private_reply) || "",
     scheduledFor: p.scheduled_for,
     publishedAt: p.published_at,
     status: p.status,
@@ -100,6 +107,7 @@ export async function GET(req: NextRequest) {
     stats: null,
   }));
 
+  let reconciled = 0;
   if (wantStats) {
     const token = await getSystemPageToken(pageId);
     if (token) {
@@ -114,6 +122,37 @@ export async function GET(req: NextRequest) {
         );
         slice.forEach((r, n) => { r.stats = got[n]; });
       }
+
+      /*
+       * Reconcile. Our row records what we INTENDED; Facebook says what is true, and
+       * they drift apart the moment a scheduled post's time passes — nothing was
+       * watching for that, so posts here sat at "scheduled" for a fortnight after
+       * they had gone live, and every control acted on the wrong assumption.
+       *
+       * Facebook wins. Only the status is corrected, never the owner's own text.
+       */
+      const fixes = rows
+        .filter((r) => r.stats && r.status !== "failed")
+        .map((r) => {
+          const live = r.stats!.isPublished;
+          const want = live ? "published" : "scheduled";
+          if (r.status === want) return null;
+          r.status = want;
+          if (live && !r.publishedAt) r.publishedAt = new Date().toISOString();
+          return {
+            id: r.id,
+            status: want,
+            published_at: live ? (r.publishedAt ?? new Date().toISOString()) : null,
+          };
+        })
+        .filter(Boolean) as Array<{ id: string; status: string; published_at: string | null }>;
+
+      for (const f of fixes) {
+        await supabaseAdmin.from("studio_posts")
+          .update({ status: f.status, published_at: f.published_at })
+          .eq("id", f.id).eq("user_id", user.id);
+      }
+      reconciled = fixes.length;
     }
   }
 
@@ -131,6 +170,8 @@ export async function GET(req: NextRequest) {
       repliesSent: rows.reduce((n, r) => n + r.repliesSent, 0),
     },
     statsIncluded: wantStats,
+    // How many rows disagreed with Facebook and were corrected.
+    reconciled,
   });
 }
 

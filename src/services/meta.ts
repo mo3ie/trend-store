@@ -343,6 +343,10 @@ export interface PostStats {
   /** Unique people who saw it. Needs page_read_engagement; 0 when unavailable. */
   reach: number;
   permalink: string | null;
+  /** Facebook's own view of whether this is live. The authority, not our row. */
+  isPublished: boolean;
+  /** Still in the future only while it really is scheduled. */
+  scheduledUnix: number | null;
 }
 
 /**
@@ -364,6 +368,11 @@ export async function getPostStats(postId: string, pageToken: string): Promise<P
       "likes.summary(true).limit(0)",
       "comments.summary(true).limit(0)",
       "shares",
+      // Facebook's own state. Our row records what we INTENDED; these say what is
+      // true — and they drift apart the moment a scheduled post's time passes, which
+      // is why a post can sit at "scheduled" here long after it went live.
+      "is_published",
+      "scheduled_publish_time",
       "insights.metric(post_impressions_unique)",
     ].join(",");
     const res = await fetch(
@@ -374,6 +383,7 @@ export async function getPostStats(postId: string, pageToken: string): Promise<P
     if (d?.error) return null;
 
     const reach = Number(d?.insights?.data?.[0]?.values?.[0]?.value ?? 0);
+    const schedUnix = d?.scheduled_publish_time ? Number(d.scheduled_publish_time) : null;
     return {
       postId,
       likes: Number(d?.likes?.summary?.total_count ?? 0),
@@ -381,6 +391,9 @@ export async function getPostStats(postId: string, pageToken: string): Promise<P
       shares: Number(d?.shares?.count ?? 0),
       reach: Number.isFinite(reach) ? reach : 0,
       permalink: d?.permalink_url ?? null,
+      // A post with no `is_published` field is a plain published post.
+      isPublished: d?.is_published !== false,
+      scheduledUnix: Number.isFinite(schedUnix as number) ? (schedUnix as number) : null,
     };
   } catch {
     return null;

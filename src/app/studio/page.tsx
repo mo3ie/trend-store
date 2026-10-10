@@ -105,10 +105,12 @@ export default function StudioPage() {
 
   // ── Report tab ──────────────────────────────────────────────────────────────
   interface ReportRow {
-    id: string; caption: string; scheduledFor: string | null; publishedAt: string | null;
+    id: string; caption: string; hashtags: string;
+    replyPublic: string[]; replyPrivate: string;
+    scheduledFor: string | null; publishedAt: string | null;
     status: string; error: string | null; externalPostId: string | null;
     hasReply: boolean; replyBound: boolean; repliesSent: number; boost: boolean;
-    stats: { likes: number; comments: number; shares: number; reach: number; permalink: string | null } | null;
+    stats: { likes: number; comments: number; shares: number; reach: number; permalink: string | null; isPublished: boolean } | null;
   }
   const [report, setReport] = useState<{
     rows: ReportRow[];
@@ -119,6 +121,15 @@ export default function StudioPage() {
   const [bindingReplies, setBindingReplies] = useState(false);
   const [reportMsg, setReportMsg] = useState("");
   const [controlBusy, setControlBusy] = useState("");
+  // The post being edited from the report, and its draft values. A sheet rather than
+  // prompt(): a browser prompt is trivially dismissed on a phone and gives no sign it
+  // was, which is exactly how an edit looks like it did nothing.
+  const [editLive, setEditLive] = useState<ReportRow | null>(null);
+  const [liveCaption, setLiveCaption] = useState("");
+  const [liveTags, setLiveTags] = useState("");
+  const [liveWhen, setLiveWhen] = useState("");
+  const [liveReply, setLiveReply] = useState("");
+  const [liveReplyPrivate, setLiveReplyPrivate] = useState("");
   const [alerts, setAlerts] = useState<{ id: string; severity: string; area: string; title: string; detail?: string; at?: string }[]>([]);
   const [botInfo, setBotInfo] = useState<BotInfo | null>(null);
 
@@ -514,8 +525,11 @@ export default function StudioPage() {
    */
   async function controlPost(
     row: ReportRow,
-    action: "edit" | "reschedule" | "publish_now" | "cancel" | "delete",
-    payload?: { message?: string; scheduledFor?: string },
+    action: "edit" | "reschedule" | "publish_now" | "cancel" | "delete" | "reply",
+    payload?: {
+      message?: string; hashtags?: string; scheduledFor?: string;
+      replyConfig?: { enabled: boolean; public_replies: string[]; private_reply: string };
+    },
   ) {
     const confirms: Partial<Record<typeof action, string>> = {
       publish_now: t("نشر هذا المنشور الآن بدل موعده؟", "Publish this now instead of at its scheduled time?"),
@@ -544,6 +558,17 @@ export default function StudioPage() {
       setReportMsg(t("تعذّر الاتصال", "Connection failed"));
     }
     setControlBusy("");
+  }
+
+  function openLiveEditor(r: ReportRow) {
+    setEditLive(r);
+    setLiveCaption(r.caption || "");
+    setLiveTags(r.hashtags || "");
+    const d = r.scheduledFor ? new Date(r.scheduledFor) : new Date();
+    setLiveWhen(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
+    setLiveReply((r.replyPublic || []).join("\n"));
+    setLiveReplyPrivate(r.replyPrivate || "");
+    setReportMsg("");
   }
 
   async function publishPlan(selectedOnly = false) {
@@ -852,14 +877,21 @@ export default function StudioPage() {
               </button>
             </div>
 
-            {/* Tabs */}
-            <div style={{ display: "flex", gap: 6, background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 13, padding: 5 }}>
+            {/*
+              Tabs. Each one sizes to its own label and the strip scrolls, rather than
+              every tab taking an equal fifth of the width: this was built for four
+              tabs with `flex: 1` and no horizontal padding, so adding a fifth squeezed
+              each to about 20% of a phone screen and the icon, the Arabic label and
+              the badge spilled out of their buttons. Sizing to content means the next
+              tab added cannot break it either.
+            */}
+            <div style={{ display: "flex", gap: 6, background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 13, padding: 5, overflowX: "auto", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
               {tabs.map((tb) => {
                 const badge = (tb as { badge?: number }).badge || 0;
                 return (
-                <button key={tb.id} onClick={() => setTab(tb.id)} style={{ flex: 1, border: "none", cursor: "pointer", borderRadius: 9, padding: "9px 0", fontFamily: "inherit", fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, position: "relative", background: tab === tb.id ? G_HERO : "transparent", color: tab === tb.id ? "#fff" : c.muted }}>
-                  <tb.icon size={15} /> {tb.label}
-                  {badge > 0 && <span style={{ background: "#ef4444", color: "#fff", borderRadius: 100, minWidth: 16, height: 16, fontSize: 10, fontWeight: 900, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{badge}</span>}
+                <button key={tb.id} onClick={() => setTab(tb.id)} style={{ flex: "0 0 auto", border: "none", cursor: "pointer", borderRadius: 9, padding: "9px 13px", fontFamily: "inherit", fontWeight: 800, fontSize: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, whiteSpace: "nowrap", position: "relative", background: tab === tb.id ? G_HERO : "transparent", color: tab === tb.id ? "#fff" : c.muted }}>
+                  <tb.icon size={15} style={{ flexShrink: 0 }} /> {tb.label}
+                  {badge > 0 && <span style={{ background: "#ef4444", color: "#fff", borderRadius: 100, minWidth: 16, height: 16, fontSize: 10, fontWeight: 900, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px", flexShrink: 0 }}>{badge}</span>}
                 </button>
                 );
               })}
@@ -1319,33 +1351,12 @@ export default function StudioPage() {
                                 return (
                                   <>
                                     <button disabled={busy} style={btn(c.inputBg, c.text, c.border)}
-                                      onClick={() => {
-                                        const next = prompt(t("نصّ المنشور الجديد:", "New post text:"), r.caption || "");
-                                        if (next && next.trim() && next !== r.caption) {
-                                          controlPost(r, "edit", { message: next.trim() });
-                                        }
-                                      }}>
-                                      <Pencil size={11} /> {t("عدّل النص", "Edit text")}
+                                      onClick={() => openLiveEditor(r)}>
+                                      <Pencil size={11} /> {t("عدّل", "Edit")}
                                     </button>
 
                                     {!live && (
                                       <>
-                                        <button disabled={busy} style={btn(c.inputBg, c.text, c.border)}
-                                          onClick={() => {
-                                            const cur = r.scheduledFor ? new Date(r.scheduledFor) : new Date();
-                                            const next = prompt(
-                                              t("الموعد الجديد (سنة-شهر-يوم ساعة:دقيقة):", "New time (YYYY-MM-DD HH:mm):"),
-                                              `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")} ${String(cur.getHours()).padStart(2, "0")}:${String(cur.getMinutes()).padStart(2, "0")}`,
-                                            );
-                                            if (next) {
-                                              const when = new Date(next.replace(" ", "T"));
-                                              if (isNaN(when.getTime())) { setReportMsg(t("صيغة الموعد غير صحيحة", "Invalid date format")); return; }
-                                              controlPost(r, "reschedule", { scheduledFor: when.toISOString() });
-                                            }
-                                          }}>
-                                          <CalendarDays size={11} /> {t("غيّر الموعد", "Reschedule")}
-                                        </button>
-
                                         <button disabled={busy} style={btn("rgba(34,197,94,0.14)", "#22c55e", "#22c55e55")}
                                           onClick={() => controlPost(r, "publish_now")}>
                                           <Send size={11} /> {t("انشر الآن", "Publish now")}
@@ -1762,6 +1773,97 @@ export default function StudioPage() {
                 {savingPost ? <Loader2 size={16} className="spin" /> : <Save size={16} />} {t("حفظ", "Save")}
               </button>
               <button onClick={() => deletePlanPost(editPost.id)} style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 13, padding: "13px 16px", color: "#ef4444", cursor: "pointer", fontFamily: "inherit" }}><Trash2 size={16} /></button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/*
+        Editing a post that is already on Facebook.
+        A sheet, not prompt(): a browser prompt is dismissed by a stray tap on a phone
+        and leaves no trace that it was, which is precisely how an edit appears to do
+        nothing. Everything editable about a live post is here in one place — and what
+        is NOT editable says so, rather than being silently absent.
+      */}
+      {editLive && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) setEditLive(null); }}
+          style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 12, direction: rtl ? "rtl" : "ltr" }}>
+          <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 480, borderRadius: 22, padding: 20, fontFamily: "Cairo,sans-serif", maxHeight: "90vh", overflowY: "auto" }}>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <div style={{ fontWeight: 900, fontSize: 16 }}>
+                {editLive.status === "published" ? t("تعديل منشور حيّ", "Edit a live post") : t("تعديل منشور مجدول", "Edit a scheduled post")}
+              </div>
+              <button onClick={() => setEditLive(null)} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer" }}><X size={20} /></button>
+            </div>
+
+            <label style={{ display: "block", fontSize: 12, color: c.muted, marginBottom: 6 }}>{t("نصّ المنشور", "Post text")}</label>
+            <textarea rows={5} value={liveCaption} onChange={(e) => setLiveCaption(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 11, padding: "11px 13px", color: c.text, fontSize: 14, lineHeight: 1.8, fontFamily: "inherit", resize: "vertical" }} />
+
+            <label style={{ display: "block", fontSize: 12, color: c.muted, margin: "13px 0 6px" }}>{t("الهاشتاقات", "Hashtags")}</label>
+            <input value={liveTags} onChange={(e) => setLiveTags(e.target.value)} placeholder="#..."
+              style={{ width: "100%", boxSizing: "border-box", background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 11, padding: "11px 13px", color: c.text, fontSize: 14, fontFamily: "inherit" }} />
+
+            <button onClick={() => { controlPost(editLive, "edit", { message: liveCaption, hashtags: liveTags }); setEditLive(null); }}
+              disabled={controlBusy === editLive.id}
+              style={{ width: "100%", marginTop: 12, background: G_HERO, border: "none", borderRadius: 12, padding: "12px 0", color: "#fff", fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <Save size={15} /> {t("احفظ النص على فيسبوك", "Save the text to Facebook")}
+            </button>
+
+            {editLive.status !== "published" && (
+              <>
+                <div style={{ height: 1, background: c.border, margin: "18px 0" }} />
+                <label style={{ display: "block", fontSize: 12, color: c.muted, marginBottom: 6 }}>{t("موعد النشر", "Publish time")}</label>
+                <input type="datetime-local" value={liveWhen} onChange={(e) => setLiveWhen(e.target.value)}
+                  style={{ width: "100%", boxSizing: "border-box", background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 11, padding: "11px 13px", color: c.text, fontSize: 14, fontFamily: "inherit" }} />
+                <div style={{ fontSize: 11.5, color: c.muted, marginTop: 6, lineHeight: 1.7 }}>
+                  {t("فيسبوك لا يقبل موعداً أقرب من عشر دقائق من الآن.", "Facebook will not accept a time less than ten minutes from now.")}
+                </div>
+                <button onClick={() => {
+                    const when = new Date(liveWhen);
+                    if (isNaN(when.getTime())) { setReportMsg(t("الموعد غير صحيح", "Invalid time")); return; }
+                    controlPost(editLive, "reschedule", { scheduledFor: when.toISOString() });
+                    setEditLive(null);
+                  }}
+                  style={{ width: "100%", marginTop: 10, background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: "11px 0", color: c.text, fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <CalendarDays size={15} /> {t("غيّر الموعد", "Reschedule")}
+                </button>
+              </>
+            )}
+
+            <div style={{ height: 1, background: c.border, margin: "18px 0" }} />
+
+            <label style={{ display: "block", fontSize: 12, color: c.muted, marginBottom: 6 }}>
+              {t("ردّ البوت على تعليقات هذا المنشور — سطر لكل صيغة", "The bot's reply on this post's comments — one per line")}
+            </label>
+            <textarea rows={3} value={liveReply} onChange={(e) => setLiveReply(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 11, padding: "11px 13px", color: c.text, fontSize: 14, lineHeight: 1.8, fontFamily: "inherit", resize: "vertical" }} />
+
+            <label style={{ display: "block", fontSize: 12, color: c.muted, margin: "11px 0 6px" }}>{t("الرسالة الخاصة (السعر والتفاصيل)", "Private message (price & details)")}</label>
+            <textarea rows={2} value={liveReplyPrivate} onChange={(e) => setLiveReplyPrivate(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 11, padding: "11px 13px", color: c.text, fontSize: 14, lineHeight: 1.8, fontFamily: "inherit", resize: "vertical" }} />
+
+            <button onClick={() => {
+                controlPost(editLive, "reply", {
+                  replyConfig: {
+                    enabled: true,
+                    public_replies: liveReply.split("\n").map((x) => x.trim()).filter(Boolean),
+                    private_reply: liveReplyPrivate.trim(),
+                  },
+                });
+                setEditLive(null);
+              }}
+              style={{ width: "100%", marginTop: 12, background: "rgba(168,85,247,0.14)", border: "1px solid rgba(168,85,247,0.4)", borderRadius: 12, padding: "11px 0", color: "#a855f7", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <MessageSquareReply size={15} /> {t("احفظ الردّ وفعّله فوراً", "Save the reply and arm it now")}
+            </button>
+
+            {/* Stated, not silently missing: Facebook has no way to swap a published
+                post's photo. Pretending otherwise would waste the owner's time. */}
+            <div style={{ fontSize: 11.5, color: c.muted, marginTop: 16, lineHeight: 1.8, background: c.inputBg, borderRadius: 11, padding: "11px 13px" }}>
+              {t("الصورة لا يمكن تغييرها بعد النشر — فيسبوك لا يتيح ذلك. لتغييرها: احذف المنشور وأعد نشره بالصورة الجديدة.",
+                 "The image cannot be changed after publishing — Facebook does not allow it. To change it: delete the post and publish it again with the new image.")}
             </div>
           </div>
         </div>
