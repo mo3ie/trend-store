@@ -14,8 +14,19 @@ export function useAuth() {
       setLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
+      // Record the sign-in for the admin login log. Fire-and-forget: a failure
+      // here must never block someone from getting into the store. The server
+      // collapses repeats, because Supabase also fires SIGNED_IN on session
+      // restore — every reopened tab would otherwise count as a fresh login.
+      if (event === "SIGNED_IN" && session?.user) {
+        fetch("/api/auth/log-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ app: "store" }),
+        }).catch(() => {});
+      }
     });
 
     return () => listener.subscription.unsubscribe();

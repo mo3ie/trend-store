@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Wallet, X, ArrowDownCircle, ArrowUpCircle, Phone, Hash, CreditCard } from "lucide-react";
+import { Wallet, X, ArrowDownCircle, ArrowUpCircle, Phone, Hash, CreditCard, Send, UserCheck, Loader2, AlertCircle } from "lucide-react";
 
 type Transaction = {
   id: string;
@@ -11,6 +11,8 @@ type Transaction = {
   status: string;
   note?: string;
   created_at: string;
+  /** Present only on transfer legs: the other party's display name. */
+  counterparty_name?: string | null;
 };
 
 const PAYMENT_METHODS = [
@@ -24,7 +26,7 @@ const PAYMENT_METHODS = [
 const METHOD_LABELS: Record<string, string> = {
   mobicash: "موبي كاش", masrefypay: "مصرفي", edfali: "ادفع لي",
   prepaid_card: "كرت شحن", cash: "نقداً", moamalat: "معاملات",
-  yousrpay: "يسر باي", credit: "إيداع", debit: "سحب",
+  yousrpay: "يسر باي", credit: "إيداع", debit: "سحب", transfer: "تحويل",
 };
 
 function timeStr(iso: string) {
@@ -52,7 +54,7 @@ export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Pr
   const [balance,      setBalance]      = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading,      setLoading]      = useState(true);
-  const [tab,          setTab]          = useState<"overview" | "recharge">(payMode ? "recharge" : "overview");
+  const [tab,          setTab]          = useState<"overview" | "recharge" | "transfer">(payMode ? "recharge" : "overview");
 
   const [method,      setMethod]      = useState("");
   const [amount,      setAmount]      = useState(payMode ? String(payAmount) : "");
@@ -62,6 +64,19 @@ export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Pr
   const [rechMsg,     setRechMsg]     = useState("");
 
   const [cardNumber,    setCardNumber]    = useState("");
+
+  // ── Transfer ───────────────────────────────────────────────────────────────
+  // A transfer cannot be undone, so the flow is deliberately two steps: look the
+  // recipient up and show their NAME, then send. The sender confirms a person,
+  // not a string they typed.
+  const [toQuery,    setToQuery]    = useState("");
+  const [toAmount,   setToAmount]   = useState("");
+  const [toNote,     setToNote]     = useState("");
+  const [lookupBusy, setLookupBusy] = useState(false);
+  const [recipient,  setRecipient]  = useState<{ id: string; name: string; email: string | null; phone: string | null } | null>(null);
+  const [trMsg,      setTrMsg]      = useState("");
+  const [trErr,      setTrErr]      = useState("");
+  const [sending,    setSending]    = useState(false);
 
   // OTP step — shared by Edfali (phone-based) and MobiCash (card-based)
   const [otpStep,       setOtpStep]       = useState<null | "sending" | "otp">(null);
@@ -273,6 +288,51 @@ export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Pr
     }
   }
 
+  async function lookupRecipient() {
+    setTrErr(""); setTrMsg(""); setRecipient(null);
+    const term = toQuery.trim();
+    if (!term) { setTrErr("أدخل البريد أو رقم الهاتف"); return; }
+    setLookupBusy(true);
+    try {
+      const r = await fetch(`/api/wallet/transfer?q=${encodeURIComponent(term)}`);
+      const d = await r.json();
+      if (!d.found) { setTrErr(d.message || "لم يُعثر على الحساب"); return; }
+      setRecipient(d.recipient);
+    } catch {
+      setTrErr("تعذّر الاتصال بالخادم");
+    } finally {
+      setLookupBusy(false);
+    }
+  }
+
+  async function sendTransfer() {
+    setTrErr(""); setTrMsg("");
+    if (!recipient) { setTrErr("ابحث عن المستلم أولاً"); return; }
+    const amt = parseFloat(toAmount);
+    if (!amt || amt <= 0) { setTrErr("أدخل مبلغاً صحيحاً"); return; }
+    if (amt > balance) { setTrErr(`رصيدك ${balance.toFixed(2)} د — لا يكفي`); return; }
+
+    setSending(true);
+    try {
+      const r = await fetch("/api/wallet/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: toQuery.trim(), amount: amt, note: toNote.trim() }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setTrErr(d.message || d.error || "فشل التحويل"); return; }
+      setBalance(d.newBalance);
+      const fresh = await fetch("/api/wallet").then((x) => x.json());
+      setTransactions(fresh.transactions || []);
+      setTrMsg(`✅ تم تحويل ${amt.toFixed(2)} د إلى ${d.recipient?.name || "المستلم"}`);
+      setToQuery(""); setToAmount(""); setToNote(""); setRecipient(null);
+    } catch {
+      setTrErr("تعذّر الاتصال بالخادم");
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-4"
@@ -306,7 +366,11 @@ export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Pr
 
         {/* Tabs */}
         <div className={`flex gap-2 px-5 mt-4 shrink-0 ${payMode ? "hidden" : ""}`}>
-          {(["overview", "recharge"] as const).map(t => (
+          {([
+            ["overview", "المعاملات"],
+            ["recharge", "شحن"],
+            ["transfer", "تحويل"],
+          ] as const).map(([t, label]) => (
             <button
               key={t}
               onClick={() => { if (!otpStep) setTab(t); }}
@@ -314,7 +378,7 @@ export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Pr
                 tab === t ? "bg-purple-600 text-[var(--text)]" : "bg-white/5 text-[var(--muted)] hover:text-[var(--text)] border border-[var(--border)]"
               }`}
             >
-              {t === "overview" ? "المعاملات" : "شحن الرصيد"}
+              {label}
             </button>
           ))}
         </div>
@@ -346,7 +410,11 @@ export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Pr
                         : <ArrowUpCircle size={18} className="text-red-400" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[var(--text)]">{tx.note || METHOD_LABELS[tx.method] || tx.method}</p>
+                      <p className="text-sm font-medium text-[var(--text)]">
+                        {tx.counterparty_name
+                          ? (tx.type === "debit" ? `تحويل إلى ${tx.counterparty_name}` : `تحويل من ${tx.counterparty_name}`)
+                          : (tx.note || METHOD_LABELS[tx.method] || tx.method)}
+                      </p>
                       <p className="text-xs text-[var(--muted-2)]">{timeStr(tx.created_at)}</p>
                     </div>
                     <div className="text-right shrink-0">
@@ -561,6 +629,106 @@ export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Pr
               >
                 ← رجوع
               </button>
+            </div>
+          )}
+
+          {tab === "transfer" && (
+            <div className="space-y-4">
+              {/* Step 1 — who */}
+              <div>
+                <label className="text-[var(--muted)] text-xs mb-2 block">المستلم (بريد إلكتروني أو رقم هاتف)</label>
+                <div className="flex gap-2">
+                  <input
+                    value={toQuery}
+                    onChange={e => { setToQuery(e.target.value); setRecipient(null); setTrErr(""); }}
+                    onKeyDown={e => { if (e.key === "Enter") lookupRecipient(); }}
+                    placeholder="name@mail.com أو 09xxxxxxxx"
+                    className="flex-1 min-w-0 px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={lookupRecipient}
+                    disabled={lookupBusy || !toQuery.trim()}
+                    className="px-4 rounded-xl bg-purple-600/20 border border-purple-500/40 text-sm font-bold text-purple-300 disabled:opacity-40 shrink-0"
+                  >
+                    {lookupBusy ? <Loader2 size={16} className="animate-spin" /> : "بحث"}
+                  </button>
+                </div>
+              </div>
+
+              {/* The confirmation that makes this safe: a NAME before any money moves. */}
+              {recipient && (
+                <div className="rounded-xl bg-green-500/10 border border-green-500/30 px-4 py-3 flex items-center gap-3">
+                  <UserCheck size={18} className="text-green-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-[var(--text)] truncate">{recipient.name}</p>
+                    <p className="text-[11px] text-[var(--muted-2)] truncate" dir="ltr">
+                      {recipient.email || recipient.phone || ""}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2 — how much */}
+              <div>
+                <label className="text-[var(--muted)] text-xs mb-2 block">المبلغ (د.ل)</label>
+                <input
+                  type="number"
+                  value={toAmount}
+                  onChange={e => setToAmount(e.target.value)}
+                  placeholder="0.00"
+                  min="1"
+                  disabled={!recipient}
+                  className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 disabled:opacity-40 transition-all"
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex gap-2">
+                    {[10, 25, 50].map(v => (
+                      <button key={v} type="button" disabled={!recipient} onClick={() => setToAmount(String(v))}
+                        className="px-3 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-[var(--muted)] border border-[var(--border)] hover:text-[var(--text)] disabled:opacity-40">
+                        {v} د
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-[11px] text-[var(--muted-2)]">رصيدك {balance.toFixed(2)} د</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[var(--muted)] text-xs mb-2 block">ملاحظة (اختياري)</label>
+                <input
+                  value={toNote}
+                  onChange={e => setToNote(e.target.value.slice(0, 140))}
+                  placeholder="سبب التحويل"
+                  disabled={!recipient}
+                  className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 disabled:opacity-40 transition-all"
+                />
+              </div>
+
+              {trErr && (
+                <p className="text-sm p-3 rounded-xl border bg-red-500/10 border-red-500/20 text-red-400 flex items-start gap-2">
+                  <AlertCircle size={15} className="shrink-0 mt-0.5" /> {trErr}
+                </p>
+              )}
+              {trMsg && (
+                <p className="text-sm p-3 rounded-xl border bg-green-500/10 border-green-500/20 text-green-400">
+                  {trMsg}
+                </p>
+              )}
+
+              <button
+                onClick={sendTransfer}
+                disabled={sending || !recipient || !toAmount}
+                className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {sending
+                  ? <><Loader2 size={16} className="animate-spin" /> جاري التحويل…</>
+                  : <><Send size={16} /> تحويل{recipient ? ` إلى ${recipient.name}` : ""}</>}
+              </button>
+
+              <p className="text-[11px] text-[var(--muted-2)] text-center leading-relaxed">
+                التحويل فوري ولا يمكن التراجع عنه. تأكّد من اسم المستلم قبل الإرسال.
+              </p>
             </div>
           )}
         </div>

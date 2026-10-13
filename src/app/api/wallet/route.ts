@@ -36,9 +36,30 @@ export async function GET() {
       .order("created_at", { ascending: false }).limit(20),
   ]);
 
+  /*
+   * Resolve the other side of any transfer, so a statement reads "to Ahmed" /
+   * "from Ahmed" rather than a bare "تحويل صادر". Without this the two legs of
+   * a transfer are indistinguishable from each other in the list.
+   */
+  const txs = transactions || [];
+  const others = [...new Set(
+    txs.map((t) => t.counterparty_id).filter(Boolean) as string[],
+  )];
+  const names = new Map<string, string>();
+  if (others.length) {
+    const { data: profiles } = await supabase
+      .from("profiles").select("id, full_name, email").in("id", others);
+    for (const pr of profiles || []) {
+      names.set(pr.id, pr.full_name || pr.email || "مستخدم");
+    }
+  }
+
   return NextResponse.json({
     balance,
-    transactions: transactions || [],
+    transactions: txs.map((t) => ({
+      ...t,
+      counterparty_name: t.counterparty_id ? names.get(t.counterparty_id) ?? "مستخدم" : null,
+    })),
   });
 }
 
