@@ -180,6 +180,8 @@ export interface PagePost {
   createdTime:  string;
   picture?:     string;
   permalinkUrl?: string;
+  /** true = Facebook allows an ad on it, false = refuses, null = unknown. */
+  promotable?:  boolean | null;
 }
 
 // Lists a Page's recent published posts using the stored PAGE access token.
@@ -189,10 +191,17 @@ export interface PagePost {
 // system-user token (SYS_TOKEN, used when `pageToken` is omitted) for Pages the
 // system user manages — surviving expired customer OAuth tokens.
 export async function getPagePosts(pageId: string, pageToken?: string, limit = 15): Promise<PagePost[]> {
-  type RawPost = { id: string; message?: string; story?: string; created_time: string; full_picture?: string; permalink_url?: string };
+  type RawPost = {
+    id: string; message?: string; story?: string; created_time: string;
+    full_picture?: string; permalink_url?: string;
+    is_eligible_for_promotion?: boolean;
+  };
   async function fetchFrom(edge: string): Promise<PagePost[]> {
+    // `is_eligible_for_promotion` is asked for here so the picker can say which
+    // posts Facebook will refuse BEFORE one is chosen and paid for. It costs
+    // nothing extra — it rides along on the same call.
     const data = await graph<{ data: RawPost[] }>(
-      `${edge}?fields=id,message,story,created_time,full_picture,permalink_url&limit=${limit}`,
+      `${edge}?fields=id,message,story,created_time,full_picture,permalink_url,is_eligible_for_promotion&limit=${limit}`,
       "GET", undefined, pageToken
     );
     return (data.data || []).map((p) => ({
@@ -202,6 +211,8 @@ export async function getPagePosts(pageId: string, pageToken?: string, limit = 1
       createdTime:  p.created_time,
       picture:      p.full_picture,
       permalinkUrl: p.permalink_url,
+      // null when Facebook did not return the field — "unknown", never "refused".
+      promotable:   typeof p.is_eligible_for_promotion === "boolean" ? p.is_eligible_for_promotion : null,
     }));
   }
   // published_posts is the canonical list, but it omits some post types (shared

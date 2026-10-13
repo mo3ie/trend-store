@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { priceFor, findTierOption } from "@/services/campaigns";
 import { getAdsPricing, getUserTier } from "@/lib/adsPricing";
 import { checkPostPromotable } from "@/services/metaEligibility";
+import { AD_ERRORS } from "@/lib/adsErrors";
 
 async function getUser() {
   const store = await cookies();
@@ -134,9 +135,16 @@ export async function POST(req: Request) {
   if (!isPageLikes && postUrl) {
     const verdict = await checkPostPromotable(pageId, String(postUrl));
     if (verdict.promotable === false) {
+      // Both languages, cause AND fix. The screen picks; nothing is lost either
+      // way, and the owner is never left with a refusal and no next step.
+      const code = verdict.code ?? "post_not_promotable";
+      const ar = AD_ERRORS[code].ar;
+      const en = AD_ERRORS[code].en;
       return NextResponse.json({
-        error: verdict.reason,
-        code: "post_not_promotable",
+        code,
+        error:    `${ar.title} — ${ar.body} ${ar.fix}`,
+        errorEn:  `${en.title} — ${en.body} ${en.fix}`,
+        reason:   { ar, en },
       }, { status: 400 });
     }
   }

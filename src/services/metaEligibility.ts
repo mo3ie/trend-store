@@ -1,11 +1,12 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import type { AdErrorCode } from "@/lib/adsErrors";
 
 const VERSION = (process.env.META_API_VERSION || "v19.0").trim();
 
 /**
  * `promotable` is deliberately three-valued:
  *   true   — Facebook says this post can be advertised
- *   false  — Facebook says it cannot, and `reason` explains it in Arabic
+ *   false  — Facebook says it cannot, and `code` names the reason
  *   null   — we could not find out (no token, network error, missing field)
  *
  * The third case matters. Treating "unknown" as "not allowed" would block
@@ -13,7 +14,7 @@ const VERSION = (process.env.META_API_VERSION || "v19.0").trim();
  * "allowed" is exactly what we already do today — so unknown must be visibly
  * distinct from a real refusal rather than collapsed into either.
  */
-export type Promotable = { promotable: boolean | null; reason: string; raw?: unknown };
+export type Promotable = { promotable: boolean | null; code: AdErrorCode | null; raw?: unknown };
 
 /** "…/posts/123", "…?story_fbid=123&id=456", "…/videos/123", or a bare id. */
 export function extractPostIdFromUrl(url: string): string | null {
@@ -38,7 +39,7 @@ export function extractPostIdFromUrl(url: string): string | null {
 export async function checkPostPromotable(pageId: string, postUrl: string): Promise<Promotable> {
   const postId = extractPostIdFromUrl(postUrl);
   if (!postId) {
-    return { promotable: false, reason: "تعذّر قراءة رقم المنشور من الرابط — تأكّد من نسخ رابط المنشور كاملاً." };
+    return { promotable: false, code: "bad_post_url" };
   }
 
   const { data: page } = await supabaseAdmin
@@ -47,7 +48,7 @@ export async function checkPostPromotable(pageId: string, postUrl: string): Prom
     .eq("page_id", String(pageId))
     .limit(1).maybeSingle();
   const token = page?.page_access_token;
-  if (!token) return { promotable: null, reason: "لا يوجد رمز للصفحة" };
+  if (!token) return { promotable: null, code: null };
 
   const full = postId.includes("_") ? postId : `${pageId}_${postId}`;
   try {
@@ -61,35 +62,25 @@ export async function checkPostPromotable(pageId: string, postUrl: string): Prom
     if (d?.error) {
       // A dead or re-authorised page token is our problem, not a verdict on the
       // post, so it must not block the sale.
-      if (d.error.code === 190) return { promotable: null, reason: "رمز الصفحة منتهي", raw: d.error };
-      return {
-        promotable: false,
-        reason: "لم يُعثر على هذا المنشور في الصفحة المختارة — تأكّد أن الرابط يخصّ نفس الصفحة.",
-        raw: d.error,
-      };
+      // A dead token is OUR problem, not a verdict on the post, so it must not
+      // block the sale — the launch path reports it with the right message.
+      if (d.error.code === 190) return { promotable: null, code: "page_token_dead", raw: d.error };
+      return { promotable: false, code: "post_not_found", raw: d.error };
     }
 
     if (d?.is_published === false) {
-      return { promotable: false, reason: "هذا المنشور غير منشور على الصفحة، فلا يمكن الإعلان عنه." };
+      return { promotable: false, code: "post_unpublished" };
     }
 
     if (d?.is_eligible_for_promotion === false) {
-      return {
-        promotable: false,
-        reason:
-          "فيسبوك لا يسمح بالإعلان عن هذا المنشور. " +
-          "افتح «جودة الحساب» في إعدادات الصفحة لمعرفة السبب — " +
-          "غالباً قيد على الصفحة نفسها أو مخالفة في محتوى المنشور. " +
-          "جرّب منشوراً آخر، فإن رُفض كذلك فالقيد على الصفحة.",
-        raw: d,
-      };
+      return { promotable: false, code: "post_not_promotable", raw: d };
     }
 
-    if (d?.is_eligible_for_promotion === true) return { promotable: true, reason: "" };
+    if (d?.is_eligible_for_promotion === true) return { promotable: true, code: null };
 
     // The field was not returned at all — say so rather than inventing a verdict.
-    return { promotable: null, reason: "تعذّر التحقق من أهلية المنشور", raw: d };
+    return { promotable: null, code: null, raw: d };
   } catch (e) {
-    return { promotable: null, reason: "تعذّر الاتصال بفيسبوك", raw: String(e) };
+    return { promotable: null, code: null, raw: String(e) };
   }
 }

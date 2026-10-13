@@ -1,5 +1,6 @@
 "use client";
 
+import { explainAdError } from "@/lib/adsErrors";
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -282,7 +283,10 @@ function CampaignsInner() {
                   camp.error_message ? (
                     <div style={{ marginTop: 10, background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#f59e0b", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                       <AlertCircle size={14} style={{ flexShrink: 0 }} />
-                      <span style={{ flex: 1, minWidth: 120 }}>{camp.error_message}</span>
+                      <span style={{ flex: 1, minWidth: 120 }}>
+                        {(() => { const ex = explainAdError(camp.error_message, rtl ? "ar" : "en");
+                          return `${ex.title} — ${ex.fix}`; })()}
+                      </span>
                       {camp.continuous && (
                         <button onClick={() => setShowWallet(true)}
                           style={{ background: G_HERO, border: "none", borderRadius: 9, padding: "6px 14px", color: "#fff", fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -304,11 +308,26 @@ function CampaignsInner() {
                   </button>
                 )}
 
-                {camp.status === "failed" && camp.error_message && (
-                  <div style={{ marginTop: 10, background: "rgba(239,68,68,0.1)", borderRadius: 10, padding: "8px 12px", fontSize: 12, color: "#ef4444" }}>
-                    {camp.error_message}
-                  </div>
-                )}
+                {camp.status === "failed" && camp.error_message && (() => {
+                  // The platform's own sentence names no cause and suggests no
+                  // fix, so it is translated into one the owner can act on. The
+                  // raw text stays available underneath: when we cannot classify
+                  // it, those words are the only real information there is.
+                  const ex = explainAdError(camp.error_message, rtl ? "ar" : "en");
+                  return (
+                    <div style={{ marginTop: 10, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#fca5a5", display: "flex", flexDirection: "column", gap: 6 }}>
+                      <div style={{ display: "flex", gap: 7, alignItems: "flex-start" }}>
+                        <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1, color: "#ef4444" }} />
+                        <strong style={{ color: "#ef4444" }}>{ex.title}</strong>
+                      </div>
+                      <span style={{ opacity: 0.9, lineHeight: 1.7 }}>{ex.body}</span>
+                      <span style={{ color: "#fbbf24", lineHeight: 1.7 }}>↳ {ex.fix}</span>
+                      {ex.code === "unknown" && ex.raw && (
+                        <code style={{ opacity: 0.55, fontSize: 10, direction: "ltr", textAlign: "left", wordBreak: "break-word" }}>{ex.raw}</code>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Actions: pause/resume + invoice */}
                 {camp.status !== "pending_payment" && camp.status !== "failed" && (

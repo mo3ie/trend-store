@@ -26,7 +26,7 @@ const PINK    = "#d6409f";
 const PINK_BG = "rgba(214,64,159,0.12)";
 
 interface ConnectedPage { id: string; page_id: string; page_name: string; page_picture?: string; }
-interface PagePost { id: string; postId: string; message: string; createdTime: string; picture?: string; permalinkUrl?: string; }
+interface PagePost { id: string; postId: string; message: string; createdTime: string; picture?: string; permalinkUrl?: string; promotable?: boolean | null; }
 interface GeoCity { key: string; name: string; region?: string; }
 interface AdInterest { id: string; name: string; audienceLower?: number; audienceUpper?: number; }
 interface SavedAudience { id: string; name: string; targeting: Record<string, unknown>; }
@@ -418,7 +418,12 @@ function CreateCampaignInner() {
       body: JSON.stringify(body),
     });
     const data = await res.json();
-    if (!res.ok) { setError(data.error || t("حدث خطأ", "Something went wrong")); setSaving(false); return; }
+    if (!res.ok) {
+      // The API answers in both languages with a cause and a fix; show the one
+      // this visitor reads rather than a generic "something went wrong".
+      setError((rtl ? data.error : (data.errorEn || data.error)) || t("حدث خطأ", "Something went wrong"));
+      setSaving(false); return;
+    }
     router.push(`/ads/checkout?campaignId=${data.campaign.id}`);
   }
 
@@ -609,13 +614,44 @@ function CreateCampaignInner() {
             </p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 340, overflowY: "auto" }}>
+              {/*
+                Every single post refused is a different fact from one post
+                refused: it means the restriction is on the PAGE, and trying
+                another post will not help. Saying which of the two it is saves
+                the owner an afternoon.
+              */}
+              {posts.length > 0 && posts.every((p) => p.promotable === false) && (
+                <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 12, padding: "12px 14px", fontSize: 12, color: "#fca5a5", lineHeight: 1.8 }}>
+                  <strong style={{ color: "#ef4444", display: "block", marginBottom: 4 }}>
+                    {t("فيسبوك يمنع الإعلان على هذه الصفحة", "Facebook is blocking ads on this Page")}
+                  </strong>
+                  {t(
+                    "كل منشورات هذه الصفحة مرفوضة للإعلان، وليس منشوراً واحداً — أي أن القيد على الصفحة نفسها.",
+                    "Every post on this Page is refused, not just one — so the restriction is on the Page itself.",
+                  )}
+                  <span style={{ color: "#fbbf24", display: "block", marginTop: 4 }}>
+                    ↳ {t(
+                      "افتح إعدادات الصفحة ← «جودة الحساب / Account Quality» على فيسبوك، وسيظهر السبب وزر الاعتراض.",
+                      "Open Page Settings → Account Quality on Facebook; the reason and an appeal button are shown there.",
+                    )}
+                  </span>
+                </div>
+              )}
               {posts.map((p) => {
                 const active = selectedPostId === p.id;
+                // Facebook refuses some posts outright. Saying so HERE, before a
+                // choice is made, is worth more than any message afterwards: the
+                // customer who paid 110 د.ل for a refused post would have seen
+                // this instead. `null` means unknown, which stays selectable.
+                const blocked = p.promotable === false;
                 return (
-                  <button key={p.id} type="button" onClick={() => pickPost(p)}
+                  <button key={p.id} type="button" disabled={blocked}
+                    title={blocked ? t("فيسبوك لا يسمح بالإعلان عن هذا المنشور", "Facebook will not allow an ad on this post") : undefined}
+                    onClick={() => { if (!blocked) pickPost(p); }}
                     style={{ display: "flex", gap: 12, alignItems: "center", textAlign: rtl ? "right" : "left",
-                      padding: 10, borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
-                      border: active ? `2px solid ${PINK}` : `1px solid ${c.border}`,
+                      padding: 10, borderRadius: 12, cursor: blocked ? "not-allowed" : "pointer", fontFamily: "inherit",
+                      opacity: blocked ? 0.55 : 1,
+                      border: active ? `2px solid ${PINK}` : `1px solid ${blocked ? "rgba(239,68,68,0.4)" : c.border}`,
                       background: active ? PINK_BG : c.inputBg }}>
                     {p.picture ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -629,7 +665,14 @@ function CreateCampaignInner() {
                       <div style={{ fontSize: 13, color: c.text, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                         {p.message ? (p.message.length > 90 ? p.message.slice(0, 90) + "…" : p.message) : t("(منشور بدون نص)", "(post with no text)")}
                       </div>
-                      <div style={{ fontSize: 11, color: c.dim, marginTop: 3 }}>{new Date(p.createdTime).toLocaleDateString(rtl ? "ar-LY" : "en-GB")}</div>
+                      <div style={{ fontSize: 11, color: c.dim, marginTop: 3, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span>{new Date(p.createdTime).toLocaleDateString(rtl ? "ar-LY" : "en-GB")}</span>
+                        {blocked && (
+                          <span style={{ color: "#ef4444", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 6, padding: "1px 6px", fontSize: 10 }}>
+                            {t("فيسبوك يرفض الإعلان عنه", "Facebook refuses to advertise it")}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {active && <CheckCircle size={18} color={PINK} style={{ flexShrink: 0 }} />}
                   </button>
