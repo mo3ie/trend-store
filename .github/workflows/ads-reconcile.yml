@@ -1,0 +1,44 @@
+# Makes sure nobody stays charged for an ad that never ran.
+#
+# The launch hop is fire-and-forget on purpose — a customer's payment must not hang
+# on a slow platform API — which means a campaign can be paid and then go silent with
+# nothing left to notice. The launch route's own refund only covers failures it lives
+# to see; this covers the ones it doesn't.
+#
+# Every 15 minutes: retry anything paid and silent for 10 minutes, and refund anything
+# still silent after an hour. The endpoint is idempotent and refuses to run without
+# CRON_SECRET, so a missed or doubled run is harmless.
+#
+# On GitHub rather than Vercel because the Hobby plan allows only DAILY cron
+# expressions, and a customer waiting a day for their money back is the complaint this
+# job exists to prevent.
+
+name: Ads — reconcile and refund
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ads-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Retry stuck campaigns and refund the lost ones
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE: ${{ vars.SITE_URL || 'https://www.trendstore-ly.com' }}
+        run: |
+          set -u
+          # Fail the step on a non-2xx, so a wrong or missing secret shows up in the
+          # Actions log instead of looking like "there was nothing to do".
+          code=$(curl -sS -o /tmp/out.txt -w '%{http_code}' --max-time 90 \
+            -H "authorization: Bearer ${CRON_SECRET}" \
+            "${BASE}/api/ads/reconcile")
+          echo "HTTP ${code}"; cat /tmp/out.txt; echo
+          [ "${code}" = "200" ]

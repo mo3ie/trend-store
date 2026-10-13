@@ -37,8 +37,24 @@ async function graph<T = Record<string, unknown>>(
   });
   const data = await res.json();
   if ((data as Record<string, unknown>).error) {
-    const err = (data as { error: { message: string } }).error;
-    throw new Error(err.message);
+    /*
+     * Meta puts the USEFUL explanation in `error_user_msg` and `error_user_title`,
+     * and leaves `message` as a generic label. Throwing only `message` is why a
+     * real failure was stored as the bare string "Invalid parameter" — true, and
+     * worth nothing to the customer or to whoever had to diagnose it afterwards.
+     * Keep the specific text, and the subcode, which is what Meta's own docs are
+     * indexed by.
+     */
+    const err = (data as {
+      error: {
+        message: string; error_user_msg?: string; error_user_title?: string;
+        code?: number; error_subcode?: number;
+      };
+    }).error;
+    const detail = [err.error_user_title, err.error_user_msg].filter(Boolean).join(" — ");
+    const codes = [err.code, err.error_subcode].filter((x) => x != null).join("/");
+    const full = [detail || err.message, codes && `[${codes}]`].filter(Boolean).join(" ");
+    throw new Error(full);
   }
   return data as T;
 }

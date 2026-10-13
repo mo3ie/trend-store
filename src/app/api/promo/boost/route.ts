@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { refundFailedCampaign, withRefundNote } from "@/lib/adsRefund";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { boostPost, extractPostId, getPagePicture } from "@/services/meta";
 
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
   if (!page) {
     await supabaseAdmin
       .from("ad_campaigns")
-      .update({ status: "failed", error_message: "لم يتم العثور على رمز الصفحة", updated_at: new Date().toISOString() })
+      .update({ status: "failed", error_message: withRefundNote("لم يتم العثور على رمز الصفحة — أعد ربط الصفحة", (await refundFailedCampaign(campaignId, "استرجاع — رمز الصفحة مفقود")).refunded), updated_at: new Date().toISOString() })
       .eq("id", campaignId);
     return NextResponse.json({ error: "page token not found" }, { status: 500 });
   }
@@ -61,9 +62,14 @@ export async function POST(req: NextRequest) {
   } else {
     const pid = extractPostId(campaign.post_url);
     if (!pid) {
+      const back = await refundFailedCampaign(campaignId, "استرجاع — رابط المنشور غير صالح");
       await supabaseAdmin
         .from("ad_campaigns")
-        .update({ status: "failed", error_message: "تعذّر استخراج رقم المنشور من الرابط", updated_at: new Date().toISOString() })
+        .update({
+          status: "failed",
+          error_message: withRefundNote("تعذّر استخراج رقم المنشور من الرابط", back.refunded),
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", campaignId);
       return NextResponse.json({ error: "cannot extract post id" }, { status: 400 });
     }
@@ -112,11 +118,18 @@ export async function POST(req: NextRequest) {
     const msg = err instanceof Error ? err.message : "Meta API error";
     console.error("Meta boost failed ❌", campaignId, msg);
 
+    // The ad never ran, so the customer must not stay charged for it.
+    const back = await refundFailedCampaign(campaignId, "استرجاع — تعذّر إنشاء الإعلان");
+
     await supabaseAdmin
       .from("ad_campaigns")
-      .update({ status: "failed", error_message: msg, updated_at: new Date().toISOString() })
+      .update({
+        status: "failed",
+        error_message: withRefundNote(msg, back.refunded),
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", campaignId);
 
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg, refunded: back.refunded }, { status: 500 });
   }
 }

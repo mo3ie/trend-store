@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { priceFor, findTierOption } from "@/services/campaigns";
 import { getAdsPricing, getUserTier } from "@/lib/adsPricing";
+import { checkPostPromotable } from "@/services/metaEligibility";
 
 async function getUser() {
   const store = await cookies();
@@ -114,6 +115,30 @@ export async function POST(req: Request) {
     serviceFee     = price.commissionLyd;
     totalLyd       = price.totalLyd;
     days           = Number(durationDays);
+  }
+
+  /*
+   * Ask Facebook whether this post can be advertised AT ALL, before the customer
+   * pays for it.
+   *
+   * A refund afterwards is the wrong shape of fix on its own: the customer has
+   * already paid, waited, and seen a failure. Facebook answers this question for
+   * free, in one call, and it is the question the whole campaign depends on —
+   * one real customer paid 110 د.ل for a post the platform was never going to
+   * promote, and the only clue we stored was "Invalid parameter".
+   *
+   * A check that cannot complete does NOT block the campaign: an outage on
+   * Facebook's side must not stop the store from selling, and the launch (with
+   * its refund) is still behind this.
+   */
+  if (!isPageLikes && postUrl) {
+    const verdict = await checkPostPromotable(pageId, String(postUrl));
+    if (verdict.promotable === false) {
+      return NextResponse.json({
+        error: verdict.reason,
+        code: "post_not_promotable",
+      }, { status: 400 });
+    }
   }
 
   const { data, error } = await supabaseAdmin

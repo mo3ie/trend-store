@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { refundFailedCampaign, withRefundNote } from "@/lib/adsRefund";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireAdsContext } from "@/lib/tiktokAdsContext";
 import { launchCampaign } from "@/services/tiktokAdsCampaigns";
@@ -40,8 +41,15 @@ export async function POST(req: NextRequest) {
   }
 
   const fail = async (message: string) => {
+    // Same rule as the Meta side: a campaign that never reached TikTok must not
+    // leave the customer charged.
+    const back = await refundFailedCampaign(campaignId, "استرجاع — تعذّر إنشاء حملة تيك توك");
     await supabaseAdmin.from("ad_campaigns")
-      .update({ status: "failed", error_message: message.slice(0, 300), updated_at: new Date().toISOString() })
+      .update({
+        status: "failed",
+        error_message: withRefundNote(message.slice(0, 260), back.refunded),
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", campaignId);
   };
 
