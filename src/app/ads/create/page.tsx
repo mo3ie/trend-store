@@ -465,8 +465,17 @@ function CreateCampaignInner() {
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "22px 20px", display: "grid", gap: 18 }}>
 
         {error && (
-          <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #ef444455", borderRadius: 14, padding: "12px 16px", color: "#ef4444", display: "flex", gap: 10, alignItems: "center" }}>
-            <AlertCircle size={16} /> {error}
+          /*
+            A flex row with no `minWidth: 0` cannot shrink below its text's
+            intrinsic width, so a long message stretches the whole column — on a
+            phone that reads as the page suddenly getting wider. It only started
+            showing when the messages grew from "Invalid parameter" to a real
+            explanation, so the longer text exposed a layout bug that was always
+            there.
+          */
+          <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #ef444455", borderRadius: 14, padding: "12px 16px", color: "#ef4444", display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 3 }} />
+            <span style={{ flex: 1, minWidth: 0, lineHeight: 1.8, overflowWrap: "anywhere" }}>{error}</span>
           </div>
         )}
 

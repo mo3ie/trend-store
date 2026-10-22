@@ -318,10 +318,10 @@ function CampaignsInner() {
                     <div style={{ marginTop: 10, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#fca5a5", display: "flex", flexDirection: "column", gap: 6 }}>
                       <div style={{ display: "flex", gap: 7, alignItems: "flex-start" }}>
                         <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1, color: "#ef4444" }} />
-                        <strong style={{ color: "#ef4444" }}>{ex.title}</strong>
+                        <strong style={{ color: "#ef4444", minWidth: 0, overflowWrap: "anywhere" }}>{ex.title}</strong>
                       </div>
-                      <span style={{ opacity: 0.9, lineHeight: 1.7 }}>{ex.body}</span>
-                      <span style={{ color: "#fbbf24", lineHeight: 1.7 }}>↳ {ex.fix}</span>
+                      <span style={{ opacity: 0.9, lineHeight: 1.7, overflowWrap: "anywhere" }}>{ex.body}</span>
+                      <span style={{ color: "#fbbf24", lineHeight: 1.7, overflowWrap: "anywhere" }}>↳ {ex.fix}</span>
                       {ex.code === "unknown" && ex.raw && (
                         <code style={{ opacity: 0.55, fontSize: 10, direction: "ltr", textAlign: "left", wordBreak: "break-word" }}>{ex.raw}</code>
                       )}

@@ -36,17 +36,25 @@ export function extractPostIdFromUrl(url: string): string | null {
  * answer only when the ad creative was rejected with a generic "Invalid
  * parameter", after the money had moved.
  */
-export async function checkPostPromotable(pageId: string, postUrl: string): Promise<Promotable> {
+export async function checkPostPromotable(
+  pageId: string,
+  postUrl: string,
+  userId?: string,
+): Promise<Promotable> {
   const postId = extractPostIdFromUrl(postUrl);
   if (!postId) {
     return { promotable: false, code: "bad_post_url" };
   }
 
-  const { data: page } = await supabaseAdmin
+  // Scoped to the asking user. A Page connected by several of our customers has
+  // several rows, and reading "whichever came first" would check the post with
+  // somebody else's token — which can answer differently, or not at all.
+  let q = supabaseAdmin
     .from("connected_pages")
     .select("page_access_token")
-    .eq("page_id", String(pageId))
-    .limit(1).maybeSingle();
+    .eq("page_id", String(pageId));
+  if (userId) q = q.eq("user_id", userId);
+  const { data: page } = await q.limit(1).maybeSingle();
   const token = page?.page_access_token;
   if (!token) return { promotable: null, code: null };
 

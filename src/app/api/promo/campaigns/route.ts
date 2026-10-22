@@ -133,7 +133,7 @@ export async function POST(req: Request) {
    * its refund) is still behind this.
    */
   if (!isPageLikes && postUrl) {
-    const verdict = await checkPostPromotable(pageId, String(postUrl));
+    const verdict = await checkPostPromotable(pageId, String(postUrl), user.id);
     if (verdict.promotable === false) {
       // Both languages, cause AND fix. The screen picks; nothing is lost either
       // way, and the owner is never left with a refusal and no next step.

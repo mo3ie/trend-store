@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { refundFailedCampaign, withRefundNote } from "@/lib/adsRefund";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { boostPost, extractPostId, getPagePicture } from "@/services/meta";
+import { boostPost, extractPostId, getPagePicture, getSystemPageToken } from "@/services/meta";
 
 // POST — create Meta ad for a paid campaign
 // Body: { campaignId }
@@ -35,17 +35,40 @@ export async function POST(req: NextRequest) {
     .update({ status: "creating", updated_at: new Date().toISOString() })
     .eq("id", campaignId);
 
-  // Load page access token
+  /*
+   * Load the page token — scoped to THIS campaign's owner.
+   *
+   * Without the user filter this was `.single()` over every row for the page id,
+   * and a Page connected by more than one of our customers has more than one
+   * row. PostgREST then answers PGRST116 ("the result contains 3 rows"), `page`
+   * comes back null, and the campaign failed with "no page token" — on a Page
+   * that was perfectly connected, with a valid token sitting in the row. It got
+   * more likely the more customers signed up, and it could just as easily have
+   * handed one customer another customer's token.
+   */
   const { data: page } = await supabaseAdmin
     .from("connected_pages")
     .select("page_access_token, page_name")
+    .eq("user_id", campaign.user_id)
     .eq("page_id", campaign.page_id)
-    .single();
+    .maybeSingle();
 
-  if (!page) {
+  // A stale or missing row is not a broken connection: the system-user token
+  // still works for Pages it manages, exactly as the Studio publish path does.
+  const pageToken = page?.page_access_token || (await getSystemPageToken(campaign.page_id));
+  const pageName = page?.page_name || campaign.page_name || campaign.page_id;
+
+  if (!pageToken) {
     await supabaseAdmin
       .from("ad_campaigns")
-      .update({ status: "failed", error_message: withRefundNote("لم يتم العثور على رمز الصفحة — أعد ربط الصفحة", (await refundFailedCampaign(campaignId, "استرجاع — رمز الصفحة مفقود")).refunded), updated_at: new Date().toISOString() })
+      .update({
+        status: "failed",
+        error_message: withRefundNote(
+          "لم يتم العثور على رمز الصفحة — أعد ربط الصفحة",
+          (await refundFailedCampaign(campaignId, "استرجاع — رمز الصفحة مفقود")).refunded,
+        ),
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", campaignId);
     return NextResponse.json({ error: "page token not found" }, { status: 500 });
   }
@@ -58,7 +81,7 @@ export async function POST(req: NextRequest) {
   let pagePicture: string | undefined;
   if (isPageLikes) {
     // Prefer the advertiser's uploaded image; otherwise use the Page picture.
-    pagePicture = campaign.ad_image || (await getPagePicture(campaign.page_id, page.page_access_token)) || undefined;
+    pagePicture = campaign.ad_image || (await getPagePicture(campaign.page_id, pageToken)) || undefined;
   } else {
     const pid = extractPostId(campaign.post_url);
     if (!pid) {
@@ -80,11 +103,11 @@ export async function POST(req: NextRequest) {
     const result = await boostPost({
       pageId:       campaign.page_id,
       postId,
-      pageToken:    page.page_access_token,
+      pageToken:    pageToken,
       budgetUsd:    campaign.budget_usd ?? undefined,
       budgetLyd:    campaign.budget,
       durationDays: campaign.duration_days,
-      campaignName: `TrendStore - ${page.page_name || campaign.page_id} - ${campaignId.slice(0, 8)}`,
+      campaignName: `TrendStore - ${pageName} - ${campaignId.slice(0, 8)}`,
       targeting:    campaign.targeting,
       objective:         campaign.objective ?? undefined,
       placements:        Array.isArray(campaign.placements) && campaign.placements.length ? campaign.placements : undefined,
