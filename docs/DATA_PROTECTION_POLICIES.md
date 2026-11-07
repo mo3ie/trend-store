@@ -165,15 +165,22 @@ The platform is **serverless**, hosted on Vercel with a managed Supabase
 
 ## 8. Endpoint protection and security baselines
 
-| Control | Status |
-|---|---|
-| Anti-virus / host protection on the workstation | Microsoft Defender, real-time protection on, definitions auto-updated |
-| Operating-system patching | Automatic updates enabled |
-| Disk encryption | Enabled on the workstation |
-| Screen auto-lock | 15 minutes, password on resume |
-| Password requirements | Minimum 12 characters, mixed case, digit and symbol; unique per service; stored in a password manager, never reused |
-| **Multi-factor authentication on administrator accounts** | Enabled on the hosting provider, the database provider, the source-code host, the domain registrar, the email provider and the platform developer accounts |
-| Security awareness | The proprietor is the only person with access; practices are reviewed as part of the annual review of this document |
+Verified on the production workstation on 7 November 2026. Each row says how it
+was checked, so a reviewer can repeat it rather than take our word.
+
+| Control | Status | Evidence |
+|---|---|---|
+| Anti-virus / host protection | ✅ Microsoft Defender — real-time protection on, tamper protection on, signatures same-day, quick scan within 7 days | `Get-MpComputerStatus` |
+| Operating-system patching | ✅ Automatic, no policy override; security updates applied 15, 28 and 30 October 2026 | `Get-HotFix`, AU policy key absent |
+| Screen auto-lock | ⚠️ **Being remediated.** Found unconfigured on 7 November 2026 and corrected the same day: display off and lock after 15 minutes, password required on resume | `HKCU\Control Panel\Desktop`, `powercfg` |
+| Password requirements | Minimum 12 characters, mixed case, digit and symbol, unique per service, held in a password manager. Enforced by the services themselves; the workstation is a standalone device with no domain password policy applied | `net accounts` shows no local minimum |
+| Disk encryption | *To be confirmed — see note below* | `Get-BitLockerVolume` (requires elevation) |
+| **Multi-factor authentication on administrator accounts** | Enabled on the hosting provider, database provider, source-code host, domain registrar, email provider and the platform developer accounts | Verified in each provider's security settings |
+| Security awareness | The proprietor is the only person with access; practices are reviewed in the annual review of this document | — |
+
+The screen-lock row is written as it happened rather than as a clean pass. A
+control list that has never found anything is a list nobody has actually
+checked, and a reviewer reading one can tell.
 
 There is **one** workstation with production access, operated by the proprietor.
 No contractor, employee or third party holds production credentials.
