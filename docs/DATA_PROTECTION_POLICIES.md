@@ -174,13 +174,21 @@ was checked, so a reviewer can repeat it rather than take our word.
 | Operating-system patching | ✅ Automatic, no policy override; security updates applied 15, 28 and 30 October 2026 | `Get-HotFix`, AU policy key absent |
 | Screen auto-lock | ⚠️ **Being remediated.** Found unconfigured on 7 November 2026 and corrected the same day: display off and lock after 15 minutes, password required on resume | `HKCU\Control Panel\Desktop`, `powercfg` |
 | Password requirements | Minimum 12 characters, mixed case, digit and symbol, unique per service, held in a password manager. Enforced by the services themselves; the workstation is a standalone device with no domain password policy applied | `net accounts` shows no local minimum |
-| Disk encryption | *To be confirmed — see note below* | `Get-BitLockerVolume` (requires elevation) |
+| Disk encryption | ❌ **Not enabled.** Checked 7 November 2026: all volumes report `ProtectionStatus: Off`. Being remediated — see section 11 | `Get-BitLockerVolume` (elevated) |
 | **Multi-factor authentication on administrator accounts** | Enabled on the hosting provider, database provider, source-code host, domain registrar, email provider and the platform developer accounts | Verified in each provider's security settings |
 | Security awareness | The proprietor is the only person with access; practices are reviewed in the annual review of this document | — |
 
-The screen-lock row is written as it happened rather than as a clean pass. A
-control list that has never found anything is a list nobody has actually
-checked, and a reviewer reading one can tell.
+The screen-lock and disk-encryption rows are written as they happened rather
+than as a clean pass. A control list that has never found anything is a list
+nobody has actually checked, and a reviewer reading one can tell.
+
+**On the scope of the encryption finding.** Customer personal data is not stored
+on this workstation. It lives in the managed database and object storage, where
+it is encrypted at rest with AES-256 and in transit with TLS 1.2 or above, as
+section 9 describes — that remains true and is what the "data protection"
+requirement asks about. What the workstation holds is *developer credentials*.
+The exposure is therefore theft of the physical device, not of a customer
+record store, and the remedy is full-volume encryption on the endpoint.
 
 There is **one** workstation with production access, operated by the proprietor.
 No contractor, employee or third party holds production credentials.
@@ -265,6 +273,11 @@ alongside the review of this document, and the result recorded.
 * **No centralised SIEM.** Logging is operational — error logs, request logs and
   an application activity log — not correlated security event management.
 * **No appointed Data Protection Officer**, for the reason given in section 1.
+* **Full-volume encryption is not yet enabled on the developer workstation.**
+  Found on 7 November 2026 and scheduled for remediation. The device is Windows
+  11 Pro with a TPM, so BitLocker will be enabled on the system volume with the
+  recovery key held offline. Until it is done, this is an open finding and is
+  recorded here rather than omitted.
 
 TikTok's documentation names an ISO 27001 certificate, a SOC 2 report or a recent
 penetration-test report as ways to speed up approval. We hold none of them and
