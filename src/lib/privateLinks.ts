@@ -39,8 +39,21 @@ export function newToken(): string {
   return out;
 }
 
-export const DEFAULT_TTL_HOURS = 48;
-export const DEFAULT_MAX_OPENS = 3;
+/*
+ * One open, 24 hours.
+ *
+ * Chosen by the operator over the gentler 3-in-48: the whole point of hiding the
+ * price is that learning it costs a comment, and a link that opens three times is
+ * a link that can be handed to two friends. At one open the only way to see the
+ * price a second time is to comment again -- which is the behaviour the mechanic
+ * is built to produce.
+ *
+ * This is survivable for the customer ONLY because the view cookie makes refreshes
+ * free (see /r/[token]). Without it, one open would mean one accidental
+ * back-button and a lost sale.
+ */
+export const DEFAULT_TTL_HOURS = 24;
+export const DEFAULT_MAX_OPENS = 1;
 /** What the merchant's public comment says when they have not written their own. */
 export const DEFAULT_LINK_TEXT = "تم تجهيز ردّك ✅";
 

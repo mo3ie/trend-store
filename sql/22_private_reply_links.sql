@@ -34,8 +34,9 @@ alter table public.bot_configs
   add column if not exists private_link_text       text,
   add column if not exists whatsapp_number         text,
   add column if not exists whatsapp_text           text,
-  add column if not exists private_link_ttl_hours  int     not null default 48,
-  add column if not exists private_link_max_opens  int     not null default 3;
+  -- One open, 24 hours: the price must cost a comment every time it is read.
+  add column if not exists private_link_ttl_hours  int     not null default 24,
+  add column if not exists private_link_max_opens  int     not null default 1;
 
 create table if not exists public.private_links (
   id                  uuid primary key default gen_random_uuid(),
@@ -54,7 +55,7 @@ create table if not exists public.private_links (
   whatsapp_number     text,
   whatsapp_text       text,
   opens               int         not null default 0,
-  max_opens           int         not null default 3,
+  max_opens           int         not null default 1,
   expires_at          timestamptz not null,
   first_opened_at     timestamptz,
   last_opened_at      timestamptz,

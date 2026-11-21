@@ -195,19 +195,19 @@ export function PrivateReplyPanel({
           <Field
             c={c} n={4}
             title={t("حدود الرابط", "Link limits")}
-            hint={t("الرابط داخل تعليق علني، فأي أحد قد يضغطه. هذه الحدود تجعل تمريره غير مُجدٍ: الزبون يفتحه أولاً لأنه يصله إشعار، ومن يأتي بعده يجده منتهياً. التحديث لا يستهلك فتحة.",
-                    "The link sits in a public comment, so anyone could tap it. These limits make passing it around pointless: your customer opens it first because they are notified, and whoever follows finds it closed. A page refresh costs nothing.")}
+            hint={t("الافتراضي: فتحة واحدة خلال ٢٤ ساعة — فمن أراد السعر مرة أخرى عليه أن يعلّق من جديد، وهذا بالضبط ما تريده. تحديث الصفحة لا يستهلك الفتحة، فلن يضيع السعر على زبونك بالخطأ.",
+                    "The default is one open within 24 hours — so anyone who wants the price again has to comment again, which is exactly what you want. Refreshing the page does not spend the open, so your customer cannot lose the price by accident.")}
           >
             <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
               <label style={{ flex: "1 1 120px", fontSize: 11.5, color: c.muted }}>
                 {t("مدة الصلاحية (ساعة)", "Valid for (hours)")}
-                <input type="number" min={1} max={720} defaultValue={config.private_link_ttl_hours ?? 48}
+                <input type="number" min={1} max={720} defaultValue={config.private_link_ttl_hours ?? 24}
                   onBlur={(e) => save({ private_link_ttl_hours: Number(e.target.value) })}
                   style={{ ...ttInput(c), marginTop: 5 }} />
               </label>
               <label style={{ flex: "1 1 120px", fontSize: 11.5, color: c.muted }}>
                 {t("عدد مرات الفتح", "Times it can open")}
-                <input type="number" min={1} max={50} defaultValue={config.private_link_max_opens ?? 3}
+                <input type="number" min={1} max={50} defaultValue={config.private_link_max_opens ?? 1}
                   onBlur={(e) => save({ private_link_max_opens: Number(e.target.value) })}
                   style={{ ...ttInput(c), marginTop: 5 }} />
               </label>

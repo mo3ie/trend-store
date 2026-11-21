@@ -116,8 +116,29 @@ export default async function PrivateReplyPage({ params }: { params: Params }) {
           </a>
         )}
 
-        <div style={{ marginTop: 14, fontSize: 11.5, color: C.muted, lineHeight: 1.7 }}>
-          هذا الرابط خاص بك ومحدود المدة. إن احتجت الرد مرة أخرى، علّق على المنشور من جديد.
+        {/*
+          Stated loudly, and before the customer leaves rather than after.
+
+          The link opens once. Someone who closes it assuming they can come back
+          finds it gone, and blames the shop -- so the one sentence that prevents
+          that complaint gets real weight on the page, not footnote grey. It also
+          does the merchant's work for them: the way back is another comment.
+        */}
+        <div style={{
+          marginTop: 16, background: "#2a1420", border: `1px solid ${C.accent}66`,
+          borderRadius: 12, padding: "13px 14px",
+        }}>
+          <div style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+            <span style={{ fontSize: 17, lineHeight: 1.2 }} aria-hidden>⚠️</span>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#ffb3c6", lineHeight: 1.6 }}>
+                هذا الرابط صالح لمرة واحدة فقط
+              </div>
+              <div style={{ fontSize: 14, color: C.text, lineHeight: 1.85, marginTop: 5 }}>
+                يمكنك فتحه لمعرفة السعر. ولمعرفته مرة أخرى <strong>علّق من جديد</strong> ليُرسل إليك من جديد.
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </Shell>
@@ -136,7 +157,7 @@ function Closed({ state }: { state: OpenResult["state"] }) {
     state === "expired"
       ? { icon: "⏳", title: "انتهت صلاحية هذا الرابط", body: "الروابط صالحة لفترة محدودة. علّق على المنشور من جديد وسيصلك رد جديد خلال ثوانٍ." }
       : state === "exhausted"
-        ? { icon: "🔒", title: "تم فتح هذا الرابط من قبل", body: "كل رابط يُفتح عدداً محدوداً من المرات. علّق على المنشور من جديد للحصول على رابط جديد." }
+        ? { icon: "🔒", title: "تم فتح هذا الرابط من قبل", body: "الرابط صالح لمرة واحدة فقط. علّق على المنشور من جديد وسيصلك رابط جديد خلال ثوانٍ." }
         : { icon: "🔍", title: "هذا الرابط غير موجود", body: "تأكد من نسخ الرابط كاملاً، أو علّق على المنشور من جديد." };
 
   return (
