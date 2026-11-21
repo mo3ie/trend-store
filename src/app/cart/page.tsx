@@ -155,7 +155,7 @@ export default function CartPage() {
     try {
       const oid = await createOrder("moamalat");
 
-      const res = await fetch("/api/payment/moamalat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId: oid, amountLYD: total }) });
+      const res = await fetch("/api/payment/moamalat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId: oid }) });
       const p = await res.json();
       if (!res.ok || !p.success) { setPayError(p.error || t("فشل إعداد الدفع", "Failed to set up payment")); setOrdering(false); return; }
 
@@ -193,7 +193,7 @@ export default function CartPage() {
       const res = await fetch("/api/edfali/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerPhone: edfaliPhone, amount: total }),
+        body: JSON.stringify({ order_id: oid, customerPhone: edfaliPhone }),
       });
       const data = await res.json();
       if (!res.ok) { setPayError(data.error || t("فشل إرسال رمز التحقق", "Failed to send the verification code")); setEdfaliStep("phone"); return; }
@@ -211,7 +211,7 @@ export default function CartPage() {
       const res = await fetch("/api/edfali/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: edfaliSession, otp: edfaliOtp, order_id: orderId }),
+        body: JSON.stringify({ otp: edfaliOtp, order_id: orderId }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) { setPayError(data.error || t("رمز التحقق غير صحيح", "Invalid verification code")); setOrdering(false); return; }

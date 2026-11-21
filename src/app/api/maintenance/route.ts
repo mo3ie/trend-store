@@ -38,7 +38,8 @@ export async function GET(req: NextRequest) {
   const id = new URL(req.url).searchParams.get("id");
   if (id) {
     const { data } = await db.from("maintenance_requests")
-      .select("id, name, phone, device, fault, status, quote_price, technician, notes, created_at, updated_at")
+      // Public endpoint: never return the customer's name or phone to whoever holds the link.
+      .select("id, device, fault, status, quote_price, technician, notes, created_at, updated_at")
       .eq("id", id).maybeSingle();
     if (!data) return NextResponse.json({ error: "الطلب غير موجود" }, { status: 404 });
     return NextResponse.json(data);

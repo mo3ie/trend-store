@@ -25,19 +25,22 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await getUser(req);
   if (!user) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
 
-  const { order_id, identityCard, amount } = await req.json();
+  const { order_id, identityCard } = await req.json();
   if (!order_id) return NextResponse.json({ error: "order_id مطلوب" }, { status: 400 });
   if (!identityCard) return NextResponse.json({ error: "رقم البطاقة مطلوب" }, { status: 400 });
-  if (!amount || Number(amount) <= 0) return NextResponse.json({ error: "المبلغ غير صحيح" }, { status: 400 });
 
   // Verify the order belongs to this user
   const { data: order, error: orderErr } = await supabaseAdmin
     .from("store_orders")
-    .select("id, user_id, total")
+    .select("id, user_id, total, payment_status")
     .eq("id", order_id)
     .eq("user_id", user.id)
     .single();
   if (orderErr || !order) return NextResponse.json({ error: "الطلب غير موجود" }, { status: 404 });
+  if (order.payment_status === "paid") return NextResponse.json({ error: "هذا الطلب مدفوع بالفعل" }, { status: 409 });
+  // Charge the total stored on the order, never an amount sent by the browser.
+  const amount = Number(order.total);
+  if (!(amount > 0)) return NextResponse.json({ error: "المبلغ غير صحيح" }, { status: 400 });
 
   try {
     const { token: signinToken } = await signin();
@@ -46,7 +49,7 @@ export async function POST(req: NextRequest) {
     // OpenSession returns its OWN token; CompleteSession must use THAT token,
     // not the signin token (using the signin token there → HTTP 403).
     const { token: sessionToken, validTo } = await openSession(signinToken, {
-      amount: Number(amount),
+      amount,
       identityCard,
       transactionId,
     });

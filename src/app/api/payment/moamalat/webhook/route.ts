@@ -52,6 +52,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false }, { status: 400 });
     }
 
+    const { data: order } = await supabaseAdmin
+      .from("store_orders")
+      .select("total, payment_status")
+      .eq("id", orderId)
+      .single();
+    if (!order) return NextResponse.json({ ok: true });
+    // A late failure notice must never undo a payment already recorded.
+    if (order.payment_status === "paid") return NextResponse.json({ ok: true });
+
+    // The signature proves Moamalat sent it, not that it covers this order's
+    // total; refuse a payment for a different amount.
+    const paidUnits = Number(body.AmountTrxn);
+    if (isPaid && body.AmountTrxn && paidUnits !== Math.round(Number(order.total) * 1000)) {
+      console.error(`MOAMALAT WEBHOOK: amount ${paidUnits} does not match order ${orderId} total ${order.total}`);
+      return NextResponse.json({ ok: false }, { status: 400 });
+    }
+
     const { error } = await supabaseAdmin
       .from("store_orders")
       .update({
