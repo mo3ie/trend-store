@@ -134,9 +134,9 @@ export function PrivateReplyPanel({
           {/* ── 1. What the customer receives ──────────────────────────────── */}
           <Field
             c={c} n={1}
-            title={t("ما يصل الزبون", "What the customer gets")}
-            hint={t("السعر والتفاصيل. هذا وحده ما يظهر في الصفحة الخاصة، ولا يراه أحد غير من فتح الرابط. يمكنك أيضاً كتابة ردّ مختلف لكل كلمة مفتاحية من تبويب «القواعد».",
-                    "The price and details. This is all the private page shows, and only whoever opens the link sees it. You can also write a different one per keyword in the Rules tab.")}
+            title={t("السعر الافتراضي — لكل الفيديوهات", "The default price — for every video")}
+            hint={t("هذا ما يُرسل حين لا يكون للفيديو سعره الخاص. إن كنت تبيع منتجات مختلفة، اكتب سعر كل فيديو من تبويب «الفيديوهات» — وهو ما سيُرسل لمن يعلّق تحته.",
+                    "This is what gets sent when a video has no price of its own. If you sell different products, write each video’s price in the Videos tab — that is what whoever comments under it will receive.")}
           >
             <textarea
               value={body} onChange={(e) => setBody(e.target.value)}
@@ -145,6 +145,31 @@ export function PrivateReplyPanel({
               placeholder={t("السعر ٣٢٠ د.ل\nمتوفر بالأسود والفضي\nالتوصيل خلال يومين", "Price 320 LYD\nAvailable in black and silver\nDelivery in two days")}
               style={{ ...ttInput(c), resize: "vertical", lineHeight: 1.8 }}
             />
+
+            {/*
+              The three levels, shown as a ladder.
+
+              The per-video price already worked -- the engine has always preferred a
+              video override over the account default -- but nothing on this screen
+              said so, so a shop with twenty products looked like it could only quote
+              one. A capability nobody can find is a capability that does not exist.
+            */}
+            <div style={{ marginTop: 11, background: c.surface2, borderRadius: 11, padding: "11px 12px" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: c.muted, marginBottom: 8, letterSpacing: ".3px" }}>
+                {t("أي سعر يُرسل؟ الأعلى أولاً", "Which price is sent? Top one wins")}
+              </div>
+              {[
+                { n: "1", ar: "سعر الفيديو نفسه", en: "The video’s own price", ar2: "تبويب الفيديوهات ← اضغط على فيديو", en2: "Videos tab → tap a video" },
+                { n: "2", ar: "سعر الكلمة المفتاحية", en: "A keyword’s price", ar2: "تبويب القواعد", en2: "Rules tab" },
+                { n: "3", ar: "السعر الافتراضي أعلاه", en: "The default above", ar2: "لكل ما سواه", en2: "everything else" },
+              ].map((x) => (
+                <div key={x.n} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 800, color: c.pinkInk, minWidth: 12 }}>{x.n}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: c.text }}>{t(x.ar, x.en)}</span>
+                  <span style={{ fontSize: 11, color: c.muted, marginInlineStart: "auto" }}>{t(x.ar2, x.en2)}</span>
+                </div>
+              ))}
+            </div>
           </Field>
 
           {/* ── 2. The public comment ──────────────────────────────────────── */}

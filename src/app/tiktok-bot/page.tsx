@@ -688,7 +688,18 @@ function TikTokBotInner() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 2 }}>
                   {videos.map((v) => {
                     const o = (config?.post_overrides || {})[v.id];
+                    /*
+                      `ownPrice` is called out separately from any other override.
+
+                      The badge used to ignore `private_reply` entirely, so a video
+                      carrying its own price looked exactly like one carrying nothing
+                      -- and an owner scanning the grid had no way to tell which of
+                      twenty products he had already priced. That is the single fact
+                      he is looking for when he opens this tab.
+                    */
+                    const ownPrice = !!o && !o.disabled && !!(o.private_reply || "").trim();
                     const custom = !!o && !o.disabled && (
+                      ownPrice ||
                       (o.groups?.length ?? 0) > 0 ||
                       (o.public_replies?.some((x) => (x || "").trim()) ?? false) ||
                       !!o.ai
@@ -702,8 +713,8 @@ function TikTokBotInner() {
                         <div style={{ position: "absolute", inset: 0, background: TT_SCRIM }} />
                         {custom && (
                           <span style={{ position: "absolute", top: 5, insetInlineEnd: 5, display: "inline-flex", alignItems: "center", gap: 3, background: "rgba(0,0,0,.55)", borderRadius: 3, padding: "2px 5px", fontSize: 8.5, fontWeight: 800, color: "#fff" }}>
-                            <span style={{ width: 5, height: 5, borderRadius: 999, background: TT_PINK }} />
-                            {t("ردّ خاص", "Custom")}
+                            <span style={{ width: 5, height: 5, borderRadius: 999, background: ownPrice ? c.ok : TT_PINK }} />
+                            {ownPrice ? t("سعره الخاص", "Own price") : t("ردّ خاص", "Custom")}
                           </span>
                         )}
                         {v.caption && (
@@ -753,6 +764,13 @@ function TikTokBotInner() {
                     onClose={() => setEditingVideo(null)}
                     c={bot} t={t} accent={c.pinkInk}
                     unitLabel={t("الفيديو", "video")}
+                    privateNote={
+                      (config?.private_delivery || "off") === "link"
+                        ? t("يُرسل خلف رابط خاص لمن يعلّق تحت هذا الفيديو وحده، ولا يظهر في التعليقات. يتجاوز السعر الافتراضي من تبويب «الردّ الخاص».",
+                             "Sent behind a private link to whoever comments under this video only, and never shown in the comments. It overrides the default in the Private reply tab.")
+                        : t("سيُنشر في التعليقات علناً لأن الردّ الخاص مُعطّل. فعّله من تبويب «الردّ الخاص» ليذهب خلف رابط بدل أن يراه الجميع.",
+                             "This will be posted publicly in the comments, because the private reply is off. Turn it on in the Private reply tab to put it behind a link instead.")
+                    }
                   />
                 </div>
               </div>

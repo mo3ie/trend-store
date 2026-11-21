@@ -29,9 +29,16 @@ export interface PostOverrideValue {
 type TF = (ar: string, en: string) => string;
 
 export function PostOverrideEditor({
-  initial, onSave, onClose, c, t, accent, unitLabel,
+  initial, onSave, onClose, c, t, accent, unitLabel, privateNote,
 }: {
   initial?: PostOverrideValue;
+  /**
+   * One line under the detailed message saying where it will actually be
+   * delivered. The two platforms do completely different things with this field
+   * -- Facebook DMs it, TikTok puts it behind a one-time link -- and a merchant
+   * typing a price deserves to know which before they type it.
+   */
+  privateNote?: string;
   onSave: (v: PostOverrideValue) => Promise<void> | void;
   onClose: () => void;
   c: BotPalette; t: TF; accent: string;
@@ -146,6 +153,9 @@ export function PostOverrideEditor({
 
       <label style={lbl}>{t("الرسالة التفصيلية (السعر/التفاصيل)", "Detailed message (price/details)")}</label>
       <textarea value={priv} onChange={(e) => setPriv(e.target.value)} rows={3} style={{ ...inp, resize: "vertical" }} />
+      {privateNote && (
+        <div style={{ fontSize: 11.5, color: c.muted, lineHeight: 1.7, marginTop: 6 }}>{privateNote}</div>
+      )}
 
       <label style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 11, padding: 12, cursor: "pointer" }}>
         <input type="checkbox" checked={useAi} onChange={(e) => setUseAi(e.target.checked)} />
