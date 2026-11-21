@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { whatsappUrl } from "@/lib/privateLinks";
@@ -47,15 +47,17 @@ export default async function PrivateReplyPage({ params }: { params: Params }) {
   if (!token || token.length > 32) notFound();
 
   /*
-   * A reload must not cost the customer an open.
+   * A reload must not cost the customer their single open: the limit exists to
+   * stop a link being passed around, not to punish the person it was written for,
+   * and that person WILL refresh or come back from WhatsApp with the back button.
    *
-   * The open limit exists to stop a link being passed around, not to punish the
-   * person it was written for — and that person WILL refresh, or come back from
-   * WhatsApp with the back button. So the first view sets a cookie for this token
-   * and every later view from the same browser is read-only.
+   * Read, never written, here. Next forbids cookie writes during a render -- "you
+   * must use .set in a Server Function or Route Handler" -- and doing it in this
+   * component threw before a single line rendered, so EVERY customer who tapped a
+   * price link got an error screen. Middleware owns the cookie now and hands down
+   * only the verdict, in a header it overwrites on every request.
    */
-  const jar = await cookies();
-  const seen = jar.get(`pl_${token}`)?.value === "1";
+  const seen = (await headers()).get("x-pl-seen") === "1";
 
   const { data } = await supabaseAdmin.rpc("open_private_link", {
     p_token: token,
@@ -64,13 +66,6 @@ export default async function PrivateReplyPage({ params }: { params: Params }) {
   const r = (data ?? { state: "missing" }) as OpenResult;
 
   if (r.state !== "ok") return <Closed state={r.state} />;
-  if (!seen) {
-    // Scoped to this one link and short-lived: it is a view marker, not a session.
-    jar.set(`pl_${token}`, "1", {
-      httpOnly: true, sameSite: "lax", secure: true,
-      path: `/r/${token}`, maxAge: 60 * 60 * 24 * 7,
-    });
-  }
 
   const wa = r.whatsapp ? whatsappUrl(r.whatsapp, r.whatsapp_text ?? null, token) : null;
 

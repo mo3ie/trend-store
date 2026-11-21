@@ -28,7 +28,18 @@ import { siteUrl } from "@/lib/siteUrl";
  * customer who mistypes their own price link blames the shop, not the font.
  */
 const ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-const TOKEN_LEN = 7;
+/*
+ * Five, not seven, because the customer TYPES this.
+ *
+ * TikTok renders a URL in a comment as plain text -- there is no tap target, on
+ * any account. So the realistic path is the one every TikTok shop already uses: a
+ * fixed clickable link in the profile bio, and a short code in the comment. Two
+ * extra characters are two more chances to mistype a price on a phone.
+ *
+ * 31^5 is 28.6 million, against links that live 24 hours. Guessing one is not a
+ * realistic attack, and the page behind it holds a price, not an account.
+ */
+const TOKEN_LEN = 5;
 
 /** ~31^7 ≈ 2.7e10 — far too sparse to walk, andeach row is rate-limited behind a route. */
 export function newToken(): string {
@@ -55,7 +66,13 @@ export function newToken(): string {
 export const DEFAULT_TTL_HOURS = 24;
 export const DEFAULT_MAX_OPENS = 1;
 /** What the merchant's public comment says when they have not written their own. */
-export const DEFAULT_LINK_TEXT = "تم تجهيز ردّك ✅";
+/*
+ * The default comment, written for a platform where the URL is not tappable.
+ * "الرابط في البايو" is the convention every TikTok user already knows, so the
+ * comment carries a short code and points at the bio rather than printing a URL
+ * nobody can press.
+ */
+export const DEFAULT_LINK_TEXT = "كودك {code} — افتح الرابط في البايو واكتب الكود لترى السعر 🔑";
 
 export interface CreateLinkInput {
   configId: string;
@@ -134,15 +151,28 @@ export function linkUrl(token: string): string {
 /**
  * Builds the comment the bot actually posts.
  *
- * The merchant writes the sentence; the engine appends the link. They cannot type
- * the URL themselves because it is minted per commenter — but a merchant who DOES
- * write `{link}` gets it placed exactly where they put it, because some want the
- * link mid-sentence and finding that impossible would feel like a bug.
+ * Two placeholders, because the platforms need different shapes:
+ *
+ *   {code}  the bare token. For TikTok, where a URL in a comment is dead text and
+ *           the customer reaches the page through the bio link instead.
+ *   {link}  the full URL. Right anywhere it is actually tappable.
+ *
+ * A template naming {code} and not {link} gets NO url appended: that merchant
+ * chose the bio flow, and pasting an unpressable URL underneath would only make
+ * the comment longer and look broken. Naming neither keeps the old behaviour.
  */
-export function composePublicReply(template: string | null, url: string, fallback?: string | null): string {
+export function composePublicReply(
+  template: string | null, url: string, fallback?: string | null, token?: string,
+): string {
   const base = (template || "").trim() || (fallback || "").trim() || DEFAULT_LINK_TEXT;
-  if (base.includes("{link}")) return base.replace(/\{link\}/g, url);
-  return `${base}\n${url}`;
+  const code = token || url.split("/").pop() || "";
+  const hasCode = base.includes("{code}");
+  const hasLink = base.includes("{link}");
+
+  let out = base.split("{code}").join(code).split("{link}").join(url);
+  if (!hasCode && !hasLink) out = out + "
+" + url;
+  return out;
 }
 
 /**

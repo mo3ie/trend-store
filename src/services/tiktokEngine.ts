@@ -486,7 +486,7 @@ export async function processClaimedComment(
       maxOpens: target.privateLinkMaxOpens,
     });
     if (url) {
-      reply = composePublicReply(target.privateLinkText, url, decision.publicText);
+      reply = composePublicReply(target.privateLinkText, url, decision.publicText, url.split("/").pop());
       patch.private_status = "link";
     } else {
       // Minting failed. Fall back to the old behaviour rather than dropping the
