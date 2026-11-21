@@ -20,6 +20,7 @@ import {
   BannedWordsEditor, CatalogPanel, ReplyGroupsEditor, type ReplyGroup,
 } from "@/components/bot/ReplySettings";
 import { PostOverrideEditor, type PostOverrideValue } from "@/components/bot/PostOverrideEditor";
+import { PrivateReplyPanel } from "@/components/tiktok/PrivateReplyPanel";
 import { botColors } from "@/lib/botTheme";
 
 /**
@@ -71,6 +72,14 @@ interface Config {
   ai_enabled: boolean;
   ai_persona: string | null;
   reply_public: boolean;
+  // The private reply and how it is delivered - see src/lib/privateLinks.ts.
+  default_private_reply: string | null;
+  private_delivery: string | null;
+  private_link_text: string | null;
+  whatsapp_number: string | null;
+  whatsapp_text: string | null;
+  private_link_ttl_hours: number | null;
+  private_link_max_opens: number | null;
   throttle_per_min: number | null;
   min_delay_sec: number | null;
   max_delay_sec: number | null;
@@ -91,7 +100,7 @@ function TikTokBotInner() {
   const [config, setConfig] = useState<Config | null>(null);
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"try" | "videos" | "rules" | "smart" | "activity" | "settings">("try");
+  const [tab, setTab] = useState<"try" | "videos" | "rules" | "smart" | "private" | "activity" | "settings">("try");
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [webhook, setWebhook] = useState<{ subscribed: boolean; last_event_at: string | null } | null>(null);
@@ -498,6 +507,7 @@ function TikTokBotInner() {
             { key: "videos" as const,   label: t("الفيديوهات", "Videos") },
             { key: "rules" as const,    label: `${t("القواعد", "Rules")}${rules.length ? ` (${rules.length})` : ""}` },
             { key: "smart" as const,    label: t("الردّ الذكي", "Smart reply") },
+            { key: "private" as const,  label: t("الردّ الخاص", "Private reply") },
             { key: "activity" as const, label: t("النشاط", "Activity") },
             { key: "settings" as const, label: t("الإعدادات", "Settings") },
           ]}
@@ -582,6 +592,22 @@ function TikTokBotInner() {
         )}
 
         {/* ── ACTIVITY: what the bot actually did ────────────────── */}
+        {/* ── PRIVATE REPLY ──────────────────── */}
+        {tab === "private" && (
+          config ? (
+            <div style={{ marginTop: 14 }}>
+              <PrivateReplyPanel
+                c={c} t={t} rtl={rtl} config={config} patch={patch}
+                siteHost={typeof window === "undefined" ? "" : window.location.host}
+              />
+            </div>
+          ) : (
+            <div style={{ ...ttCard(c), padding: 24, textAlign: "center", marginTop: 14, fontSize: 12.5, color: c.muted, lineHeight: 1.8 }}>
+              {t("جارٍ تجهيز الإعدادات…", "Preparing your settings…")}
+            </div>
+          )
+        )}
+
         {tab === "activity" && (
           <div>
             <p style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.75, margin: "0 0 12px" }}>

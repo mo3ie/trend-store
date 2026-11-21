@@ -4,6 +4,7 @@ import { hasProduct } from "@/lib/entitlements";
 import { getAuthUser } from "@/lib/authUser";
 import { checkRateLimit, rateLimitedJson, identifierFor, RATE_RULES } from "@/lib/rateLimit";
 import { listTikTokAccounts, tokenStatusFor, disconnectTikTokAccount } from "@/lib/tiktokTokens";
+import { normalizeWhatsApp } from "@/lib/privateLinks";
 
 const EDITABLE = [
   "enabled", "reply_public", "ai_enabled", "ai_persona", "throttle_per_min",
@@ -15,6 +16,13 @@ const EDITABLE = [
   "reply_groups", "banned_words", "banned_action", "mention_author", "once_per_user",
   "like_comments", "public_replies", "default_public_reply", "post_overrides",
   "catalog_match", "catalog_ambiguous_reply",
+  // The private reply. `default_private_reply` was missing from this list, so on
+  // TikTok the merchant could never write the private text at all — the field
+  // existed, the engine read it, and no screen could set it.
+  "default_private_reply", "reply_private",
+  // Its delivery: see src/lib/privateLinks.ts.
+  "private_delivery", "private_link_text", "whatsapp_number", "whatsapp_text",
+  "private_link_ttl_hours", "private_link_max_opens",
 ] as const;
 
 /**
@@ -112,6 +120,24 @@ export async function PATCH(req: NextRequest) {
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   for (const k of EDITABLE) if (k in body) patch[k] = body[k];
+
+  /*
+   * Two fields the merchant types by hand, normalised here rather than in the UI.
+   *
+   * The WhatsApp number especially: merchants write it the way they say it aloud
+   * ("0 91 234 5678", "+218 91…"), and wa.me accepts none of those. Normalising at
+   * the edge means one bad keystroke cannot produce a dead button under every
+   * comment for the next two days.
+   */
+  if ("whatsapp_number" in patch) {
+    patch.whatsapp_number = normalizeWhatsApp(patch.whatsapp_number as string | null);
+  }
+  if ("private_delivery" in patch && !["off", "link"].includes(String(patch.private_delivery))) {
+    patch.private_delivery = "off";
+  }
+  for (const [k, lo, hi] of [["private_link_ttl_hours", 1, 720], ["private_link_max_opens", 1, 50]] as const) {
+    if (k in patch) patch[k] = Math.min(hi, Math.max(lo, Math.round(Number(patch[k]) || lo)));
+  }
 
   const { data: updated, error } = await supabaseAdmin
     .from("bot_configs").update(patch).eq("id", id).select().single();

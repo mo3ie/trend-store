@@ -32,6 +32,7 @@ import {
 import { decide, type ReplyGroup, type ReplyPolicy } from "@/services/replyDecision";
 import { loadCatalog, matchProduct, productReply } from "@/services/catalogMatcher";
 import { featuresFor } from "@/lib/entitlements";
+import { createPrivateLink, composePublicReply } from "@/lib/privateLinks";
 import type { PostOverride } from "@/services/botEngine";
 
 /** The bot's view of a connected TikTok account: credentials + rule configuration. */
@@ -68,6 +69,18 @@ export interface TikTokTarget {
   postOverrides: Record<string, PostOverride> | null;
   catalogMatch: string;
   catalogAmbiguousReply: string | null;
+  /**
+   * Where the private half of a reply goes.
+   *   'off'  — unchanged: it becomes the public comment (there is nowhere else)
+   *   'link' — it goes behind a one-off token and the comment carries the link
+   * See `src/lib/privateLinks.ts` for why this exists at all.
+   */
+  privateDelivery: string;
+  privateLinkText: string | null;
+  whatsappNumber: string | null;
+  whatsappText: string | null;
+  privateLinkTtlHours: number | null;
+  privateLinkMaxOpens: number | null;
 }
 
 /** Loads the account + its bot config, verifying the subscription gate. */
@@ -82,7 +95,7 @@ export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
 
   const { data: config } = await supabaseAdmin
     .from("bot_configs")
-    .select("id, user_id, page_id, page_name, enabled, ai_enabled, ai_persona, reply_public, throttle_per_min, min_delay_sec, max_delay_sec, post_filter, post_filter_enabled, reply_groups, banned_words, banned_action, mention_author, once_per_user, like_comments, public_replies, default_public_reply, default_private_reply, post_overrides, catalog_match, catalog_ambiguous_reply")
+    .select("id, user_id, page_id, page_name, enabled, ai_enabled, ai_persona, reply_public, throttle_per_min, min_delay_sec, max_delay_sec, post_filter, post_filter_enabled, reply_groups, banned_words, banned_action, mention_author, once_per_user, like_comments, public_replies, default_public_reply, default_private_reply, post_overrides, catalog_match, catalog_ambiguous_reply, private_delivery, private_link_text, whatsapp_number, whatsapp_text, private_link_ttl_hours, private_link_max_opens")
     .eq("platform", "tiktok")
     .eq("page_id", openId)
     .eq("enabled", true)
@@ -131,6 +144,12 @@ export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
     postOverrides: (config.post_overrides as Record<string, PostOverride> | null) ?? null,
     catalogMatch: config.catalog_match || "off",
     catalogAmbiguousReply: config.catalog_ambiguous_reply,
+    privateDelivery: (config.private_delivery as string | null) || "off",
+    privateLinkText: config.private_link_text,
+    whatsappNumber: config.whatsapp_number,
+    whatsappText: config.whatsapp_text,
+    privateLinkTtlHours: config.private_link_ttl_hours ?? null,
+    privateLinkMaxOpens: config.private_link_max_opens ?? null,
   };
 }
 
@@ -424,15 +443,22 @@ export async function processClaimedComment(
   /*
    * Where the private text goes.
    *
-   * With Business Messaging granted, the Facebook shape is available at last: a short
-   * public reply under the comment, and the detail — the price — sent privately. The
-   * private side is best-effort, because TikTok can only message a conversation that
-   * already exists, and one exists only once Comment-to-Message has moved the
-   * commenter into a thread.
+   * Three channels, in order of how private they actually are:
    *
-   * Without the scope, or without a conversation, the behaviour is unchanged and for
-   * the same reason as before: the richer text becomes the PUBLIC answer rather than
-   * being dropped, since there is nowhere private for the price to go.
+   *   1. A real DM, when Business Messaging is granted AND a conversation already
+   *      exists. Best, and almost never available: TikTok froze the application on
+   *      7 Nov 2026 and will only serve Verified Business Accounts when it reopens.
+   *
+   *   2. A one-off link (`private_delivery = 'link'`). The comment carries an opaque
+   *      token and the price sits behind it, so the merchant's price is not handed to
+   *      every reader. This is what makes "comment to see the price" work at all on a
+   *      platform with no private channel.
+   *
+   *   3. Nothing — the historical behaviour. The private text BECOMES the public
+   *      comment, because a price nobody can read is worse than a price everyone can.
+   *
+   * The order matters: a merchant who has a real DM should get it, and the link is
+   * the fallback, not a replacement.
    */
   let privateSent = false;
   if (target.canMessage && decision.privateText && comment.username) {
@@ -440,9 +466,36 @@ export async function processClaimedComment(
   }
   if (privateSent) patch.private_status = "sent";
 
-  const reply = privateSent
-    ? (decision.publicText || decision.privateText)
-    : (decision.privateText || decision.publicText);
+  let reply: string | null;
+  if (privateSent) {
+    reply = decision.publicText || decision.privateText;
+  } else if (decision.privateText && target.privateDelivery === "link") {
+    const url = await createPrivateLink({
+      configId: target.configId,
+      userId: target.userId,
+      platform: "tiktok",
+      pageId: target.pageId,
+      commentId: comment.commentId,
+      videoId: comment.videoId,
+      commenterName: comment.username,
+      body: decision.privateText,
+      brandName: target.pageName,
+      whatsappNumber: target.whatsappNumber,
+      whatsappText: target.whatsappText,
+      ttlHours: target.privateLinkTtlHours,
+      maxOpens: target.privateLinkMaxOpens,
+    });
+    if (url) {
+      reply = composePublicReply(target.privateLinkText, url, decision.publicText);
+      patch.private_status = "link";
+    } else {
+      // Minting failed. Fall back to the old behaviour rather than dropping the
+      // answer: a customer who waited for a reply gets one either way.
+      reply = decision.privateText || decision.publicText;
+    }
+  } else {
+    reply = decision.privateText || decision.publicText;
+  }
   if (!reply || !target.replyPublic) {
     await finishComment(comment.commentId, {
       ...patch, public_status: "skipped",
