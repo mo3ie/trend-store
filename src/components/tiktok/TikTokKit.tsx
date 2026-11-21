@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, BellRing, ChevronLeft, ChevronRight, Check, Link2, Loader2 } from "lucide-react";
+import { Bell, BellRing, ChevronLeft, ChevronRight, Check, Link2, Loader2, RefreshCw } from "lucide-react";
 import {
   tt, ttCard, ttPrimary, ttTitleAccent, TT_PINK, TT_CYAN,
   type TikTokPalette,
@@ -27,10 +27,20 @@ export interface TikTokAccount {
 }
 
 export function AccountStrip({
-  account, c, t, rtl, pending, onNotify, notifying, onLink, linking,
+  account, c, t, rtl, pending, onNotify, notifying, onLink, linking, credential,
 }: {
   account: TikTokAccount | null;
   c: TikTokPalette; t: TF; rtl: boolean;
+  /**
+   * Credential health for a LINKED account, straight from `token_status`.
+   *
+   * An account row can exist while its token is dead — the owner revoked us in TikTok,
+   * or the refresh token expired. Before this prop the strip showed a green "Linked"
+   * dot either way, so a bot that had silently stopped looked perfectly healthy and
+   * the owner kept paying for it. Anything other than "active" is a dead credential
+   * and only re-authorisation fixes it.
+   */
+  credential?: string | null;
   /** True when linking is not available yet — an operator step, not a user one. */
   pending?: boolean;
   onNotify?: () => void;
@@ -54,10 +64,26 @@ export function AccountStrip({
               @{account.handle}
             </div>
           </div>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: c.muted }}>
-            <span style={{ width: 7, height: 7, borderRadius: 999, background: c.ok }} />
-            {t("مرتبط", "Linked")}
-          </span>
+          {credential && credential !== "active" ? (
+            <>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: c.danger, whiteSpace: "nowrap" }}>
+                <span style={{ width: 7, height: 7, borderRadius: 999, background: c.danger }} />
+                {t("انتهت الصلاحية", "Expired")}
+              </span>
+              {onLink && (
+                <button onClick={onLink} disabled={linking}
+                  style={{ ...ttPrimary(rtl, linking), padding: "9px 14px", fontSize: 13, whiteSpace: "nowrap" }}>
+                  {linking ? <Loader2 size={15} className="spin" /> : <RefreshCw size={15} />}
+                  {t("أعد الربط", "Reconnect")}
+                </button>
+              )}
+            </>
+          ) : (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: c.muted }}>
+              <span style={{ width: 7, height: 7, borderRadius: 999, background: c.ok }} />
+              {t("مرتبط", "Linked")}
+            </span>
+          )}
         </>
       ) : (
         <>

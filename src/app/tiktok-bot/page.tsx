@@ -103,6 +103,17 @@ function TikTokBotInner() {
   const [videosCursor, setVideosCursor] = useState<number | null>(null);
   const [videosMore, setVideosMore] = useState(false);
   const [error, setError] = useState("");
+  /**
+   * Credential health of the linked account ("active" | "expired" | "revoked" | ...).
+   *
+   * The API has reported this since the integration shipped and no screen read it, so
+   * an account whose token had died still rendered as linked and healthy: the bot
+   * stopped answering comments, nothing said why, and the owner went on paying. TikTok
+   * now rotates the refresh token on every renewal (effective 1 Dec 2026), which makes
+   * a dead credential a normal end-state rather than a rare one — so it has to be
+   * visible, and it has to be fixable from here.
+   */
+  const [tokenStatus, setTokenStatus] = useState<string | null>(null);
   const [flash, setFlash] = useState("");
   const [draft, setDraft] = useState(false);
   const [linking, setLinking] = useState(false);
@@ -131,6 +142,8 @@ function TikTokBotInner() {
     const d = await fetch("/api/tiktok/configs").then((r) => r.json()).catch(() => ({}));
     let cfg: Config | null = (d.accounts || []).map((a: { config: Config | null }) => a.config).find(Boolean) ?? null;
     if (d.webhook) setWebhook(d.webhook);
+    const linked = (d.accounts || [])[0] as { token_status?: string } | undefined;
+    setTokenStatus(linked?.token_status ?? null);
 
     // No linked account yet → work on a draft, so the whole editor surface is usable
     // now and moves onto the real account the moment it links.
@@ -383,7 +396,45 @@ function TikTokBotInner() {
           account={st?.account ? { handle: st.account.handle, avatarUrl: st.account.avatarUrl } : null}
           c={c} t={t} rtl={rtl} pending={linkingPending}
           onLink={startLink} linking={linking}
+          credential={st?.account ? tokenStatus : null}
         />
+
+        {/*
+          A dead credential is not an error the owner caused and not one they can wait
+          out, so it gets its own banner rather than a line in the generic error box:
+          it states what stopped, why, and the single action that restores it.
+        */}
+        {st?.account && tokenStatus && tokenStatus !== "active" && (
+          <div style={{
+            display: "flex", gap: 10, alignItems: "flex-start",
+            background: `${c.danger}14`, border: `1px solid ${c.danger}55`,
+            borderRadius: 11, padding: "12px 14px", marginBottom: 13, fontSize: 13, lineHeight: 1.7,
+          }}>
+            <AlertCircle size={17} color={c.danger} style={{ flexShrink: 0, marginTop: 2 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 800, color: c.danger, marginBottom: 3 }}>
+                {t("البوت متوقف — انتهت صلاحية ربط حساب تيك توك",
+                   "The bot is stopped — the TikTok connection has expired")}
+              </div>
+              <div style={{ color: c.text }}>
+                {tokenStatus === "revoked"
+                  ? t("تم سحب إذن التطبيق من إعدادات تيك توك، فلم يعد بإمكاننا الرد على التعليقات نيابة عنك.",
+                      "The app's permission was removed in TikTok settings, so we can no longer reply to comments for you.")
+                  : t("انتهت صلاحية إذن الوصول إلى الحساب، فتوقّف الرد على التعليقات. لم يُفقد أي من إعداداتك.",
+                      "The account authorisation expired, so replying has stopped. None of your settings were lost.")}
+              </div>
+              <div style={{ color: c.muted, marginTop: 3 }}>
+                {t("اضغط «أعد الربط» وسيعود البوت للعمل فوراً بنفس القواعد.",
+                   "Press Reconnect and the bot resumes immediately with the same rules.")}
+              </div>
+              <button onClick={startLink} disabled={linking}
+                style={{ ...ttPrimary(rtl, linking), marginTop: 9, padding: "9px 16px", fontSize: 13.5 }}>
+                {linking ? <Loader2 size={15} className="spin" /> : null}
+                {t("أعد الربط", "Reconnect")}
+              </button>
+            </div>
+          </div>
+        )}
 
         {flash && (
           <div style={{ display: "flex", gap: 8, alignItems: "center", background: `${c.ok}18`, border: `1px solid ${c.ok}55`, borderRadius: 11, padding: "10px 13px", marginBottom: 13, fontSize: 13 }}>
