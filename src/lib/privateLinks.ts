@@ -170,8 +170,8 @@ export function composePublicReply(
   const hasLink = base.includes("{link}");
 
   let out = base.split("{code}").join(code).split("{link}").join(url);
-  if (!hasCode && !hasLink) out = out + "
-" + url;
+  if (!hasCode && !hasLink) out = `${out}
+${url}`;
   return out;
 }
 
