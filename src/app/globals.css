@@ -931,6 +931,7 @@ html[data-ui="glass"] .theme-fab { display: none !important; }
   .gp-buybar-price span { font-size: 12px; opacity: .8; }
   .gp-buybar .gp-btn { flex: 1; min-height: 46px; }
   html.has-gnav body:has(.gp-buybar) { padding-bottom: 150px; }
+  html:not(.has-gnav) .gp-buybar { bottom: 12px; }
   html.has-gnav .ui-fx-ctl { bottom: 150px; }
   html.has-gnav body:has(.gp-buybar) .ui-fx-ctl { bottom: 214px; }
   html.has-gnav .ui-fx-btn { width: 38px; height: 38px; opacity: .92; }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { createPortal } from "react-dom";
 import {
   ArrowRight, ShoppingCart, Package, User,
   ChevronLeft, ChevronRight, Tag, CheckCircle, XCircle, Heart,
@@ -226,13 +227,16 @@ export default function ProductView() {
               </section>
             </div>
 
-            {/* Phone: price + add button stay reachable above the bottom bar */}
-            <div className="gp-buybar">
+            {/* Phone: price + add button stay reachable above the bottom bar.
+                Portalled to <body>: the page-transition wrapper animates a transform,
+                which would otherwise trap this fixed bar inside the page. (Only renders
+                after the client fetch, so there is no server render to mismatch.) */}
+            {createPortal(<div className="gp-buybar">
               <div className="gp-buybar-price"><b>{product.price}</b><span>{t("دينار", "LYD")}</span></div>
               <button onClick={handleAddToCart} disabled={!canAdd} className={`gp-btn gp-btn-main ${added ? "done" : ""}`}>
                 {added ? <><CheckCircle size={17} /> {t("تمت", "Added")}</> : <><ShoppingCart size={17} /> {t("أضف للسلة", "Add")}</>}
               </button>
-            </div>
+            </div>, document.body)}
           </>
         )}
       </div>
