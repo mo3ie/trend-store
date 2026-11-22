@@ -14,9 +14,6 @@ const nextConfig = {
       fallback: [],
     };
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },

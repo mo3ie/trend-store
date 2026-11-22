@@ -61,6 +61,19 @@ const paymentLabels: Record<string, string> = {
   masarafi: "مصرفي باي",
 };
 
+// Payment state of a store order — separate from its fulfilment status.
+const payLabels: Record<string, string> = {
+  paid: "مدفوع", pending: "غير مدفوع", awaiting_verification: "بانتظار التحقق",
+  failed: "فشل الدفع", refunded: "مُسترد",
+};
+const payColors: Record<string, string> = {
+  paid: "bg-green-500/20 text-green-400 border-green-500/30",
+  pending: "bg-gray-500/20 text-[var(--muted)] border-gray-500/30",
+  awaiting_verification: "bg-amber-500/20 text-amber-300 border-amber-500/40",
+  failed: "bg-red-500/20 text-red-400 border-red-500/30",
+  refunded: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+};
+
 const sheinStatuses = ["الكل", "pending", "processing", "shipped", "delivered", "cancelled", "paid"];
 
 const storeStatuses = ["الكل", "pending", "processing", "shipped", "delivered", "cancelled"];
@@ -73,9 +86,25 @@ function fmtDate(iso?: string) {
     d.toLocaleTimeString("ar-LY", { hour: "2-digit", minute: "2-digit" });
 }
 
-function StoreDetailModal({ order, onClose, onStatusChange }: { order: StoreOrder; onClose: () => void; onStatusChange: (id: string, s: string) => void }) {
+function StoreDetailModal({ order, onClose, onStatusChange, onPaymentChange }: { order: StoreOrder; onClose: () => void; onStatusChange: (id: string, s: string) => void; onPaymentChange: (id: string, p: string) => void }) {
   const [status, setStatus] = useState(order.status);
   const [saving, setSaving] = useState(false);
+  const [payBusy, setPayBusy] = useState(false);
+  const pay = order.payment_status || "pending";
+
+  // Marking "paid" books the sale in the POS (DB trigger), so it asks first.
+  async function setPayment(next: string) {
+    if (next === "paid" && !confirm("تأكيد أن المبلغ وصل فعلاً؟ سيُسجَّل الطلب مدفوعاً ويُحجز في نقطة البيع.")) return;
+    setPayBusy(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const r = await fetch("/api/admin/orders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ table: "store", id: order.id, payment_status: next }),
+    });
+    setPayBusy(false);
+    if (r.ok) onPaymentChange(order.id, next); else alert("تعذّر تحديث حالة الدفع");
+  }
 
   async function save() {
     setSaving(true);
@@ -145,6 +174,9 @@ function StoreDetailModal({ order, onClose, onStatusChange }: { order: StoreOrde
               <p className="text-[var(--muted)] text-sm flex items-center gap-1.5">
                 <CreditCard size={12} />{paymentLabels[order.payment_method || ""] || order.payment_method || "—"}
               </p>
+              <p className="text-sm flex items-center gap-2 mt-1">
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${payColors[pay] || payColors.pending}`}>{payLabels[pay] || pay}</span>
+              </p>
             </div>
           </div>
 
@@ -202,6 +234,25 @@ function StoreDetailModal({ order, onClose, onStatusChange }: { order: StoreOrde
               <p className="text-[var(--muted)] text-sm">{order.notes}</p>
             </div>
           )}
+
+          {/* Payment status */}
+          <div className="bg-[var(--input)] rounded-2xl p-4">
+            <p className="text-[var(--muted-2)] text-xs mb-2">حالة الدفع</p>
+            {pay === "awaiting_verification" && (
+              <p className="text-amber-300 text-xs mb-3 leading-relaxed">الزبون رجع من صفحة معاملات كأنه دفع، لكن لم يصل تأكيد موقّع من معاملات. تحقّق من بوابة التاجر ثم أكّد أو ارفض.</p>
+            )}
+            <div className="flex gap-2 flex-wrap">
+              {pay !== "paid" && (
+                <button onClick={() => setPayment("paid")} disabled={payBusy} className="px-4 py-2 rounded-xl bg-green-600/80 text-white text-sm font-bold disabled:opacity-40">تأكيد الدفع</button>
+              )}
+              {pay !== "failed" && pay !== "paid" && (
+                <button onClick={() => setPayment("failed")} disabled={payBusy} className="px-4 py-2 rounded-xl bg-red-600/70 text-white text-sm font-bold disabled:opacity-40">لم يُدفع</button>
+              )}
+              {pay === "paid" && (
+                <button onClick={() => setPayment("refunded")} disabled={payBusy} className="px-4 py-2 rounded-xl border border-[var(--border)] text-[var(--text)] text-sm disabled:opacity-40">تسجيل استرداد</button>
+              )}
+            </div>
+          </div>
 
           {/* Status update */}
           <div className="bg-[var(--input)] rounded-2xl p-4">
@@ -310,6 +361,11 @@ export default function AdminOrders() {
     setSheinUpdating(null);
   }
 
+  function handleStorePaymentChange(id: string, payment_status: string) {
+    setStoreOrders(prev => prev.map(o => o.id === id ? { ...o, payment_status } : o));
+    if (selectedOrder?.id === id) setSelectedOrder(prev => prev ? { ...prev, payment_status } : null);
+  }
+
   function handleStoreStatusChange(id: string, newStatus: string) {
     setStoreOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
     if (selectedOrder?.id === id) setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
@@ -391,6 +447,7 @@ export default function AdminOrders() {
                       <th className="text-right px-5 py-3 font-medium">المبلغ</th>
                       <th className="text-right px-5 py-3 font-medium">التاريخ</th>
                       <th className="text-right px-5 py-3 font-medium">الحالة</th>
+                      <th className="text-right px-5 py-3 font-medium">الدفع</th>
                       <th className="px-5 py-3" />
                     </tr>
                   </thead>
@@ -409,6 +466,11 @@ export default function AdminOrders() {
                         <td className="px-5 py-3.5">
                           <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusColors[order.status] || "bg-gray-500/20 text-[var(--muted)] border-gray-500/30"}`}>
                             {statusLabels[order.status] || order.status}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${payColors[order.payment_status || "pending"] || payColors.pending}`}>
+                            {payLabels[order.payment_status || "pending"] || order.payment_status}
                           </span>
                         </td>
                         <td className="px-5 py-3.5">
@@ -533,6 +595,7 @@ export default function AdminOrders() {
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onStatusChange={handleStoreStatusChange}
+          onPaymentChange={handleStorePaymentChange}
         />
       )}
     </div>
