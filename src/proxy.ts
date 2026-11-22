@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
 /** /r/<token> — the customer-facing private reply page. */
 const PRIVATE_LINK = /^\/r\/([A-Za-z0-9]{1,32})$/;
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   /*
    * The private-reply page marks a link as seen so a refresh does not spend the
    * customer’s single open. That marking has to happen HERE.

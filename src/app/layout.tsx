@@ -4,6 +4,7 @@ import "./globals.css";
 import ThemeToggle from "@/components/ThemeToggle";
 import PWARegister from "@/components/PWARegister";
 import UiFx from "@/components/UiFx";
+import GlassNav from "@/components/GlassNav";
 import { preloadScript } from "@/lib/uiGlass";
 
 export const viewport: Viewport = {
@@ -76,6 +77,7 @@ export default function RootLayout({
         {children}
         <ThemeToggle />
         <UiFx />
+        <GlassNav />
         <PWARegister />
       </body>
     </html>
