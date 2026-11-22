@@ -61,6 +61,8 @@ export function useCart() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       return next;
     });
+    // Sound + cart-icon bump in the TREND Glass layer (components/UiFx).
+    try { window.dispatchEvent(new Event("trend:add")); } catch {}
   }, []);
 
   // accepts both cartKey and id for backwards compatibility
