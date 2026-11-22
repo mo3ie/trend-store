@@ -101,10 +101,10 @@ function OrderCard({ order }: { order: Order }) {
   return (
     <>
       {printing && <PrintReceipt order={order} onClose={() => setPrinting(false)} />}
-      <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl overflow-hidden">
+      <div className={`gp-panel gp-order overflow-hidden ${expanded ? "open" : ""}`}>
         <div className="flex items-center justify-between p-5 cursor-pointer hover:bg-white/[0.02] transition-colors" onClick={() => setExpanded(!expanded)}>
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center"><ShoppingBag size={18} className="text-purple-400" /></div>
+            <div className="gp-order-ic"><ShoppingBag size={18} /></div>
             <div>
               <p className="text-sm font-bold text-[var(--text)]">{t("طلب", "Order")} #{order.id.slice(0, 8).toUpperCase()}</p>
               <p className="text-[var(--muted-2)] text-xs mt-0.5">{new Date(order.created_at).toLocaleDateString(rtl ? "ar-LY" : "en-GB", { year: "numeric", month: "long", day: "numeric" })}</p>
@@ -120,15 +120,15 @@ function OrderCard({ order }: { order: Order }) {
         {expanded && (
           <div className="border-t border-[var(--border)] p-5 space-y-5">
             {!isCancelled && (
-              <div className="flex items-center justify-between">
+              <div className="gp-track flex items-center justify-between">
                 {steps.map((step, i) => {
                   const Icon = step.icon;
                   const done = currentStep > i + 1;
                   const active = currentStep === i + 1;
                   return (
-                    <div key={step.key} className="flex-1 flex flex-col items-center gap-1.5 relative">
-                      {i < steps.length - 1 && <div className={`absolute top-4 end-1/2 w-full h-0.5 ${done ? "bg-purple-500" : "bg-white/10"}`} />}
-                      <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${active ? "border-purple-500 bg-purple-500/20 shadow-[0_0_12px_rgba(168,85,247,0.4)]" : done ? "border-purple-500 bg-purple-500" : "border-[var(--border)] bg-white/5"}`}>
+                    <div key={step.key} className={`gp-track-step flex-1 flex flex-col items-center gap-1.5 relative ${active ? "active" : done ? "done" : ""}`}>
+                      {i < steps.length - 1 && <div className={`gp-track-line absolute top-4 end-1/2 w-full ${done ? "on" : ""}`} />}
+                      <div className="gp-track-dot relative z-10 w-8 h-8 rounded-full flex items-center justify-center">
                         <Icon size={14} className={active || done ? "text-white" : "text-[var(--muted-2)]"} />
                       </div>
                       <span className={`text-xs text-center ${active ? "text-purple-400 font-medium" : done ? "text-[var(--muted)]" : "text-[var(--muted-2)]"}`}>{t(step.ar, step.en)}</span>
@@ -143,7 +143,7 @@ function OrderCard({ order }: { order: Order }) {
               <div className="space-y-2">
                 <p className="text-[var(--muted-2)] text-xs mb-2">{t("المنتجات", "Items")} ({items.length})</p>
                 {items.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-3 bg-black/20 rounded-xl p-3">
+                  <div key={idx} className="flex items-center gap-3 gp-sub rounded-xl p-3">
                     {item.image_url ? <img src={item.image_url} className="w-12 h-12 rounded-lg object-cover border border-[var(--border)] shrink-0" alt={item.name} /> : <div className="w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0"><Package size={16} className="text-purple-400/50" /></div>}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-[var(--text)] font-medium leading-tight">{item.name}</p>
@@ -163,13 +163,13 @@ function OrderCard({ order }: { order: Order }) {
             )}
 
             <div className="grid grid-cols-2 gap-3 text-xs">
-              {(order.address || order.address_text) && <div className="bg-black/20 rounded-xl p-3"><p className="text-[var(--muted-2)] mb-1 flex items-center gap-1"><MapPin size={10} /> {t("عنوان التسليم", "Delivery address")}</p><p className="text-[var(--muted)]">{order.address || order.address_text}</p></div>}
-              {order.phone && <div className="bg-black/20 rounded-xl p-3"><p className="text-[var(--muted-2)] mb-1 flex items-center gap-1"><Phone size={10} /> {t("رقم التواصل", "Phone")}</p><p className="text-[var(--muted)]">{order.phone}</p></div>}
-              {order.payment_method && <div className="bg-black/20 rounded-xl p-3"><p className="text-[var(--muted-2)] mb-1 flex items-center gap-1"><CreditCard size={10} /> {t("طريقة الدفع", "Payment")}</p><p className="text-[var(--muted)]">{t(paymentLabels[order.payment_method]?.ar || order.payment_method, paymentLabels[order.payment_method]?.en || order.payment_method)}</p></div>}
-              {(order.note || order.notes) && <div className="bg-black/20 rounded-xl p-3 col-span-2"><p className="text-[var(--muted-2)] mb-1">{t("ملاحظة", "Note")}</p><p className="text-[var(--muted)]">{order.note || order.notes}</p></div>}
+              {(order.address || order.address_text) && <div className="gp-sub rounded-xl p-3"><p className="text-[var(--muted-2)] mb-1 flex items-center gap-1"><MapPin size={10} /> {t("عنوان التسليم", "Delivery address")}</p><p className="text-[var(--muted)]">{order.address || order.address_text}</p></div>}
+              {order.phone && <div className="gp-sub rounded-xl p-3"><p className="text-[var(--muted-2)] mb-1 flex items-center gap-1"><Phone size={10} /> {t("رقم التواصل", "Phone")}</p><p className="text-[var(--muted)]">{order.phone}</p></div>}
+              {order.payment_method && <div className="gp-sub rounded-xl p-3"><p className="text-[var(--muted-2)] mb-1 flex items-center gap-1"><CreditCard size={10} /> {t("طريقة الدفع", "Payment")}</p><p className="text-[var(--muted)]">{t(paymentLabels[order.payment_method]?.ar || order.payment_method, paymentLabels[order.payment_method]?.en || order.payment_method)}</p></div>}
+              {(order.note || order.notes) && <div className="gp-sub rounded-xl p-3 col-span-2"><p className="text-[var(--muted-2)] mb-1">{t("ملاحظة", "Note")}</p><p className="text-[var(--muted)]">{order.note || order.notes}</p></div>}
             </div>
 
-            <button onClick={(e) => { e.stopPropagation(); setPrinting(true); }} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-white/10 transition-all text-sm">
+            <button onClick={(e) => { e.stopPropagation(); setPrinting(true); }} className="gp-btn gp-btn-ghost w-full text-sm">
               <Printer size={14} />{t("طباعة الوصل", "Print receipt")}
             </button>
           </div>
@@ -201,7 +201,7 @@ export default function OrdersPage() {
 
   return (
     <div className="flex flex-col bg-[var(--bg)] text-[var(--text)] min-h-screen" dir={rtl ? "rtl" : "ltr"}>
-      <header className="flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[var(--glass)] backdrop-blur-md z-40">
+      <header className="gp-top flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[var(--glass)] backdrop-blur-md z-40">
         <button onClick={() => router.back()} className="text-[var(--muted)] hover:text-purple-400 transition-colors shrink-0"><ArrowRight size={22} className={rtl ? "" : "rotate-180"} /></button>
         <a href="/" className="text-xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent shrink-0">TREND</a>
         <div className="flex-1" />
@@ -219,31 +219,31 @@ export default function OrdersPage() {
         </div>
       </header>
 
-      <div className="p-6 max-w-2xl mx-auto w-full space-y-5">
+      <div className="gp-wrap gp-narrow w-full space-y-5">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-black">{t("طلباتي", "My Orders")}</h1>
             <p className="text-[var(--muted-2)] text-sm mt-0.5">{loading ? t("جاري التحميل...", "Loading...") : `${orders.length} ${t("طلب", "orders")}`}</p>
           </div>
-          <a href="/products" className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-blue-500 text-white text-sm font-bold hover:shadow-[0_0_18px_rgba(168,85,247,0.4)] transition-all"><Plus size={15} /> {t("طلب جديد", "New order")}</a>
+          <a href="/products" className="gp-btn gp-btn-main text-sm px-4 py-2"><Plus size={15} /> {t("طلب جديد", "New order")}</a>
         </div>
 
         <div className="flex gap-2 flex-wrap">
           {filterOpts.map((f) => (
             <button key={f.key} onClick={() => setActiveFilter(f.key)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${activeFilter === f.key ? "bg-purple-600 text-white shadow-[0_0_10px_rgba(168,85,247,0.4)]" : "bg-[var(--surface)] border border-purple-500/20 text-[var(--muted)] hover:text-[var(--text)]"}`}>
+              className={`gp-pill ${activeFilter === f.key ? "on" : ""}`}>
               {t(f.ar, f.en)}
             </button>
           ))}
         </div>
 
         {loading ? (
-          <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="bg-[var(--surface)] border border-purple-500/10 rounded-2xl p-5 animate-pulse"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-white/5" /><div className="space-y-2 flex-1"><div className="h-3 bg-white/5 rounded w-1/3" /><div className="h-3 bg-white/5 rounded w-1/4" /></div></div></div>)}</div>
+          <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="gp-panel p-5 animate-pulse"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-white/5" /><div className="space-y-2 flex-1"><div className="h-3 bg-white/5 rounded w-1/3" /><div className="h-3 bg-white/5 rounded w-1/4" /></div></div></div>)}</div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4 text-[var(--muted-2)]">
-            <ShoppingBag size={56} className="text-purple-500/20" />
+          <div className="gp-panel gp-empty flex flex-col items-center justify-center py-20 gap-4 text-[var(--muted-2)]">
+            <span className="gp-empty-ic"><ShoppingBag size={40} /></span>
             <p className="text-lg font-medium">{t("لا توجد طلبات", "No orders")}</p>
-            <a href="/products" className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-500 text-white text-sm font-bold hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all"><ShoppingCart size={16} /> {t("تصفح المنتجات", "Browse products")}</a>
+            <a href="/products" className="gp-btn gp-btn-main px-7"><ShoppingCart size={16} /> {t("تصفح المنتجات", "Browse products")}</a>
           </div>
         ) : (
           <div className="space-y-3">{filtered.map((order) => <OrderCard key={order.id} order={order} />)}</div>

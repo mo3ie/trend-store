@@ -84,7 +84,7 @@ export default function ProductView() {
   return (
     <div className="flex flex-col bg-[var(--bg)] text-[var(--text)] min-h-screen" dir={rtl ? "rtl" : "ltr"}>
 
-      <header className="flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[var(--glass)] backdrop-blur-md z-40">
+      <header className="gp-top flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[var(--glass)] backdrop-blur-md z-40">
         <button onClick={() => router.back()} className="text-[var(--muted)] hover:text-purple-400 transition-colors shrink-0">
           <ArrowRight size={22} className={rtl ? "" : "rotate-180"} />
         </button>
@@ -114,116 +114,124 @@ export default function ProductView() {
         </div>
       </header>
 
-      <div className="flex-1 p-4 md:p-6 max-w-4xl mx-auto w-full">
+      <div className="gp-wrap flex-1 w-full">
         {loading ? (
           <div className="flex items-center justify-center h-64"><span className="w-10 h-10 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" /></div>
         ) : !product ? (
-          <div className="flex flex-col items-center justify-center h-64 gap-4 text-[var(--muted-2)]">
+          <div className="gp-panel flex flex-col items-center justify-center h-64 gap-4 text-[var(--muted-2)]">
             <Package size={48} className="text-purple-500/30" />
             <p>{t("المنتج غير موجود", "Product not found")}</p>
-            <button onClick={() => router.push("/products")} className="text-purple-400 hover:underline text-sm">{t("العودة للمتجر", "Back to store")}</button>
+            <button onClick={() => router.push("/products")} className="gp-btn gp-btn-ghost text-sm">{t("العودة للمتجر", "Back to store")}</button>
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2 text-xs text-[var(--muted-2)] mb-5">
-              <a href="/" className="hover:text-purple-400 transition-colors">{t("الرئيسية", "Home")}</a>
+            <nav className="gp-crumbs">
+              <a href="/">{t("الرئيسية", "Home")}</a>
               <ChevronLeft size={12} className={rtl ? "" : "rotate-180"} />
-              <span className="text-[var(--muted)]">{product.category}</span>
+              <a href={`/products?category=${encodeURIComponent(product.category)}`}>{product.category}</a>
               <ChevronLeft size={12} className={rtl ? "" : "rotate-180"} />
-              <span className="text-[var(--text)] truncate max-w-[200px]">{product.name}</span>
-            </div>
+              <span className="truncate max-w-[220px]">{product.name}</span>
+            </nav>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-              <div className="space-y-3">
-                <div className="relative bg-[var(--surface)] border border-purple-500/20 rounded-2xl overflow-hidden aspect-square">
+            <div className="gp-pdp">
+              {/* Stage: the product on a white plate floating in a glass frame */}
+              <section className="gp-stage">
+                <div className="gp-plate">
                   {images.length > 0 ? (
-                    <img src={images[activeImage]} alt={product.name} className="w-full h-full object-cover" />
+                    <img key={activeImage} src={images[activeImage]} alt={product.name} className="gp-shot" />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-purple-400/40 gap-3"><Package size={64} /><span className="text-sm">{t("لا توجد صورة", "No image")}</span></div>
+                    <div className="w-full h-full flex flex-col items-center justify-center text-[#8aa0ad] gap-3"><Package size={64} /><span className="text-sm">{t("لا توجد صورة", "No image")}</span></div>
                   )}
                   {images.length > 1 && (
                     <>
-                      <button onClick={() => setActiveImage((p) => (p - 1 + images.length) % images.length)} className="absolute start-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors"><ChevronLeft size={16} /></button>
-                      <button onClick={() => setActiveImage((p) => (p + 1) % images.length)} className="absolute end-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors"><ChevronRight size={16} /></button>
+                      <button aria-label="السابق" onClick={() => setActiveImage((p) => (p - 1 + images.length) % images.length)} className="gp-arrow start-3"><ChevronLeft size={18} /></button>
+                      <button aria-label="التالي" onClick={() => setActiveImage((p) => (p + 1) % images.length)} className="gp-arrow end-3"><ChevronRight size={18} /></button>
                     </>
                   )}
+                  <button onClick={toggleFavorite} disabled={favLoading} className={`gp-fav ${isFav ? "on" : ""}`} aria-label={isFav ? t("إزالة من المفضلة", "Remove from favorites") : t("إضافة للمفضلة", "Add to favorites")}>
+                    <Heart size={18} className={isFav ? "fill-current" : ""} />
+                  </button>
                 </div>
                 {images.length > 1 && (
-                  <div className="grid grid-cols-5 gap-2">
+                  <div className="gp-thumbs">
                     {images.map((src, i) => (
-                      <button key={i} onClick={() => setActiveImage(i)}>
-                        <img src={src} className={`w-full aspect-square object-cover rounded-xl border-2 transition-all ${activeImage === i ? "border-purple-500 opacity-100" : "border-[var(--border)] opacity-50 hover:opacity-80"}`} />
+                      <button key={i} onClick={() => setActiveImage(i)} className={activeImage === i ? "on" : ""} aria-label={`${i + 1}`}>
+                        <img src={src} alt="" />
                       </button>
                     ))}
                   </div>
                 )}
-              </div>
+              </section>
 
-              <div className="space-y-5">
-                <div className="flex items-center gap-2"><Tag size={13} className="text-purple-400" /><span className="text-xs text-purple-400 font-medium">{product.category}</span></div>
-                <h1 className="text-2xl font-black text-[var(--text)] leading-tight">{product.name}</h1>
-                <div className="flex items-end gap-2">
-                  <span className="text-4xl font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">{product.price}</span>
-                  <span className="text-[var(--muted)] text-lg mb-1">{t("دينار", "LYD")}</span>
+              {/* Info */}
+              <section className="gp-panel gp-info">
+                <span className="gp-chip"><Tag size={12} />{product.category}</span>
+                <h1 className="gp-title">{product.name}</h1>
+                <div className="gp-price">
+                  <b>{product.price}</b><span>{t("دينار", "LYD")}</span>
                 </div>
-                <div className={`flex items-center gap-2 text-sm font-medium ${!isOwner || inStock ? "text-green-400" : "text-red-400"}`}>
-                  {!isOwner || inStock ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                <div className={`gp-stock ${!isOwner || inStock ? "ok" : "out"}`}>
+                  {!isOwner || inStock ? <CheckCircle size={15} /> : <XCircle size={15} />}
                   {!isOwner
                     ? t("متوفر", "Available")
                     : inStock
                       ? (product.stock < 5 ? `${t("متبقي", "Only")} ${product.stock} ${t("فقط", "left")}` : t("متوفر في المخزن", "In stock"))
                       : t("نفذ من المخزن", "Sold out")}
                 </div>
-                {product.description && (
-                  <div className="bg-[var(--surface)] border border-purple-500/15 rounded-2xl p-4">
-                    <p className="text-[var(--muted)] text-xs font-medium mb-2">{t("وصف المنتج", "Description")}</p>
-                    <p className="text-[var(--muted)] text-sm leading-relaxed">{product.description}</p>
-                  </div>
-                )}
 
                 {product.variants && product.variants.length > 0 && (
                   <div className="space-y-4">
                     {product.variants.map((variant) => (
                       <div key={variant.name}>
-                        <label className="text-[var(--muted)] text-xs font-medium mb-2 flex items-center gap-1.5">
+                        <p className="gp-label">
                           {variant.name}
-                          {selectedVars[variant.name] && <span className="text-purple-400 font-bold">: {selectedVars[variant.name]}</span>}
-                        </label>
+                          {selectedVars[variant.name] && <b>: {selectedVars[variant.name]}</b>}
+                        </p>
                         <div className="flex flex-wrap gap-2">
-                          {variant.options.map((option) => {
-                            const isSelected = selectedVars[variant.name] === option;
-                            return (
-                              <button key={option} onClick={() => setSelectedVars((prev) => ({ ...prev, [variant.name]: option }))}
-                                className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${isSelected ? "border-purple-500 bg-purple-500/20 text-[var(--text)] shadow-[0_0_12px_rgba(168,85,247,0.4)]" : "border-[var(--border)] bg-white/5 text-[var(--muted)] hover:border-purple-500/40 hover:text-[var(--text)]"}`}>
-                                {option}
-                              </button>
-                            );
-                          })}
+                          {variant.options.map((option) => (
+                            <button key={option} onClick={() => setSelectedVars((prev) => ({ ...prev, [variant.name]: option }))}
+                              className={`gp-opt ${selectedVars[variant.name] === option ? "on" : ""}`}>
+                              {option}
+                            </button>
+                          ))}
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
 
-                <div className="space-y-3 pt-2">
-                  <button onClick={handleAddToCart} disabled={!canAdd}
-                    className={`w-full py-3.5 rounded-2xl font-bold text-white flex items-center justify-center gap-2 transition-all ${canAdd ? (added ? "bg-green-600 shadow-[0_0_20px_rgba(34,197,94,0.4)]" : "bg-gradient-to-r from-purple-600 to-blue-500 hover:shadow-[0_0_24px_rgba(168,85,247,0.5)]") : "bg-gray-700 opacity-50 cursor-not-allowed"}`}>
+                <div className="gp-actions">
+                  <button onClick={handleAddToCart} disabled={!canAdd} className={`gp-btn gp-btn-main ${added ? "done" : ""}`}>
                     {added ? <><CheckCircle size={18} /> {t("تمت الإضافة!", "Added!")}</> : <><ShoppingCart size={18} /> {t("أضف إلى السلة", "Add to cart")}</>}
                   </button>
-                  <a href={`https://wa.me/2180945798033?text=${encodeURIComponent(`${t("مرحبا، أريد الاستفسار عن:", "Hello, I'd like to ask about:")} ${product.name}`)}`} target="_blank" rel="noopener noreferrer"
-                    className="w-full py-3 rounded-2xl font-bold text-[var(--text)] bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 hover:border-green-500/60 flex items-center justify-center gap-2 transition-all text-sm">
+                  <a href={`https://wa.me/2180945798033?text=${encodeURIComponent(`${t("مرحبا، أريد الاستفسار عن:", "Hello, I'd like to ask about:")} ${product.name}`)}`} target="_blank" rel="noopener noreferrer" className="gp-btn gp-btn-ghost">
                     <span className="text-base">💬</span> {t("استفسر عبر واتساب", "Ask on WhatsApp")}
                   </a>
                 </div>
 
-                <div className="border-t border-purple-500/15 pt-4 space-y-2 text-xs text-[var(--muted-2)]">
-                  <div className="flex justify-between"><span>{t("التصنيف", "Category")}</span><span className="text-[var(--muted)]">{product.category}</span></div>
-                  <div className="flex justify-between"><span>{t("الحالة", "Status")}</span><span className={!isOwner || inStock ? "text-green-400" : "text-red-400"}>{!isOwner || inStock ? t("متوفر", "Available") : t("نفذ", "Sold out")}</span></div>
+                {product.description && (
+                  <div className="gp-desc">
+                    <p className="gp-label">{t("وصف المنتج", "Description")}</p>
+                    <p>{product.description}</p>
+                  </div>
+                )}
+
+                <dl className="gp-specs">
+                  <div><dt>{t("التصنيف", "Category")}</dt><dd>{product.category}</dd></div>
+                  <div><dt>{t("الحالة", "Status")}</dt><dd className={!isOwner || inStock ? "ok" : "out"}>{!isOwner || inStock ? t("متوفر", "Available") : t("نفذ", "Sold out")}</dd></div>
                   {product.created_at && (
-                    <div className="flex justify-between"><span>{t("تاريخ الإضافة", "Added on")}</span><span className="text-[var(--muted)]">{new Date(product.created_at).toLocaleDateString(rtl ? "ar-EG" : "en-GB", { year: "numeric", month: "long", day: "numeric" })}</span></div>
+                    <div><dt>{t("تاريخ الإضافة", "Added on")}</dt><dd>{new Date(product.created_at).toLocaleDateString(rtl ? "ar-EG" : "en-GB", { year: "numeric", month: "long", day: "numeric" })}</dd></div>
                   )}
-                </div>
-              </div>
+                </dl>
+              </section>
+            </div>
+
+            {/* Phone: price + add button stay reachable above the bottom bar */}
+            <div className="gp-buybar">
+              <div className="gp-buybar-price"><b>{product.price}</b><span>{t("دينار", "LYD")}</span></div>
+              <button onClick={handleAddToCart} disabled={!canAdd} className={`gp-btn gp-btn-main ${added ? "done" : ""}`}>
+                {added ? <><CheckCircle size={17} /> {t("تمت", "Added")}</> : <><ShoppingCart size={17} /> {t("أضف للسلة", "Add")}</>}
+              </button>
             </div>
           </>
         )}

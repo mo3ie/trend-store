@@ -351,7 +351,7 @@ export default function CartPage() {
     <div className="flex flex-col bg-[var(--bg)] text-[var(--text)] min-h-screen" dir={rtl ? "rtl" : "ltr"}>
 
       {/* ─── HEADER ─── */}
-      <header className="flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[var(--glass)] backdrop-blur-md z-40">
+      <header className="gp-top flex items-center gap-4 px-6 py-3.5 border-b border-purple-500/20 sticky top-0 bg-[var(--glass)] backdrop-blur-md z-40">
         <button onClick={() => router.back()} className="text-[var(--muted)] hover:text-purple-400 transition-colors shrink-0">
           <ArrowRight size={22} className={rtl ? "" : "rotate-180"} />
         </button>
@@ -382,9 +382,16 @@ export default function CartPage() {
         </div>
       </header>
 
-      <div className="p-4 md:p-6 max-w-2xl mx-auto w-full space-y-5">
+      <div className="gp-wrap w-full space-y-5">
 
-        {/* Title */}
+        {/* Title + checkout steps */}
+        <div className="gp-steps" aria-label="مراحل الطلب">
+          <span className="on"><i>1</i>{t("السلة", "Cart")}</span>
+          <em />
+          <span><i>2</i>{t("الدفع", "Payment")}</span>
+          <em />
+          <span><i>3</i>{t("التأكيد", "Done")}</span>
+        </div>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-black">{t("سلة التسوق", "Shopping Cart")}</h1>
@@ -398,23 +405,23 @@ export default function CartPage() {
         </div>
 
         {items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-4 text-[var(--muted-2)]">
-            <ShoppingBag size={64} className="text-purple-500/20" />
+          <div className="gp-panel gp-empty flex flex-col items-center justify-center py-20 gap-4 text-[var(--muted-2)]">
+            <span className="gp-empty-ic"><ShoppingBag size={40} /></span>
             <p className="text-lg font-medium">{t("السلة فارغة", "Your cart is empty")}</p>
             <p className="text-sm text-[var(--muted-2)]">{t("أضف منتجات تعجبك من المتجر", "Add some products from the store")}</p>
-            <a href="/products" className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-500 text-white text-sm font-bold hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all mt-2">
+            <a href="/products" className="gp-btn gp-btn-main mt-2 px-7">
               <ShoppingCart size={16} /> {t("تصفح المنتجات", "Browse products")}
             </a>
           </div>
         ) : (
-          <>
+          <div className="gp-cart">
             {/* Items */}
-            <div className="space-y-3">
+            <div className="space-y-3 gp-cart-items">
               {items.map((item) => (
-                <div key={item.cartKey} className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-4 flex items-center gap-4">
+                <div key={item.cartKey} className="gp-panel gp-line flex items-center gap-4">
                   <a href={`/products/${item.id}`}>
                     {item.image_url ? (
-                      <img src={item.image_url} alt={item.name} className="w-16 h-16 rounded-xl object-cover border border-[var(--border)] shrink-0" />
+                      <img src={item.image_url} alt={item.name} className="gp-line-img" />
                     ) : (
                       <div className="w-16 h-16 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
                         <Package size={22} className="text-purple-400/40" />
@@ -448,8 +455,9 @@ export default function CartPage() {
               ))}
             </div>
 
+            <aside className="gp-cart-side space-y-4">
             {/* Summary */}
-            <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 space-y-3">
+            <div className="gp-panel p-5 space-y-3">
               <h2 className="font-bold text-sm text-[var(--muted)]">{t("ملخص الطلب", "Order summary")}</h2>
               <div className="space-y-2 text-sm">
                 {items.map((item) => (
@@ -468,7 +476,7 @@ export default function CartPage() {
             </div>
 
             {/* Notes */}
-            <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5">
+            <div className="gp-panel p-5">
               <label className="text-[var(--muted)] text-sm font-medium mb-2 block">📝 {t("ملاحظات للطلب (اختياري)", "Order notes (optional)")}</label>
               <textarea
                 value={notes}
@@ -484,18 +492,19 @@ export default function CartPage() {
               <button
                 onClick={startCheckout}
                 disabled={ordering}
-                className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-blue-500 hover:shadow-[0_0_24px_rgba(168,85,247,0.5)] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                className="gp-btn gp-btn-main w-full disabled:opacity-50"
               >
                 {ordering
                   ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   : <><ShoppingBag size={18} /> {t("تأكيد الطلب", "Checkout")}</>
                 }
               </button>
-              <a href="/products" className="w-full py-3 rounded-2xl font-medium text-[var(--muted)] hover:text-[var(--text)] bg-white/5 hover:bg-white/10 border border-[var(--border)] flex items-center justify-center gap-2 transition-all text-sm">
+              <a href="/products" className="gp-btn gp-btn-ghost w-full text-sm">
                 <ShoppingCart size={16} /> {t("مواصلة التسوق", "Continue shopping")}
               </a>
             </div>
-          </>
+            </aside>
+          </div>
         )}
       </div>
 

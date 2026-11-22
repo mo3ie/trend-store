@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Volume2, VolumeX, Sparkles } from "lucide-react";
+import { Volume2, VolumeX, Sparkles, Sun, Moon } from "lucide-react";
 import { isGlassPath } from "@/lib/uiGlass";
 
 /**
@@ -141,6 +141,20 @@ export default function UiFx() {
     };
   }, []);
 
+  const [light, setLight] = useState(false);
+  useEffect(() => {
+    const d = document.documentElement;
+    const sync = () => setLight(d.classList.contains("light"));
+    sync();
+    const mo = new MutationObserver(sync);
+    mo.observe(d, { attributes: true, attributeFilter: ["class"] });
+    return () => mo.disconnect();
+  }, []);
+  const toggleTheme = () => {
+    const n = !light;
+    document.documentElement.classList.toggle("light", n);
+    try { localStorage.setItem("theme", n ? "light" : "dark"); } catch {}
+  };
   if (!glass) return null;
 
   const toggleSound = () => {
@@ -172,6 +186,10 @@ export default function UiFx() {
             <button onClick={toggleMotion}>
               <Sparkles size={16} />
               <span>{motion === "full" ? "الحركة: كاملة" : "الحركة: حسب الجهاز"}</span>
+            </button>
+            <button onClick={toggleTheme}>
+              {light ? <Moon size={16} /> : <Sun size={16} />}
+              <span>{light ? "الوضع: فاتح" : "الوضع: زجاجي داكن"}</span>
             </button>
           </div>
         )}

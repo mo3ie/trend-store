@@ -275,7 +275,7 @@ export default function AccountPage() {
       <div className="fixed top-[-150px] right-[-150px] w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[140px] pointer-events-none" />
 
       {/* Header */}
-      <header className="border-b border-purple-500/20 px-4 md:px-6 py-4 flex items-center justify-between bg-[var(--glass)] backdrop-blur-md sticky top-0 z-40">
+      <header className="gp-top border-b border-purple-500/20 px-4 md:px-6 py-4 flex items-center justify-between bg-[var(--glass)] backdrop-blur-md sticky top-0 z-40">
         <a href="/" className="text-2xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
           TREND
         </a>
@@ -296,10 +296,10 @@ export default function AccountPage() {
         </div>
       </header>
 
-      <div className="max-w-3xl mx-auto px-4 py-6 md:py-8">
+      <div className="gp-wrap gp-narrow">
 
         {/* Avatar + Name */}
-        <div className="flex items-center gap-4 mb-6 md:mb-8">
+        <div className="gp-panel gp-hero flex items-center gap-4 mb-5">
           <div className="relative group cursor-pointer" onClick={() => !uploading && fileRef.current?.click()}>
             {avatarUrl ? (
               <img src={avatarUrl} alt="avatar" className="w-16 h-16 rounded-2xl object-cover border-2 border-purple-500/40"
@@ -324,11 +324,7 @@ export default function AccountPage() {
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1 -mx-1 px-1">
           {tabs.map(({ key, label, labelEn, icon: Icon }) => (
             <button key={key} onClick={() => setActiveTab(key)}
-              className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl text-xs md:text-sm font-medium whitespace-nowrap transition-all ${
-                activeTab === key
-                  ? "bg-purple-600 text-[var(--text)] shadow-[0_0_14px_rgba(168,85,247,0.4)]"
-                  : "bg-white/5 text-[var(--muted)] hover:text-[var(--text)] hover:bg-white/10 border border-[var(--border)]"
-              }`}>
+              className={`gp-pill flex items-center gap-2 whitespace-nowrap ${activeTab === key ? "on" : ""}`}>
               <Icon size={14} />
               {rtl ? label : labelEn}
             </button>
@@ -337,7 +333,7 @@ export default function AccountPage() {
 
         {/* ── PROFILE TAB ── */}
         {activeTab === "profile" && (
-          <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 md:p-6">
+          <div className="gp-panel p-5 md:p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-bold text-lg">{t("البيانات الشخصية", "Personal details")}</h2>
               {!editMode ? (
@@ -388,12 +384,12 @@ export default function AccountPage() {
               <a href="/orders" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors">{t("عرض الكل", "View all")} <ArrowLeft size={14} /></a>
             </div>
             {storeOrders.length === 0 ? (
-              <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-10 text-center text-[var(--muted-2)]">
+              <div className="gp-panel p-10 text-center text-[var(--muted-2)]">
                 <ShoppingBag size={40} className="mx-auto mb-3 text-purple-500/40" />
                 {t("لا توجد طلبات من المتجر بعد", "No store orders yet")}
               </div>
             ) : storeOrders.map((order) => (
-              <a key={order.id} href="/orders" className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 flex items-center justify-between hover:border-purple-500/50 transition-all block">
+              <a key={order.id} href="/orders" className="gp-panel p-5 flex items-center justify-between hover:border-purple-500/50 transition-all block">
                 <div>
                   <p className="text-sm font-semibold">{t("طلب", "Order")} #{order.id.slice(0, 8)}</p>
                   <p className="text-[var(--muted-2)] text-xs mt-0.5">{new Date(order.created_at).toLocaleDateString(rtl ? "ar-LY" : "en-GB")}</p>
@@ -410,12 +406,12 @@ export default function AccountPage() {
         {activeTab === "shein" && (
           <div className="space-y-3">
             {sheinOrders.length === 0 ? (
-              <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-10 text-center text-[var(--muted-2)]">
+              <div className="gp-panel p-10 text-center text-[var(--muted-2)]">
                 <Package size={40} className="mx-auto mb-3 text-purple-500/40" />
                 {t("لا توجد طلبات شي إن بعد", "No Shein orders yet")}
               </div>
             ) : sheinOrders.map((order) => (
-              <div key={order.id} className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 flex items-center justify-between">
+              <div key={order.id} className="gp-panel p-5 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold">{t("طلب", "Order")} #{order.id.toString().slice(0, 8)}</p>
                   <p className="text-[var(--muted-2)] text-xs mt-0.5">{new Date(order.created_at).toLocaleDateString(rtl ? "ar-LY" : "en-GB")}</p>
@@ -443,7 +439,7 @@ export default function AccountPage() {
                 <span className="w-7 h-7 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
               </div>
             ) : favorites.length === 0 ? (
-              <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-10 text-center text-[var(--muted-2)]">
+              <div className="gp-panel p-10 text-center text-[var(--muted-2)]">
                 <Heart size={40} className="mx-auto mb-3 text-purple-500/40" />
                 <p>{t("المفضلة فارغة", "No favorites yet")}</p>
                 <p className="text-xs mt-1 text-[var(--muted-2)]">{t("أضف منتجات تعجبك من صفحة المنتج", "Add products you like from the product page")}</p>
@@ -454,7 +450,7 @@ export default function AccountPage() {
                   const p = fav.products;
                   if (!p) return null;
                   return (
-                    <div key={fav.product_id} className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all relative group">
+                    <div key={fav.product_id} className="gp-panel overflow-hidden hover:border-purple-500/50 transition-all relative group">
                       <button
                         onClick={() => removeFavorite(fav.product_id)}
                         className="absolute top-2 left-2 z-10 w-7 h-7 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/40 transition-all shadow-sm"
@@ -520,7 +516,7 @@ export default function AccountPage() {
                 <span className="w-7 h-7 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
               </div>
             ) : addresses.length === 0 ? (
-              <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-10 text-center text-[var(--muted-2)]">
+              <div className="gp-panel p-10 text-center text-[var(--muted-2)]">
                 <MapPin size={40} className="mx-auto mb-3 text-purple-500/40" />
                 {t("لا توجد مواقع محفوظة — أضف موقعك الأول!", "No saved locations — add your first one!")}
               </div>
@@ -664,7 +660,7 @@ export default function AccountPage() {
         {activeTab === "settings" && (
           <div className="space-y-4">
             {/* تغيير كلمة المرور */}
-            <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 md:p-6">
+            <div className="gp-panel p-5 md:p-6">
               <h2 className="font-bold text-lg mb-1">🔒 {t("تغيير كلمة المرور", "Change password")}</h2>
               <p className="text-[var(--muted-2)] text-sm mb-5">{t("يجب أن تكون 6 أحرف على الأقل", "Must be at least 6 characters")}</p>
               <div className="space-y-3">
@@ -689,7 +685,7 @@ export default function AccountPage() {
             </div>
 
             {/* تعديل بيانات الحساب */}
-            <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 md:p-6">
+            <div className="gp-panel p-5 md:p-6">
               <h2 className="font-bold text-lg mb-1">✏️ {t("بيانات الحساب", "Account details")}</h2>
               <p className="text-[var(--muted-2)] text-sm mb-5">{t("تعديل الاسم ورقم الهاتف والعنوان", "Edit your name, phone and address")}</p>
               <div className="space-y-3">
@@ -713,7 +709,7 @@ export default function AccountPage() {
             </div>
 
             {/* الصورة الشخصية */}
-            <div className="bg-[var(--surface)] border border-purple-500/20 rounded-2xl p-5 md:p-6">
+            <div className="gp-panel p-5 md:p-6">
               <h2 className="font-bold text-lg mb-1">📸 {t("الصورة الشخصية", "Profile picture")}</h2>
               <p className="text-[var(--muted-2)] text-sm mb-5">{t("اضغط على الصورة أو زر التغيير لرفع صورة جديدة", "Click the photo or the change button to upload a new picture")}</p>
               <div className="flex items-center gap-5">
