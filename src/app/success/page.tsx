@@ -19,6 +19,9 @@ function SuccessContent() {
     return () => clearInterval(t);
   }, []);
 
+  // Success chime in the TREND Glass layer (plays once the visitor has interacted).
+  useEffect(() => { try { window.dispatchEvent(new Event("trend:success")); } catch {} }, []);
+
   // Confirm Moamalat payment immediately after returning from trendstore-ly.com/moamalat-pay
   useEffect(() => {
     if (via === "moamalat" && paid === "1" && orderId) {

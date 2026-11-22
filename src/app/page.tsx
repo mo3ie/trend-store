@@ -46,6 +46,7 @@ export default function Home() {
   const [mImages, setMImages] = useState<string[]>([]);
   const [mBusy, setMBusy] = useState(false);
   const [mDoneId, setMDoneId] = useState<string | null>(null);
+  const [pickOff, setPickOff] = useState(0); // Instant Visual carousel offset (UI only)
 
   useEffect(() => {
     setLight(document.documentElement.classList.contains("light"));
@@ -87,6 +88,13 @@ export default function Home() {
     ? products.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()) || (p.category || "").toLowerCase().includes(query.toLowerCase()))
     : products.slice(0, 8);
 
+  // Instant Visual stage: the newest product with a photo leads, the next ones rotate in threes.
+  const withImg = products.filter((p) => !!p.image_url);
+  const feat = withImg[0];
+  const pool = withImg.slice(1);
+  const picks = pool.length ? [0, 1, 2].map((i) => pool[(pickOff + i) % pool.length]).filter((p, i, a) => a.findIndex((q) => q.id === p.id) === i) : [];
+  const stepPicks = (d: number) => setPickOff((o) => (pool.length ? (o + d * 3 + pool.length * 3) % pool.length : 0));
+
   const categories = [
     { ar: "هواتف", en: "Phones", sub: "PHONES", icon: Smartphone, href: "/products?category=هواتف" },
     { ar: "لابتوبات", en: "Laptops", sub: "LAPTOPS", icon: Laptop, href: "/products?category=لابتوبات" },
@@ -118,7 +126,7 @@ export default function Home() {
       <header className="topbar">
         <button className="iconbtn menubtn" aria-label="menu" onClick={() => setMenuOpen(true)}><Menu size={20} /></button>
         <div className="brand">
-          <span className="logo"><b>T</b></span>
+          <img className="brandlogo" src="/brand/trend-logo.png" alt="TREND" />
           <span className="names">
             <span className="ar">{t("محل ترند", "Trend Store")}</span>
             <span className="wm en">TREND ELECTRONICS</span>
@@ -132,7 +140,7 @@ export default function Home() {
         <button className="iconbtn langbtn" onClick={toggleLang}>{lang === "ar" ? "EN" : "ع"}</button>
         <button className="iconbtn" aria-label="theme" onClick={toggleTheme}>{light ? <Moon size={19} /> : <Sun size={19} />}</button>
         {user && <span className="hide-sm flex"><NotificationBell /></span>}
-        <a className="iconbtn cartdot" href="/cart" aria-label="cart"><ShoppingCart size={20} />{count > 0 && <i>{count > 9 ? "9+" : count}</i>}</a>
+        <a className="iconbtn cartdot" href="/cart" aria-label="cart" data-cart-icon><ShoppingCart size={20} />{count > 0 && <i>{count > 9 ? "9+" : count}</i>}</a>
         <a className="iconbtn hide-sm" href={user ? "/account" : "/login"} aria-label="account"><svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg></a>
       </header>
 
@@ -140,7 +148,7 @@ export default function Home() {
         {menuOpen && <div className="drawer-overlay" onClick={() => setMenuOpen(false)} />}
         <aside className={`sidebar${collapsed ? " collapsed" : ""}${menuOpen ? " open" : ""}`} onClick={() => setMenuOpen(false)}>
           <div className="side-head">
-            <span className="logo" style={{ width: 32, height: 32, borderRadius: 10 }}><b style={{ fontSize: 15 }}>T</b></span>
+            <img className="brandlogo" src="/brand/trend-logo.png" alt="" style={{ height: 36 }} />
             <span className="ar" style={{ fontWeight: 900, fontSize: 15 }}>{t("محل ترند", "Trend Store")}</span>
             <button className="collapse" aria-label="collapse" onClick={() => setCollapsed((c) => !c)}><svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor" style={{ width: 16, height: 16, transform: rtl ? "" : "scaleX(-1)" }}><path d="M9 6l6 6-6 6" /></svg></button>
           </div>
@@ -160,6 +168,42 @@ export default function Home() {
         </aside>
 
         <main className="content">
+          <section className="g-stage" aria-label={t("اختيارات ترند", "Trend picks")}>
+            <a className="g-hero" href={feat ? `/products/${feat.id}` : "/products"}>
+              {feat?.image_url ? <img src={feat.image_url} alt={feat.name} /> : <Package />}
+              {feat && <span className="g-hero-cap"><b>{feat.name}</b><i>{feat.price} {t("د.ل", "LYD")}</i></span>}
+            </a>
+            <span className="g-arrow" aria-hidden="true"><svg viewBox="0 0 44 30"><path d="M42 15H6M16 5 6 15l10 10" fill="none" stroke="#E8FFFF" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+            <div className="g-picks">
+              <div className="g-picks-h">
+                <h1>Instant Visual</h1>
+                <span>Trend Picks</span>
+                <a className="g-pill" href="/products">{t("استكشاف الكل", "Explore all")} <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" style={{ transform: rtl ? "" : "scaleX(-1)" }}><path d="M19 12H5M11 6l-6 6 6 6" /></svg></a>
+              </div>
+              <div className="g-cards" key={pickOff}>
+                {picks.length === 0 && <p style={{ color: "var(--muted)", gridColumn: "1/-1" }}>{t("جاري تحميل المنتجات…", "Loading products…")}</p>}
+                {picks.map((p, i) => (
+                  <div key={p.id} className={`g-card${i === 1 ? " frost" : ""}`}>
+                    <button className="g-add" aria-label={t("أضف للسلة", "Add to cart")} onClick={() => addToCart(p)}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg></button>
+                    <a className="g-img" href={`/products/${p.id}`}><img src={p.image_url} alt={p.name} /></a>
+                    <b>{p.name}</b>
+                    <span className="g-price">{p.price} {t("د.ل", "LYD")}</span>
+                    {p.category && <span className="g-cat">{p.category}</span>}
+                  </div>
+                ))}
+              </div>
+              <div className="g-actions">
+                <a className="g-cta" href="/products">{t("تسوّق الآن", "Shop now")}</a>
+                {pool.length > 3 && (
+                  <span className="g-nav">
+                    <button aria-label={t("السابق", "Previous")} onClick={() => stepPicks(-1)}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg></button>
+                    <button aria-label={t("التالي", "Next")} onClick={() => stepPicks(1)}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg></button>
+                  </span>
+                )}
+              </div>
+            </div>
+          </section>
+
           <section className="hero" style={img.hero ? { backgroundImage: `linear-gradient(120deg, rgba(8,10,18,.80), rgba(8,10,18,.45)), url(${img.hero})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
             <div className="inner">
               <h1>{t("كل ما تحتاجه من عالم التقنية", "Everything you need from the world of tech")}</h1>
@@ -251,7 +295,7 @@ export default function Home() {
 
           <footer className="footer">
             <div>
-              <div className="row"><span className="logo"><b>T</b></span><div className="names"><div style={{ fontWeight: 900, fontSize: 17 }}>{t("محل ترند", "Trend Store")}</div><div className="wm" style={{ fontSize: 12 }}>TREND ELECTRONICS</div></div></div>
+              <div className="row"><img className="brandlogo" src="/brand/trend-logo.png" alt="TREND" style={{ height: 46, filter: "none" }} /><div className="names"><div style={{ fontWeight: 900, fontSize: 17 }}>{t("محل ترند", "Trend Store")}</div><div className="wm" style={{ fontSize: 12 }}>TREND ELECTRONICS</div></div></div>
               <span className="support-badge"><span className="dot" />{t("دعم فني 24/7", "24/7 support")}</span>
               <p>{t("وجهتك الأولى للإلكترونيات والخدمات الرقمية في ليبيا — جودة موثوقة وخدمة سريعة.", "Your first stop for electronics & digital services in Libya — trusted quality, fast service.")}</p>
               <button className="btn" onClick={() => setModal("support")}>{t("تواصل معنا", "Contact us")}</button>

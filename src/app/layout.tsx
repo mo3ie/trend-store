@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Cairo } from "next/font/google";
+import { Cairo, IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 import ThemeToggle from "@/components/ThemeToggle";
 import PWARegister from "@/components/PWARegister";
+import UiFx from "@/components/UiFx";
+import { preloadScript } from "@/lib/uiGlass";
 
 export const viewport: Viewport = {
   themeColor: "#0b0f1a",
@@ -12,12 +14,20 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-// Applied before paint to avoid a theme flash. Default is dark.
-const noFlashScript = `(function(){try{if(localStorage.getItem('theme')==='light'){document.documentElement.classList.add('light');}}catch(e){}})();`;
+// Applied before paint to avoid a flash: theme (default dark), the TREND Glass
+// storefront layer, and the motion preference.
+const noFlashScript = preloadScript;
 
 const cairo = Cairo({
   subsets: ["arabic"],
   weight: ["400", "700", "900"],
+});
+
+// TREND Glass typeface — used only under html[data-ui="glass"] (globals.css).
+const plex = IBM_Plex_Sans_Arabic({
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex",
 });
 
 export const metadata: Metadata = {
@@ -62,9 +72,10 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: noFlashScript }} />
       </head>
-      <body className={`${cairo.className} min-h-full flex flex-col`}>
+      <body className={`${cairo.className} ${plex.variable} min-h-full flex flex-col`}>
         {children}
         <ThemeToggle />
+        <UiFx />
         <PWARegister />
       </body>
     </html>
