@@ -625,27 +625,30 @@ html[data-ui="glass"].light {
   --brand: #2e8fae; --brand-2: #3db6c9; --brand-ink: #1f6f86;
   --line: rgba(24, 35, 44, 0.1);
 }
-/* The atmosphere sits on <html> (the canvas) so it covers the whole scroll
-   height — on <body> it stopped after the first screen. */
-html[data-ui="glass"] body { background: transparent; }
+/* The atmosphere is a fixed layer behind everything (body::before). A
+   background on <body>/<html> either stopped after the first screen or tiled
+   every viewport height (html is h-full), and background-attachment:fixed is
+   ignored on phones. A fixed pseudo-element behaves the same everywhere. */
+html[data-ui="glass"] { background-color: #6f8496; }
+html[data-ui="glass"].light { background-color: #d1dce5; }
 html[data-ui="glass"] body {
+  background: transparent;
   font-family: var(--font-plex), "IBM Plex Sans Arabic", Cairo, system-ui, sans-serif;
   color: var(--text);
 }
-html[data-ui="glass"] {
-  min-height: 100%;
-  background-color: #6f8496;
+html[data-ui="glass"] body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background:
     radial-gradient(ellipse 45% 42% at 6% 100%, rgba(214, 196, 202, 0.95), transparent 70%),
     radial-gradient(ellipse 55% 50% at 100% 100%, rgba(176, 221, 240, 0.95), transparent 70%),
     radial-gradient(ellipse 60% 50% at 0% 0%, rgba(78, 88, 98, 0.55), transparent 70%),
-    linear-gradient(160deg, #5d6770 0%, #677684 35%, #7f9aae 70%, #a6c9dd 100%);
+    linear-gradient(160deg, #5d6770 0%, #677684 35%, #7f9aae 70%, #a6c9dd 100%);
 }
-html[data-ui="glass"].light {
+html[data-ui="glass"].light body::before {
   background:
     radial-gradient(ellipse 45% 42% at 6% 100%, rgba(232, 220, 226, 0.9), transparent 70%),
     radial-gradient(ellipse 55% 50% at 100% 100%, rgba(200, 232, 244, 0.95), transparent 70%),
-    linear-gradient(160deg, #dfe7ed 0%, #d1dce5 45%, #c8d8e4 75%, #d6e6f0 100%);
+    linear-gradient(160deg, #dfe7ed 0%, #d1dce5 45%, #c8d8e4 75%, #d6e6f0 100%);
 }
 html[data-ui="glass"] ::selection { background: rgba(112, 232, 232, 0.45); }
 html[data-ui="glass"] input::placeholder, html[data-ui="glass"] textarea::placeholder { color: var(--muted-2); }
