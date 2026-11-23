@@ -43,6 +43,9 @@ async function callProvider(p: { provider: Provider; key: string }, params: AIPa
       headers: { "content-type": "application/json", authorization: `Bearer ${p.key}` },
       body: JSON.stringify({
         model, max_tokens: maxTokens, temperature,
+        // gpt-oss is a reasoning model: at default effort it can spend the whole
+        // token budget thinking and return an EMPTY answer.
+        ...(model.includes("gpt-oss") ? { reasoning_effort: "low" } : {}),
         messages: [{ role: "system", content: params.system }, { role: "user", content: params.user }],
       }),
       cache: "no-store",

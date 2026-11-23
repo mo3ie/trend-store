@@ -5,8 +5,11 @@ import { useRouter, useParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
   ArrowRight, ShoppingCart, Package, User,
-  ChevronLeft, ChevronRight, Tag, CheckCircle, XCircle, Heart,
+  ChevronLeft, ChevronRight, Tag, CheckCircle, XCircle, Heart, Image as ImageIcon, Rotate3d, Box,
 } from "lucide-react";
+import dynamic from "next/dynamic";
+const Spin360 = dynamic(() => import("@/components/three/Spin360"), { ssr: false });
+const Model3D = dynamic(() => import("@/components/three/Model3D"), { ssr: false });
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
 import { useLang } from "@/hooks/useLang";
@@ -17,6 +20,7 @@ type Variant = { name: string; options: string[] };
 type Product = {
   id: string; name: string; description?: string; price: number; stock: number;
   category: string; image_url?: string; images?: string[]; created_at?: string; variants?: Variant[];
+  spin_images?: string[]; model_url?: string | null;
 };
 
 export default function ProductView() {
@@ -31,6 +35,7 @@ export default function ProductView() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState(0);
+  const [view, setView] = useState<"photo" | "spin" | "model">("photo");
   const [added, setAdded] = useState(false);
   const [selectedVars, setSelectedVars] = useState<Record<string, string>>({});
   const [isFav, setIsFav] = useState(false);
@@ -76,6 +81,12 @@ export default function ProductView() {
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   }
+
+  // Lead with the most impressive view the product has.
+  useEffect(() => {
+    if (product?.spin_images?.length) setView("spin");
+    else if (product?.model_url) setView("model");
+  }, [product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const images = product?.images?.length ? product.images : product?.image_url ? [product.image_url] : [];
   const inStock = (product?.stock ?? 0) > 0;
@@ -138,12 +149,16 @@ export default function ProductView() {
               {/* Stage: the product on a white plate floating in a glass frame */}
               <section className="gp-stage">
                 <div className="gp-plate">
-                  {images.length > 0 ? (
+                  {view === "spin" && product.spin_images?.length ? (
+                    <Spin360 frames={product.spin_images} alt={product.name} />
+                  ) : view === "model" && product.model_url ? (
+                    <Model3D src={product.model_url} poster={images[0]} alt={product.name} />
+                  ) : images.length > 0 ? (
                     <img key={activeImage} src={images[activeImage]} alt={product.name} className="gp-shot" />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-[#8aa0ad] gap-3"><Package size={64} /><span className="text-sm">{t("لا توجد صورة", "No image")}</span></div>
                   )}
-                  {images.length > 1 && (
+                  {view === "photo" && images.length > 1 && (
                     <>
                       <button aria-label="السابق" onClick={() => setActiveImage((p) => (p - 1 + images.length) % images.length)} className="gp-arrow start-3"><ChevronLeft size={18} /></button>
                       <button aria-label="التالي" onClick={() => setActiveImage((p) => (p + 1) % images.length)} className="gp-arrow end-3"><ChevronRight size={18} /></button>
@@ -153,7 +168,14 @@ export default function ProductView() {
                     <Heart size={18} className={isFav ? "fill-current" : ""} />
                   </button>
                 </div>
-                {images.length > 1 && (
+                {(!!product.spin_images?.length || !!product.model_url) && (
+                  <div className="gp-modes" role="tablist">
+                    <button className={view === "photo" ? "on" : ""} onClick={() => setView("photo")}><ImageIcon size={14} /> {t("الصور", "Photos")}</button>
+                    {!!product.spin_images?.length && <button className={view === "spin" ? "on" : ""} onClick={() => setView("spin")}><Rotate3d size={14} /> 360°</button>}
+                    {!!product.model_url && <button className={view === "model" ? "on" : ""} onClick={() => setView("model")}><Box size={14} /> 3D · AR</button>}
+                  </div>
+                )}
+                {view === "photo" && images.length > 1 && (
                   <div className="gp-thumbs">
                     {images.map((src, i) => (
                       <button key={i} onClick={() => setActiveImage(i)} className={activeImage === i ? "on" : ""} aria-label={`${i + 1}`}>

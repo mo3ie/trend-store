@@ -5,6 +5,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import PWARegister from "@/components/PWARegister";
 import UiFx from "@/components/UiFx";
 import GlassNav from "@/components/GlassNav";
+import HoloBot from "@/components/holo/HoloBot";
 import { preloadScript } from "@/lib/uiGlass";
 
 export const viewport: Viewport = {
@@ -78,6 +79,7 @@ export default function RootLayout({
         <ThemeToggle />
         <UiFx />
         <GlassNav />
+        <HoloBot />
         <PWARegister />
       </body>
     </html>

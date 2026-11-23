@@ -67,6 +67,12 @@ export default function ViewProduct() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <a
+            href={`/admin/products/${id}/3d`}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-sm font-medium transition-colors"
+          >
+            3D / 360°
+          </a>
           <button
             onClick={() => router.push(`/admin/products/${id}/edit`)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-sm font-medium transition-colors"

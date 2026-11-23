@@ -5,9 +5,11 @@ import {
   Home as HomeIcon, ShoppingCart, Wrench, Laptop, Gamepad2, Globe, Smartphone,
   Megaphone, Package, Heart, Wallet, Settings, Menu, Search, Sun, Moon,
   Building2, Headphones, Phone, MapPin, ShieldCheck, Truck, RotateCcw, Lock,
-  BadgeCheck, MessageCircle, Check, X, MessagesSquare, Music2,
+  BadgeCheck, MessageCircle, Check, X, MessagesSquare, Music2, Stethoscope,
 } from "lucide-react";
 import WalletModal from "@/components/WalletModal";
+import dynamic from "next/dynamic";
+const HeroRobot = dynamic(() => import("@/components/holo/HeroRobot"), { ssr: false, loading: () => <div className="g-hero g-hero-bot" /> });
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
@@ -51,6 +53,7 @@ export default function Home() {
   useEffect(() => {
     setLight(document.documentElement.classList.contains("light"));
     fetch("/api/products?limit=12").then((r) => r.json()).then((d) => setProducts(Array.isArray(d) ? d : []));
+    try { if (new URLSearchParams(window.location.search).get("repair") === "1") setModal("maint"); } catch {}
     fetch("/api/site-settings").then((r) => r.json()).then((d) => setSettings(d || null)).catch(() => {});
   }, []);
 
@@ -90,8 +93,7 @@ export default function Home() {
 
   // Instant Visual stage: the newest product with a photo leads, the next ones rotate in threes.
   const withImg = products.filter((p) => !!p.image_url);
-  const feat = withImg[0];
-  const pool = withImg.slice(1);
+  const pool = withImg;
   const picks = pool.length ? [0, 1, 2].map((i) => pool[(pickOff + i) % pool.length]).filter((p, i, a) => a.findIndex((q) => q.id === p.id) === i) : [];
   const stepPicks = (d: number) => setPickOff((o) => (pool.length ? (o + d * 3 + pool.length * 3) % pool.length : 0));
 
@@ -106,6 +108,7 @@ export default function Home() {
     { ar: "مواقعنا", en: "Our Sites", sub: "SITES", icon: Building2, href: "/our-sites" },
   ];
   const services = [
+    { ar: "افحص جهازك", en: "Check your phone", dAr: "فحص ذكي للأعطال من المتصفح", dEn: "Smart fault scan in your browser", icon: Stethoscope, cta: t("ابدأ الفحص", "Start scan"), href: "/diagnose" },
     { ar: "صيانة الأجهزة", en: "Device repair", dAr: "إصلاح احترافي بضمان", dEn: "Pro repair, warranted", icon: Wrench, cta: t("احجز صيانة", "Book repair"), onClick: () => setModal("maint") },
     { ar: "الإكسسوارات", en: "Accessories", dAr: "ملحقات أصلية", dEn: "Genuine add-ons", icon: Headphones, cta: t("تصفّح", "Browse"), href: "/products?category=إكسسوارات" },
     { ar: "خدمات رقمية", en: "Digital services", dAr: "اشتراكات وبطاقات", dEn: "Subs & cards", icon: Globe, cta: t("اطلب خدمة", "Request"), onClick: () => setModal("soon") },
@@ -169,10 +172,7 @@ export default function Home() {
 
         <main className="content">
           <section className="g-stage" aria-label={t("اختيارات ترند", "Trend picks")}>
-            <a className="g-hero" href={feat ? `/products/${feat.id}` : "/products"}>
-              {feat?.image_url ? <img src={feat.image_url} alt={feat.name} /> : <Package />}
-              {feat && <span className="g-hero-cap"><b>{feat.name}</b><i>{feat.price} {t("د.ل", "LYD")}</i></span>}
-            </a>
+            <HeroRobot />
             <span className="g-arrow" aria-hidden="true"><svg viewBox="0 0 44 30"><path d="M42 15H6M16 5 6 15l10 10" fill="none" stroke="#E8FFFF" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
             <div className="g-picks">
               <div className="g-picks-h">
