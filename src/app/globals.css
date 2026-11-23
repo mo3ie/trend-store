@@ -1189,3 +1189,15 @@ html[data-ui="glass"] .theme-fab { display: none !important; }
 
 /* PREVIEW: robot card without its solid backdrop (badge, tiles and offer box unchanged) */
 .home2 .g-hero.g-hero-bot { background: transparent; box-shadow: none; border: none; overflow: visible; }
+
+/* Product cards show the whole product (phones were cropped by object-fit: cover) */
+.home2 .thumb img { object-fit: contain; padding: 7%; }
+/* The floating product always floats — the site keeps motion even with OS reduce-motion (see .mo-auto) */
+.fp-float { animation: fpFloat 4.8s ease-in-out infinite !important; }
+.fp-shadow { animation: fpShadow 4.8s ease-in-out infinite !important; }
+@keyframes fpFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7%); } }
+@keyframes fpShadow { 0%, 100% { transform: scale(1); opacity: .95; } 50% { transform: scale(.72); opacity: .5; } }
+html.mo-auto .fp-float, html.mo-auto .fp-shadow { animation: none !important; }
+@media (prefers-reduced-motion: no-preference) { html.mo-auto .fp-float { animation: fpFloat 4.8s ease-in-out infinite !important; } html.mo-auto .fp-shadow { animation: fpShadow 4.8s ease-in-out infinite !important; } }
+/* Robot companion sits beside the sound button, not on top of it */
+.holo-mini { left: 70px !important; }

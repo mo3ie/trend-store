@@ -193,7 +193,7 @@ export default function ProductsPage() {
               <a key={product.id} href={`/products/${product.id}`} className="group bg-[var(--surface)] border border-purple-500/20 rounded-2xl overflow-hidden hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.15)] transition-all">
                 <div className="aspect-square bg-[var(--input)] overflow-hidden">
                   {product.image_url ? (
-                    <img src={product.image_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-purple-400/20"><Package size={40} /></div>
                   )}
