@@ -87,8 +87,9 @@ export default function DiagnosePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dev]);
 
+  const AUTO: TestId[] = ["fps", "cpu", "battery", "network"];
   const run = async (id: TestId) => {
-    if (running) return;
+    if (running && !AUTO.includes(running)) return;
     setRunning(id);
     try {
       if (id === "display" || id === "touch" || id === "multi" || id === "camFront" || id === "camBack") { setOverlay(id); return; }
@@ -179,7 +180,7 @@ export default function DiagnosePage() {
                 const r = res[id];
                 const s = r ? ST[r.status] : null;
                 return (
-                  <button key={id} className={`gp-panel dg-test ${s ? s.cls : ""}`} onClick={() => run(id)} disabled={!!running && running !== id}>
+                  <button key={id} className={`gp-panel dg-test ${s ? s.cls : ""}`} onClick={() => run(id)} disabled={!!running && running !== id && !AUTO.includes(running)}>
                     <span className="dg-ic"><Icon size={20} /></span>
                     <span className="dg-t"><b>{ar}</b><small>{r?.value || r?.note || desc}</small></span>
                     <span className="dg-st">

@@ -14,8 +14,9 @@ type Pick = { id: string; name: string; price: number; image_url: string | null;
  * (from /api/ai/picks), follows the cursor with its head, waves, and opens the
  * «ترندي» AI chat. On other store pages it shrinks to a small hologram button.
  */
+// Kept clear of the right-hand (RTL) sidebar, which takes ~22% of the width.
 const SPOTS_DESKTOP = [
-  { x: 0.84, y: 0.62 }, { x: 0.12, y: 0.66 }, { x: 0.86, y: 0.3 }, { x: 0.1, y: 0.34 }, { x: 0.5, y: 0.7 },
+  { x: 0.68, y: 0.7 }, { x: 0.07, y: 0.72 }, { x: 0.42, y: 0.74 }, { x: 0.07, y: 0.34 },
 ];
 const HIDE_ON = [/^\/admin/, /^\/diagnose/, /^\/login/, /^\/register/, /^\/moamalat-pay/, /^\/r\//, /^\/studio/, /^\/tiktok/, /^\/facebook/, /^\/ads/, /^\/bot/];
 
@@ -99,13 +100,21 @@ export default function HoloBot() {
     fetch("/api/ai/picks").then((r) => r.json()).then((d) => setPicks(Array.isArray(d.picks) ? d.picks : [])).catch(() => {});
   }, [home, hidden]);
 
+  // Phone: the offer bubble shows for a few seconds, then gets out of the way.
+  useEffect(() => {
+    if (!phone || !home) return;
+    const t = setInterval(() => setBubble((b) => !b), 7000);
+    return () => clearInterval(t);
+  }, [phone, home]);
+
   // Cycle offers; move to a new spot every few offers (desktop homepage)
   useEffect(() => {
     if (!home || hidden || chat || picks.length === 0) return;
     const t = setInterval(() => {
       setIdx((i) => {
         const n = (i + 1) % picks.length;
-        if (!phone && !reduced && n % 2 === 0) {
+        if (phone) return n;
+        if (!reduced && n % 2 === 0) {
           setBubble(false);
           setSpot((s) => (s + 1) % SPOTS_DESKTOP.length);
           setTimeout(() => { setBubble(true); botRef.current?.wave(); }, 1500);
