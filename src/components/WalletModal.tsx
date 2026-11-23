@@ -19,6 +19,8 @@ const PAYMENT_METHODS = [
   { id: "edfali",       label: "ادفع لي",  icon: "🏧", desc: "محفظة ادفع لي"        },
   { id: "moamalat",     label: "معاملات",   icon: "💳", desc: "بوابة معاملات"        },
   { id: "mobicash",     label: "موبي كاش",  icon: "📲", desc: "بطاقة موبي كاش"       },
+  { id: "yusor",        label: "يسر باي",   icon: "💳", desc: "بطاقة مصرفية (يسر)"   },
+  { id: "masarafi",     label: "مصرفي باي", icon: "🏛️", desc: "مصرف الجمهورية"      },
   // prepaid_card temporarily disabled: no card-inventory validation exists yet,
   // so it must not be selectable until a real card system is built (see /api/wallet).
 ];
@@ -26,7 +28,7 @@ const PAYMENT_METHODS = [
 const METHOD_LABELS: Record<string, string> = {
   mobicash: "موبي كاش", masrefypay: "مصرفي", edfali: "ادفع لي",
   prepaid_card: "كرت شحن", cash: "نقداً", moamalat: "معاملات",
-  yousrpay: "يسر باي", credit: "إيداع", debit: "سحب", transfer: "تحويل",
+  yousrpay: "يسر باي", yusor: "يسر باي", masarafi: "مصرفي باي", credit: "إيداع", debit: "سحب", transfer: "تحويل",
 };
 
 function timeStr(iso: string) {
@@ -80,7 +82,7 @@ export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Pr
 
   // OTP step — shared by Edfali (phone-based) and MobiCash (card-based)
   const [otpStep,       setOtpStep]       = useState<null | "sending" | "otp">(null);
-  const [otpProvider,   setOtpProvider]   = useState<"edfali" | "mobicash">("edfali");
+  const [otpProvider,   setOtpProvider]   = useState<"edfali" | "mobicash" | "bank">("edfali");
   const [edfaliSession, setEdfaliSession] = useState("");
   const [otpTxId,       setOtpTxId]       = useState("");
   const [otpCode,       setOtpCode]       = useState("");
@@ -107,6 +109,7 @@ export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Pr
     if (method === "edfali" && !phone.trim()) { setRechMsg("يرجى إدخال رقم هاتف ادفع لي"); return; }
     if (method === "mobicash" && cardNumber.replace(/\D/g, "").length < 5) { setRechMsg("يرجى إدخال رقم بطاقة موبي كاش"); return; }
     if (method === "prepaid_card" && !reference.trim()) { setRechMsg("يرجى إدخال رقم الكرت"); return; }
+    if ((method === "yusor" || method === "masarafi") && cardNumber.replace(/\D/g, "").length < 9) { setRechMsg("رقم البطاقة يجب أن يكون 9 أرقام على الأقل"); return; }
 
     setRecharging(true);
 
@@ -134,6 +137,28 @@ export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Pr
         setRechMsg("خطأ في الاتصال بالخادم");
         resetOtp();
         setRecharging(false);
+      }
+      setRecharging(false);
+      return;
+    }
+
+    // ── يسر باي / مصرفي باي: bank card → OTP from the bank ────────────────────
+    if (method === "yusor" || method === "masarafi") {
+      try {
+        setOtpProvider("bank");
+        setOtpStep("sending");
+        const r = await fetch("/api/wallet/bank-topup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider: method, amount: amt, identityCard: cardNumber.replace(/\D/g, "") }),
+        });
+        const d = await r.json();
+        if (!r.ok || !d.txId) { setRechMsg(d.error || "فشل إرسال رمز التحقق"); resetOtp(); setRecharging(false); return; }
+        setOtpTxId(d.txId);
+        setOtpStep("otp");
+      } catch {
+        setRechMsg("خطأ في الاتصال بالخادم");
+        resetOtp();
       }
       setRecharging(false);
       return;
@@ -257,8 +282,8 @@ export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Pr
     setConfirming(true);
     setRechMsg("");
     try {
-      const url  = otpProvider === "mobicash" ? "/api/wallet/mobicash-confirm" : "/api/wallet/edfali-confirm";
-      const body = otpProvider === "mobicash"
+      const url  = otpProvider === "bank" ? "/api/wallet/bank-confirm" : otpProvider === "mobicash" ? "/api/wallet/mobicash-confirm" : "/api/wallet/edfali-confirm";
+      const body = otpProvider === "mobicash" || otpProvider === "bank"
         ? { txId: otpTxId, otp: otpCode }
         : { sessionId: edfaliSession, otp: otpCode, txId: otpTxId };
       const r = await fetch(url, {
@@ -522,6 +547,25 @@ export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Pr
                     style={{ direction: "ltr" }}
                   />
                   <p className="text-[var(--muted-2)] text-xs mt-1">سيصلك رمز تحقق على هاتفك المرتبط بالبطاقة</p>
+                </div>
+              )}
+
+              {/* Bank card for Yusor / Masarafi */}
+              {(method === "yusor" || method === "masarafi") && (
+                <div>
+                  <label className="text-[var(--muted)] text-xs mb-2 flex items-center gap-1 block">
+                    <CreditCard size={12} /> {method === "yusor" ? "رقم البطاقة المصرفية (يسر باي)" : "رقم بطاقة مصرف الجمهورية"}
+                  </label>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    value={cardNumber}
+                    onChange={e => setCardNumber(e.target.value.replace(/\D/g, "").slice(0, 19))}
+                    placeholder="رقم البطاقة"
+                    className="w-full px-4 py-3 rounded-xl bg-[var(--input)] border border-purple-500/30 text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60 transition-all font-mono"
+                    style={{ direction: "ltr" }}
+                  />
+                  <p className="text-[var(--muted-2)] text-xs mt-1">المصرف يبعثلك رمز تحقق على هاتفك المسجّل</p>
                 </div>
               )}
 
