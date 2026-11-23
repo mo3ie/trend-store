@@ -5,7 +5,7 @@ import { Camera, ArrowRight, Microscope, ShieldCheck, Loader2, CheckCircle2, Sma
 import WalletModal from "@/components/WalletModal";
 import { summarize, hasUsefulData, type AnalyticsSummary } from "@/lib/iosAnalytics";
 
-type Data = { price: number; signedIn: boolean; vouchers: { code: string; status: string; created_at: string; report_id: string | null }[]; reports: { id: string; score: number; created_at: string; device: { model?: string; source?: string } }[] };
+type Data = { imei?: boolean; price: number; signedIn: boolean; vouchers: { code: string; status: string; created_at: string; report_id: string | null }[]; reports: { id: string; score: number; created_at: string; device: { model?: string; source?: string } }[] };
 
 const SHOTS_IOS = [
   { t: "الإعدادات ← البطارية ← صحة البطارية والشحن", d: "صوّر الشاشة اللي فيها «السعة القصوى» %" },
@@ -35,6 +35,7 @@ export default function DeepScanPage() {
   const [quick, setQuick] = useState<string | null>(null);
   const [sum, setSum] = useState<AnalyticsSummary | null>(null);
   const [shots, setShots] = useState<string[]>([]);
+  const [imei, setImei] = useState("");
   const [platform, setPlatform] = useState<"ios" | "android">("ios");
   const shotRef = useRef<HTMLInputElement>(null);
   const [parsing, setParsing] = useState(false);
@@ -76,7 +77,7 @@ export default function DeepScanPage() {
   };
   const submit = async () => {
     setBusy(true); setErr("");
-    const r = await fetch("/api/deep-scan/analyze", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ analytics: sum, images: shots, quickReportId: quick }) });
+    const r = await fetch("/api/deep-scan/analyze", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ analytics: sum, images: shots, imei: imei.trim() || undefined, quickReportId: quick }) });
     const j = await r.json();
     setBusy(false);
     if (!r.ok) { setErr(j.error); return; }
@@ -84,7 +85,7 @@ export default function DeepScanPage() {
     setDone({ id: j.id, score: j.score }); load();
   };
 
-  const step = !paid && !done ? 1 : done ? 4 : (sum && hasUsefulData(sum)) || shots.length ? 3 : 2;
+  const step = !paid && !done ? 1 : done ? 4 : (sum && hasUsefulData(sum)) || shots.length || imei.replace(/D/g, "").length === 15 ? 3 : 2;
 
   // Screenshots are downscaled in the browser (≤1280px JPEG) before upload.
   const addShots = async (files: FileList | null) => {
@@ -132,6 +133,14 @@ export default function DeepScanPage() {
               {quick ? <p className="text-sm text-green-400 flex items-center gap-1"><CheckCircle2 size={16} /> تم — بيتضاف للشهادة</p>
                 : <button onClick={runQuick} className="gp-btn gp-btn-ghost w-full">ابدأ فحص الشاشة واللمس والصوت والكاميرات <ChevronLeft size={16} /></button>}
             </section>
+
+            {d?.imei && (
+              <section className="gp-panel p-5 space-y-3">
+                <h3 className="font-bold flex items-center gap-2"><ShieldCheck size={18} /> فحص IMEI <small className="font-normal text-green-400">(قفل iCloud · مسروق/مبلّغ · قفل الشبكة · الضمان)</small></h3>
+                <p className="text-xs text-[var(--muted)]">اطلب <b dir="ltr">*#06#</b> من لوحة الاتصال وانسخ رقم IMEI (15 رقم) — أو من الإعدادات ← عام ← حول.</p>
+                <input value={imei} onChange={(e) => setImei(e.target.value.replace(/[^0-9A-Za-z]/g, "").slice(0, 15))} inputMode="numeric" dir="ltr" placeholder="35xxxxxxxxxxxxx" className="w-full px-4 py-3 rounded-xl bg-black/15 border border-white/15 text-center font-mono tracking-widest outline-none" />
+              </section>
+            )}
 
             <section className="gp-panel p-5 space-y-3">
               <h3 className="font-bold flex items-center gap-2"><Camera size={18} /> صوّر شاشات الإعدادات <small className="font-normal text-green-400">(الأسهل — دقيقة)</small></h3>

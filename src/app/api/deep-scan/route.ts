@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { getUser } from "@/lib/apiAuth";
 import { creditWallet, debitWallet } from "@/lib/wallet";
+import { imeiEnabled } from "@/lib/imeiCheck";
 
 /**
  * Paid deep USB scan (in the shop, via Trend POS). The customer buys a voucher
@@ -16,12 +17,12 @@ const newCode = () => "DS-" + Array.from(randomBytes(6), (x) => ALPH[x % ALPH.le
 
 export async function GET() {
   const user = await getUser().catch(() => null);
-  if (!user) return NextResponse.json({ price: DEEP_SCAN_PRICE, signedIn: false, vouchers: [], reports: [] });
+  if (!user) return NextResponse.json({ price: DEEP_SCAN_PRICE, signedIn: false, vouchers: [], reports: [], imei: imeiEnabled() });
   const [{ data: vouchers }, { data: reports }] = await Promise.all([
     db.from("deep_scan_vouchers").select("code,status,created_at,used_at,report_id").eq("user_id", user.id).order("created_at", { ascending: false }),
     db.from("device_reports").select("id,score,created_at,device").eq("user_id", user.id).eq("device->>deep", "true").order("created_at", { ascending: false }),
   ]);
-  return NextResponse.json({ price: DEEP_SCAN_PRICE, signedIn: true, vouchers: vouchers || [], reports: reports || [] });
+  return NextResponse.json({ price: DEEP_SCAN_PRICE, signedIn: true, vouchers: vouchers || [], reports: reports || [], imei: imeiEnabled() });
 }
 
 export async function POST() {

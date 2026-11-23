@@ -4,6 +4,7 @@ import { getUser } from "@/lib/apiAuth";
 import { analyzeDeep } from "@/lib/deepReport";
 import { rateLimited } from "@/lib/catalog";
 import { readScreenshots, visionUseful, type VisionFacts } from "@/lib/visionExtract";
+import { checkImei, imeiEnabled, type ImeiFacts } from "@/lib/imeiCheck";
 
 /**
  * Deep scan from the customer's own iPhone: the browser has already parsed the
@@ -48,7 +49,14 @@ export async function POST(req: Request) {
     if (visionUseful(r)) vision = r;
     else if (!useful && !quick) return NextResponse.json({ error: "الصور ما فيهاش شاشة صحة البطارية أو سجل القطع — صوّر الشاشات المطلوبة بالترتيب. ما خصمنا شي من كودك.", code: "NO_DATA" }, { status: 422 });
   }
-  if (!useful && !quick && !vision) return NextResponse.json({ error: "ما فيش بيانات كافية — ارفع صور الإعدادات أو ملفات التحليلات. ما خصمنا شي من كودك.", code: "NO_DATA" }, { status: 422 });
+  // Optional IMEI lookup (iCloud lock, blacklist, carrier lock, warranty) — provider configured by env.
+  let imei: ImeiFacts | null = null;
+  if (typeof body.imei === "string" && body.imei.trim() && imeiEnabled()) {
+    const r = await checkImei(body.imei);
+    if ("error" in r) return NextResponse.json({ error: r.error.startsWith("imei_") ? "خدمة فحص IMEI ما ردّتش الآن — جرّب بعد شوية. ما خصمنا شي من كودك." : r.error, code: "IMEI" }, { status: 400 });
+    imei = r;
+  }
+  if (!useful && !quick && !vision && !imei) return NextResponse.json({ error: "ما فيش بيانات كافية — ارفع صور الإعدادات أو ملفات التحليلات. ما خصمنا شي من كودك.", code: "NO_DATA" }, { status: 422 });
 
   const { data: v } = await db.from("deep_scan_vouchers").select("id,code").eq("user_id", user.id).eq("status", "paid").order("created_at").limit(1).maybeSingle();
   if (!v) return NextResponse.json({ error: "ما عندكش كود فحص مدفوع", code: "NO_VOUCHER" }, { status: 402 });
@@ -61,17 +69,17 @@ export async function POST(req: Request) {
     ...(vision?.battery.serviceWarning ? { serviceWarning: true } : {}),
     ...(vision?.battery.peakPerformanceOk !== undefined ? { peakPerformanceOk: vision.battery.peakPerformanceOk } : {}),
   };
-  const model = vision?.device.model || analytics.device.model || (quick?.device as { model?: string })?.model;
+  const model = vision?.device.model || imei?.model || analytics.device.model || (quick?.device as { model?: string })?.model;
   const os = vision?.device.os || (analytics.device.ios ? `iOS ${analytics.device.ios}` : undefined);
   const scan = {
     device: { model, ios: analytics.device.ios || vision?.device.os, storage: vision?.device.storage },
     battery, storage: {}, parts: vision?.parts || [],
     panics: analytics.panics, appCrashes: analytics.appCrashes, jetsam: analytics.jetsam,
     warnings: vision?.warnings || [], scannedAt: new Date().toISOString(), period: analytics.period, files: analytics.files,
-    screens: vision?.screensRead || 0,
+    screens: vision?.screensRead || 0, imei,
   };
   const source = vision && !useful ? "screenshots" : "analytics";
-  const report = await analyzeDeep({ scan, browser_hardware_test: quick, parts_and_service_history: vision?.parts || null }, "analytics");
+  const report = await analyzeDeep({ scan, browser_hardware_test: quick, parts_and_service_history: vision?.parts || null, imei_check: imei }, "analytics");
   report.source = source;
 
   const { data, error } = await db.from("device_reports").insert({

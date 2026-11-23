@@ -11,6 +11,7 @@ type Deep = {
   panics: { last30d: number; total: number; reasons: string[] };
   appCrashes?: { total: number; top: { app: string; count: number }[] };
   parts?: { part: string; status: string; note?: string }[];
+  imei?: { imeiMasked: string; icloud?: string; blacklist?: string; simLock?: string; carrier?: string; warranty?: string; purchaseDate?: string; refurbished?: boolean; replaced?: boolean } | null;
   jetsam?: number;
   period?: { from?: string; to?: string };
   scannedAt: string;
@@ -35,6 +36,19 @@ function DeepCert({ d, notes, source }: { d: Deep; notes?: string | null; source
       </div>
       {!!(d.appCrashes?.total || d.jetsam) && (
         <p className="text-sm text-[var(--muted)]">أعطال التطبيقات: <b>{d.appCrashes?.total || 0}</b>{d.appCrashes?.top?.length ? ` (${d.appCrashes.top.slice(0, 3).map((x) => `${x.app} ×${x.count}`).join("، ")})` : ""} · ضغط الذاكرة: <b>{d.jetsam || 0}</b></p>
+      )}
+      {d.imei && (
+        <div className="rounded-xl bg-white/5 p-3 text-sm space-y-1">
+          <b>فحص IMEI <span dir="ltr" className="font-mono text-xs text-[var(--muted)]">{d.imei.imeiMasked}</span></b>
+          <div className="flex flex-wrap gap-2 text-xs">
+            {d.imei.icloud && <span className={"px-2.5 py-1 rounded-full font-bold " + (d.imei.icloud === "off" ? "bg-green-500/15 text-green-300" : "bg-red-500/15 text-red-300")}>iCloud: {d.imei.icloud === "off" ? "مطفي ✓" : "مفعّل (مقفول)"}</span>}
+            {d.imei.blacklist && <span className={"px-2.5 py-1 rounded-full font-bold " + (d.imei.blacklist === "clean" ? "bg-green-500/15 text-green-300" : "bg-red-500/15 text-red-300")}>{d.imei.blacklist === "clean" ? "غير مبلّغ عنه ✓" : "مبلّغ عنه (" + d.imei.blacklist + ")"}</span>}
+            {d.imei.simLock && <span className={"px-2.5 py-1 rounded-full font-bold " + (d.imei.simLock === "unlocked" ? "bg-green-500/15 text-green-300" : "bg-amber-500/15 text-amber-300")}>الشبكة: {d.imei.simLock === "unlocked" ? "مفتوح ✓" : "مقفول" + (d.imei.carrier ? " على " + d.imei.carrier : "")}</span>}
+            {d.imei.refurbished && <span className="px-2.5 py-1 rounded-full font-bold bg-amber-500/15 text-amber-300">مجدّد</span>}
+            {d.imei.replaced && <span className="px-2.5 py-1 rounded-full font-bold bg-amber-500/15 text-amber-300">جهاز مستبدل</span>}
+          </div>
+          {(d.imei.warranty || d.imei.purchaseDate) && <p className="text-xs text-[var(--muted)]">{d.imei.warranty ? "الضمان: " + d.imei.warranty : ""}{d.imei.purchaseDate ? " · تاريخ الشراء: " + d.imei.purchaseDate : ""}</p>}
+        </div>
       )}
       {!!d.parts?.length && (
         <div className="flex flex-wrap gap-2 text-xs">
