@@ -38,7 +38,7 @@ const RobotCanvas = forwardRef<RobotApi, { className?: string; onReady?: () => v
         setReady(true);
         onReady?.();
         setTimeout(() => h.wave(), 700);
-      } catch { /* no WebGL: the page still works without the robot */ }
+      } catch (e) { console.warn("[TREND AI] robot unavailable:", e); /* page works without it */ }
     })();
     return () => { dead = true; bot.current?.dispose(); bot.current = null; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
