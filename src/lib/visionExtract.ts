@@ -37,14 +37,14 @@ export async function readScreenshots(images: string[]): Promise<VisionFacts | {
   const key = (process.env.GROQ_API_KEY || "").trim();
   if (!key) return { error: "no_vision" };
   const content = [{ type: "text", text: PROMPT }, ...images.slice(0, 5).map((url) => ({ type: "image_url", image_url: { url } }))];
-  let lastStatus = 0;
+  let lastStatus = 0, lastErr = "";
   for (const model of MODELS) {
     const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST", cache: "no-store",
       headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model, temperature: 0, max_tokens: 900, messages: [{ role: "user", content }], response_format: { type: "json_object" } }),
+      body: JSON.stringify({ model, temperature: 0, max_tokens: 900, messages: [{ role: "user", content }] }),
     });
-    if (!r.ok) { lastStatus = r.status; if ([400, 403, 404].includes(r.status)) continue; break; }
+    if (!r.ok) { lastStatus = r.status; lastErr = `${model}: ${(await r.text().catch(() => "")).slice(0, 160)}`; if ([400, 403, 404].includes(r.status)) continue; break; }
     const d = await r.json().catch(() => ({}));
     const raw = String(d.choices?.[0]?.message?.content || "");
     let j: Partial<VisionFacts> & Record<string, unknown>;
@@ -69,7 +69,7 @@ export async function readScreenshots(images: string[]): Promise<VisionFacts | {
       screensRead: Math.min(images.length, 5),
     };
   }
-  return { error: `vision_http_${lastStatus}` };
+  return { error: `vision_http_${lastStatus} ${lastErr}` };
 }
 
 export const visionUseful = (v: VisionFacts) => v.battery.healthPct !== undefined || v.battery.cycles !== undefined || v.parts.length > 0 || !!v.device.model;
