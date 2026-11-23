@@ -6,7 +6,7 @@ import { aiComplete, hasAI, parseJsonReply } from "@/services/ai";
  *   • "analytics" — the owner's own iPhone Analytics files, parsed in their browser
  * Plus, optionally, the browser hardware checks (screen/touch/sound/cameras…).
  */
-export type DeepSource = "usb" | "analytics";
+export type DeepSource = "usb" | "analytics" | "screenshots";
 
 const SYSTEM = `أنت فني آيفون خبير في محل ترند (ليبيا). عندك نتائج فحص عميق للجهاز:
 صحة البطارية ودوراتها، أعطال النظام (kernel panics) وأسبابها، أعطال التطبيقات، ضغط الذاكرة (Jetsam)، التخزين، ونتائج فحص الهاردوير من المتصفح إن وجدت.
@@ -15,6 +15,8 @@ const SYSTEM = `أنت فني آيفون خبير في محل ترند (ليبي
 - panics متكررة في آخر 30 يوم = مشكلة؛ فسّر السبب من النص (missing sensor / thermalmonitord / watchdog / AppleSPU / i2c = غالباً قطعة أو فلكس أو بطارية؛ تكرار نفس السبب أوضح).
 - تطبيق يتعطّل كثير = مشكلة برمجية في التطبيق (تحديث/حذف/إعادة تثبيت).
 - Jetsam كثير = ذاكرة ممتلئة أو تطبيقات ثقيلة.
+- سجل القطع والصيانة (parts): أي قطعة "unknown" = قطعة غير أصلية أو مجهولة (مشكلة مهمة واذكر اسم القطعة)، "replaced/used" = تم تبديلها (اذكرها بوضوح)، "genuine" = أصلية.
+- تحذير "Service"/صيانة في البطارية = تحتاج تبديل.
 - خطوات حل برمجية أولاً، ثم هل يحتاج صيانة.
 أرجع JSON فقط:
 {"score":0-100,"summary":"...","issues":[{"title":"...","severity":"low|medium|high","cause":"...","fixes":["..."],"needsRepair":false}],"tips":["..."],"products":[]}`;

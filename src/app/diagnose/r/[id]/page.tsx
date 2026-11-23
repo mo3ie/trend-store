@@ -10,6 +10,7 @@ type Deep = {
   storage: { totalGb?: number; freeGb?: number };
   panics: { last30d: number; total: number; reasons: string[] };
   appCrashes?: { total: number; top: { app: string; count: number }[] };
+  parts?: { part: string; status: string; note?: string }[];
   jetsam?: number;
   period?: { from?: string; to?: string };
   scannedAt: string;
@@ -17,14 +18,14 @@ type Deep = {
 
 /** «شهادة فحص عميق» — data read straight from the iPhone over USB at the shop. */
 function DeepCert({ d, notes, source }: { d: Deep; notes?: string | null; source?: string }) {
-  const usb = source !== "analytics";
+  const usb = !source || source === "usb";
   const h = d.battery.healthPct;
   const hc = h == null ? "" : h >= 85 ? "text-green-400" : h >= 80 ? "text-amber-400" : "text-red-400";
   return (
     <section className="gp-panel p-5 space-y-3">
       <div className="flex items-center gap-2">
         <ShieldCheck className="text-cyan-300" />
-        <div className="flex-1"><b>شهادة فحص عميق — محل ترند</b><p className="text-xs text-[var(--muted)]">{usb ? "✅ موثّقة: قراءة مباشرة بالكابل في المحل" : "من ملفات نظام الجهاز رفعها صاحبه"} · {new Date(d.scannedAt).toLocaleString("ar-LY")}{d.period?.from ? ` · بيانات من ${d.period.from} إلى ${d.period.to}` : ""}</p></div>
+        <div className="flex-1"><b>شهادة فحص عميق — محل ترند</b><p className="text-xs text-[var(--muted)]">{usb ? "✅ موثّقة: قراءة مباشرة بالكابل في المحل" : source === "screenshots" ? "من شاشات إعدادات الجهاز رفعها صاحبه" : "من ملفات نظام الجهاز رفعها صاحبه"} · {new Date(d.scannedAt).toLocaleString("ar-LY")}{d.period?.from ? ` · بيانات من ${d.period.from} إلى ${d.period.to}` : ""}</p></div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
         <div className="rounded-xl bg-white/5 p-3"><small className="text-[var(--muted)] block">الجهاز</small><b>{d.device.model}</b><small className="block">iOS {d.device.ios} · {d.device.serialMasked}</small></div>
@@ -34,6 +35,11 @@ function DeepCert({ d, notes, source }: { d: Deep; notes?: string | null; source
       </div>
       {!!(d.appCrashes?.total || d.jetsam) && (
         <p className="text-sm text-[var(--muted)]">أعطال التطبيقات: <b>{d.appCrashes?.total || 0}</b>{d.appCrashes?.top?.length ? ` (${d.appCrashes.top.slice(0, 3).map((x) => `${x.app} ×${x.count}`).join("، ")})` : ""} · ضغط الذاكرة: <b>{d.jetsam || 0}</b></p>
+      )}
+      {!!d.parts?.length && (
+        <div className="flex flex-wrap gap-2 text-xs">
+          {d.parts.map((p) => <span key={p.part} className={"px-2.5 py-1 rounded-full font-bold " + (p.status === "genuine" ? "bg-green-500/15 text-green-300" : p.status === "unknown" ? "bg-red-500/15 text-red-300" : "bg-amber-500/15 text-amber-300")}>{p.part}: {({ genuine: "أصلية", unknown: "غير معروفة / غير أصلية", replaced: "مبدّلة", used: "مستعملة" } as Record<string, string>)[p.status] || p.status}</span>)}
+        </div>
       )}
       {!!d.panics.reasons?.length && <details className="text-xs text-[var(--muted)]"><summary>أسباب أعطال النظام</summary><ul dir="ltr" className="mt-1 space-y-0.5">{d.panics.reasons.map((r) => <li key={r}>{r}</li>)}</ul></details>}
       {notes && <p className="text-sm"><b>ملاحظات الفني:</b> {notes}</p>}

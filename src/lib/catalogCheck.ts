@@ -104,7 +104,8 @@ Output JSON only:
     .slice(0, 5).map((s) => ({ title: String(s.title || host(s.url!)).slice(0, 120), url: s.url! }));
   if (!sources.length) return { error: "unverified_sources" };
 
-  const text = String(out.description_ar || "").replace(/\*\*/g, "").trim();
+  // Strip markdown and the search tool's citation marks like 【2†L7-L10】 / [1].
+  const text = String(out.description_ar || "").replace(/\*\*/g, "").replace(/【[^】]*】/g, "").replace(/\[\d+(?:†[^\]]*)?\]/g, "").replace(/[ \t]+\n/g, "\n").trim();
   if (text.length < 20) return { error: "empty" };
   return { text: text.slice(0, 1200), sources };
 }
