@@ -176,6 +176,7 @@ export default function Home() {
           <div className="navitem" onClick={() => go("/cards")}><Globe size={19} /><span>{t("الكروت والخدمات الرقمية", "Cards & Digital")}</span></div>
           <div className="navitem" onClick={() => go("/market")}><ShieldCheck size={19} /><span>{t("سوق المستعمل بضمان", "Used Market")}</span></div>
           <div className="navitem" onClick={() => go("/gift")}><Gift size={19} /><span>{t("هدية اليوم", "Daily Gift")}</span></div>
+          <div className="navitem" onClick={() => go("/games")}><Gamepad2 size={19} /><span>{t("تحديات وألعاب", "Games")}</span></div>
           <div className="navitem" onClick={() => go("/our-sites")}><Building2 size={19} /><span>{t("مواقعنا", "Our Sites")}</span></div>
           <div className="side-group">{t("حسابي", "My account")}</div>
           <div className="navitem" onClick={() => go("/orders")}><Package size={19} /><span>{t("تتبّع طلبك", "Track order")}</span></div>

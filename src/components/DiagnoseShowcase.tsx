@@ -26,6 +26,7 @@ export default function DiagnoseShowcase() {
         </div>
         <div className="dx-cta">
           <a href="/diagnose" className="dx-btn"><Stethoscope size={18} /> ابدأ الفحص الآن</a>
+          <a href="/deep-scan" className="dx-deep">🔬 الفحص العميق بالكابل · 5 د.ل</a>
           <span className="dx-note"><ShieldCheck size={14} /> بدون تسجيل · تقرير تشاركه</span>
         </div>
       </div>

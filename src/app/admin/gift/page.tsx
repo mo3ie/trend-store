@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Gift, Loader2, Trash2, CheckCircle2, Search, Trophy } from "lucide-react";
 
 type Plan = { day: string; gift_title: string; gift_image: string | null };
-type Draw = { day: string; gift_title: string; entries_count: number; winner_name: string | null; claim_code: string | null; drawn_at: string | null; claimed_at: string | null; winner: { full_name: string | null; phone: string | null; email: string | null } | null };
+type Draw = { day: string; gift_title: string; entries_count: number; winner_name: string | null; claim_code: string | null; drawn_at: string | null; claimed_at: string | null; excluded: Record<string, number>; winner: { full_name: string | null; phone: string | null; email: string | null } | null };
 
 const tomorrow = () => new Date(Date.now() + 2 * 3600_000 + 864e5).toISOString().slice(0, 10);
 
@@ -88,6 +88,12 @@ export default function AdminGiftPage() {
             <span>{d.gift_title} · {d.drawn_at ? `${d.entries_count} مشارك` : "لم يُسحب بعد"}</span>
             <span>{d.winner ? `${d.winner.full_name || "-"} · ${d.winner.phone || d.winner.email || ""}` : d.drawn_at ? "لا يوجد مشاركين" : ""}</span>
             <span className={d.claimed_at ? "text-green-400" : d.winner ? "text-amber-400" : "text-[var(--muted)]"}>{d.claimed_at ? "استُلمت" : d.winner ? <span dir="ltr" className="font-mono">{d.claim_code}</span> : ""}</span>
+            {(Object.keys(d.excluded || {}).length > 0 || (d.winner && !d.claimed_at)) && (
+              <div className="md:col-span-4 flex flex-wrap items-center gap-2 text-xs">
+                {Object.entries(d.excluded || {}).map(([k, v]) => <span key={k} className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-300">🚫 {k}: {v}</span>)}
+                {d.winner && !d.claimed_at && <button onClick={async () => { const r = prompt("سبب استبعاد الفائز (يظهر للعامة كمخالفة):", "مخالفة شروط المسابقة"); if (!r) return; const { ok, d: j } = await post({ action: "redraw", day: d.day, reason: r }); if (!ok) alert(j.error); load(); }} className="ms-auto px-2 py-1 rounded-lg bg-red-600/80 text-white">استبعاد الفائز وإعادة السحب</button>}
+              </div>
+            )}
           </div>
         ))}
       </section>

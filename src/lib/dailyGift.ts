@@ -68,31 +68,94 @@ function claimCode(): string {
   return Array.from(b, (x) => CODE_ALPHABET[x % CODE_ALPHABET.length]).join("");
 }
 
+type Entry = { id: number; user_id: string; device_hash: string | null; ip_hash: string | null; phone_hash: string | null; excluded: string | null };
+
+/**
+ * Anti-fraud pass run at draw time (results stored on each entry):
+ *  • more than MAX_PER_IP entries from one network → all excluded (account farm)
+ *  • same phone or same device twice → only the first entry counts
+ *  • won within the cooldown window (by account, phone or device) → excluded
+ */
+async function screen(day: string, entries: Entry[]) {
+  const { MAX_PER_IP, WIN_COOLDOWN_DAYS } = await import("@/lib/antifraud");
+  const since = new Date(Date.now() - WIN_COOLDOWN_DAYS * 864e5).toISOString().slice(0, 10);
+  const { data: wins } = await db.from("daily_draws").select("winner_user_id,winner_phone_hash,winner_device_hash").gte("day", since).lt("day", day).not("winner_user_id", "is", null);
+  const wonUsers = new Set((wins || []).map((w) => w.winner_user_id)), wonPhones = new Set((wins || []).map((w) => w.winner_phone_hash).filter(Boolean)), wonDevs = new Set((wins || []).map((w) => w.winner_device_hash).filter(Boolean));
+  const perIp = new Map<string, number>();
+  for (const e of entries) if (e.ip_hash) perIp.set(e.ip_hash, (perIp.get(e.ip_hash) || 0) + 1);
+  const seenPhone = new Set<string>(), seenDev = new Set<string>();
+  const updates: { id: number; excluded: string }[] = [];
+  for (const e of entries) {
+    if (e.excluded) continue;
+    let why = "";
+    if (e.ip_hash && (perIp.get(e.ip_hash) || 0) > MAX_PER_IP) why = "حسابات كثيرة من نفس الشبكة";
+    else if (e.phone_hash && seenPhone.has(e.phone_hash)) why = "رقم هاتف مكرر";
+    else if (e.device_hash && seenDev.has(e.device_hash)) why = "جهاز مكرر";
+    else if (wonUsers.has(e.user_id) || (e.phone_hash && wonPhones.has(e.phone_hash)) || (e.device_hash && wonDevs.has(e.device_hash))) why = "فاز خلال آخر 30 يوم";
+    if (e.phone_hash) seenPhone.add(e.phone_hash);
+    if (e.device_hash) seenDev.add(e.device_hash);
+    if (why) { e.excluded = why; updates.push({ id: e.id, excluded: why }); }
+  }
+  for (const u of updates) await db.from("daily_draw_entries").update({ excluded: u.excluded }).eq("id", u.id);
+  return entries.filter((e) => !e.excluded);
+}
+
+async function crown(day: string, giftTitle: string, winner: Entry, extra: Record<string, unknown>) {
+  const { data: prof } = await db.from("profiles").select("full_name").eq("id", winner.user_id).maybeSingle();
+  const code = claimCode();
+  const { data: upd } = await db.from("daily_draws").update({
+    ...extra, winner_user_id: winner.user_id, winner_name: maskName(prof?.full_name), claim_code: code,
+    winner_phone_hash: winner.phone_hash, winner_device_hash: winner.device_hash, claimed_at: null,
+  }).eq("day", day).select("day");
+  if (!upd?.length) return null;
+  await db.from("notifications").insert({
+    user_id: winner.user_id, type: "gift", title: "🎁 مبروك! فزت بهدية اليوم",
+    body: `فزت بـ «${giftTitle}». كود الاستلام: ${code} — اعرضه في المحل مع بطاقة هويتك ورقم هاتفك المسجّل.`, link: "/gift",
+  });
+  return code;
+}
+
 export async function runDraw(day: string) {
   await ensureDraw(day);
   const { data: draw } = await db.from("daily_draws").select("*").eq("day", day).single();
   if (!draw || draw.drawn_at) return { day, skipped: "already drawn" };
-  const { data: entries } = await db.from("daily_draw_entries").select("id,user_id").eq("day", day).order("id");
-  const list = entries || [];
-  const { hash } = entriesDigest(list, day);
-  if (!list.length) {
-    await db.from("daily_draws").update({ drawn_at: new Date().toISOString(), entries_count: 0, entries_hash: hash }).eq("day", day).is("drawn_at", null);
-    return { day, winner: null };
+  // claim the draw first so two triggers can't both run it
+  const { data: lock } = await db.from("daily_draws").update({ drawn_at: new Date().toISOString() }).eq("day", day).is("drawn_at", null).select("day");
+  if (!lock?.length) return { day, skipped: "raced" };
+  const { data: all } = await db.from("daily_draw_entries").select("id,user_id,device_hash,ip_hash,phone_hash,excluded").eq("day", day).order("id");
+  const eligible = await screen(day, (all || []) as Entry[]);
+  const { hash } = entriesDigest(eligible, day);
+  if (!eligible.length) {
+    await db.from("daily_draws").update({ entries_count: 0, entries_hash: hash }).eq("day", day);
+    return { day, winner: null, excluded: (all || []).length };
   }
-  const idx = pickIndex(draw.seed, hash, list.length);
-  const winner = list[idx];
-  const { data: prof } = await db.from("profiles").select("full_name").eq("id", winner.user_id).maybeSingle();
-  const code = claimCode();
-  const { data: upd } = await db.from("daily_draws").update({
-    drawn_at: new Date().toISOString(), entries_count: list.length, entries_hash: hash,
-    winner_user_id: winner.user_id, winner_name: maskName(prof?.full_name), claim_code: code,
-  }).eq("day", day).is("drawn_at", null).select("day");
-  if (!upd?.length) return { day, skipped: "raced" };
-  await db.from("notifications").insert({
-    user_id: winner.user_id, type: "gift",
-    title: "🎁 مبروك! فزت بهدية اليوم",
-    body: `فزت بـ «${draw.gift_title}». كود الاستلام: ${code} — اعرضه في المحل أو تواصل معنا لاستلام هديتك.`,
-    link: "/gift",
-  });
-  return { day, winner: winner.user_id, entries: list.length };
+  const winner = eligible[pickIndex(draw.seed, hash, eligible.length)];
+  await crown(day, draw.gift_title, winner, { entries_count: eligible.length, entries_hash: hash });
+  return { day, winner: winner.user_id, entries: eligible.length, excluded: (all || []).length - eligible.length };
+}
+
+/**
+ * Admin disqualifies the winner (fraud found / didn't meet the rules) → a new
+ * winner is drawn the same verifiable way: candidates = published list minus
+ * disqualified entries, index = HMAC(seed, entriesHash + ":r" + n) mod count.
+ */
+export async function redraw(day: string, reason: string) {
+  const { data: draw } = await db.from("daily_draws").select("*").eq("day", day).single();
+  if (!draw?.drawn_at || !draw.winner_user_id) throw new Error("لا يوجد فائز لإعادة السحب");
+  if (draw.claimed_at) throw new Error("الهدية استُلمت بالفعل");
+  const { data: rows } = await db.from("daily_draw_entries").select("id,user_id,device_hash,ip_hash,phone_hash,excluded").eq("day", day).order("id");
+  const published = ((rows || []) as Entry[]).filter((e) => !e.excluded || e.excluded.startsWith("استبعاد بعد الفوز"));
+  const cur = published.find((e) => e.user_id === draw.winner_user_id && !e.excluded);
+  if (cur) await db.from("daily_draw_entries").update({ excluded: `استبعاد بعد الفوز: ${reason.slice(0, 80)}` }).eq("id", cur.id);
+  const dq = [...(Array.isArray(draw.disqualified) ? draw.disqualified : []), { entry: cur?.id, reason: reason.slice(0, 120) }];
+  const dqIds = new Set(dq.map((x: { entry?: number }) => x.entry));
+  const candidates = published.filter((e) => !dqIds.has(e.id));
+  const n = (draw.redraws || 0) + 1;
+  if (!candidates.length) {
+    await db.from("daily_draws").update({ redraws: n, disqualified: dq, winner_user_id: null, winner_name: null, claim_code: null }).eq("day", day);
+    return { winner: null };
+  }
+  const idx = pickIndex(draw.seed, `${draw.entries_hash}:r${n}`, candidates.length);
+  await crown(day, draw.gift_title, candidates[idx], { redraws: n, disqualified: dq });
+  return { winner: candidates[idx].user_id };
 }

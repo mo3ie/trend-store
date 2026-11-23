@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, ShieldCheck, Trophy, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import DailyGift from "@/components/DailyGift";
 
-type Draw = { day: string; gift_title: string; seed_hash: string; seed: string | null; entries_count: number | null; entries_hash: string | null; winner_name: string | null; drawn: boolean; claimed: boolean };
+type Draw = { day: string; gift_title: string; seed_hash: string; seed: string | null; entries_count: number | null; entries_hash: string | null; winner_name: string | null; drawn: boolean; claimed: boolean; redraws: number; disqualified: number[] };
 type Data = { history: Draw[]; myWins: { day: string; gift_title: string; claim_code: string; claimed: boolean }[] };
 
 const hex = (b: ArrayBuffer) => Array.from(new Uint8Array(b), (x) => x.toString(16).padStart(2, "0")).join("");
@@ -29,7 +29,13 @@ async function verify(d: Draw): Promise<{ ok: boolean; lines: string[] }> {
   if (!list) return { ok: c1 && c2, lines: [...lines, "لا يوجد مشاركين في هذا اليوم"] };
   const rows = list.split("\n");
   const idx = Number(BigInt("0x" + (await hmac(d.seed, eh))) % BigInt(rows.length));
-  lines.push(`→ الفائز = المشارك رقم ${idx + 1} في القائمة (المعرّف ${rows[idx]})`);
+  lines.push(`→ الفائز الأول = المشارك رقم ${idx + 1} في القائمة (المعرّف ${rows[idx]})`);
+  if (d.redraws > 0) {
+    // Winners disqualified after the draw are skipped; the redraw uses the same seed + ":rN".
+    const cand = rows.filter((r) => !d.disqualified.includes(Number(r.split(":")[0])));
+    const j = Number(BigInt("0x" + (await hmac(d.seed, `${eh}:r${d.redraws}`))) % BigInt(cand.length || 1));
+    lines.push(`↻ أُعيد السحب ${d.redraws} مرة بعد استبعاد فائز مخالف → الفائز النهائي: ${cand[j] || "-"}`);
+  }
   return { ok: c1 && c2, lines };
 }
 
@@ -69,7 +75,8 @@ export default function GiftPage() {
             <li>المشاركات تتسجّل بالترتيب، وكل مشارك له معرّف مجهول.</li>
             <li>الساعة 9 بالليل يُحسب الفائز تلقائياً: <code dir="ltr">HMAC-SHA256(البذرة, بصمة القائمة) mod عدد المشاركين</code>.</li>
             <li>بعد السحب تنكشف البذرة والقائمة، وتقدر تعيد الحساب بنفسك بزر «تحقق» تحت — يشتغل في متصفحك أنت.</li>
-            <li>الفائز يوصله <b>كود استلام</b> في حسابه وفي الإشعارات، والمحل يتأكد من الكود قبل تسليم الهدية.</li>
+            <li>الفائز يوصله <b>كود استلام</b> في حسابه وفي الإشعارات، والمحل يتأكد من الكود وهوية الفائز قبل التسليم.</li>
+            <li><b>الحماية من الاحتيال:</b> مشاركة وحدة لكل شخص مربوطة برقم الهاتف والجهاز والشبكة؛ الحسابات الأحدث من 3 أيام ما تشاركش؛ كثرة الحسابات من نفس الشبكة تُستبعد كلها؛ والفائز ما يشاركش 30 يوم بعد فوزه. المستبعدين ما يدخلوش في القائمة المنشورة.</li>
           </ol>
         </section>
 

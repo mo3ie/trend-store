@@ -172,8 +172,9 @@ export default function DiagnosePage() {
               </section>
             )}
             {ios && (
-              <p className="dg-note">ملاحظة: أبل ما تسمحش للمواقع تقرأ صحة البطارية وسجلات النظام. لهذا نسألك عنها تحت — وللفحص العميق بالكابل زورنا في المحل.</p>
+              <p className="dg-note">ملاحظة: أبل ما تسمحش للمواقع تقرأ صحة البطارية وسجلات النظام. لهذا نسألك عنها تحت — أو اطلب <a href="/deep-scan" className="text-cyan-300 underline">الفحص العميق بالكابل (5 د.ل)</a> في المحل.</p>
             )}
+            <a href="/deep-scan" className="gp-panel dg-deep"><span>🔬</span><div><b>الفحص العميق بالكابل — 5 د.ل</b><small>صحة البطارية الحقيقية، دورات الشحن، سجلات أعطال النظام + شهادة رسمية</small></div></a>
 
             <div className="dg-grid">
               {TESTS.map(({ id, ar, desc, Icon }) => {

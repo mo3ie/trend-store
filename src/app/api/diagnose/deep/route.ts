@@ -32,6 +32,16 @@ export async function POST(req: NextRequest) {
   const scan = body?.scan;
   if (!scan?.device) return NextResponse.json({ error: "بيانات الفحص ناقصة" }, { status: 400 });
 
+  // Optional paid voucher bought on the site → the certificate goes to that customer's account.
+  let voucher: { id: string; user_id: string } | null = null;
+  const vcode = String(body.voucher || "").trim().toUpperCase();
+  if (vcode) {
+    const { data: v } = await db.from("deep_scan_vouchers").select("id,user_id,status").eq("code", vcode).maybeSingle();
+    if (!v) return NextResponse.json({ error: "كود الفحص غير صحيح" }, { status: 404 });
+    if (v.status !== "paid") return NextResponse.json({ error: "كود الفحص مستعمل من قبل" }, { status: 409 });
+    voucher = v;
+  }
+
   let report: Record<string, unknown> = {
     score: 0, summary: "", issues: [], tips: [], products: [],
   };
@@ -47,11 +57,16 @@ export async function POST(req: NextRequest) {
   report.deep = true;
 
   const { data, error } = await db.from("device_reports").insert({
+    user_id: voucher?.user_id || null,
     device: { platform: "ios", os: "iOS", osVersion: scan.device.ios, model: scan.device.model, deep: true },
     results: { deep: scan, customer: body.customer || null, notes: body.notes || null },
     score: Math.round(Number(report.score) || 0), ai_report: JSON.stringify(report),
   }).select("id").single();
   if (error || !data) return NextResponse.json({ error: error?.message || "تعذّر الحفظ" }, { status: 500 });
   const base = process.env.NEXT_PUBLIC_SITE_URL || "https://www.trendstore-ly.com";
+  if (voucher) {
+    await db.from("deep_scan_vouchers").update({ status: "used", report_id: data.id, used_at: new Date().toISOString() }).eq("id", voucher.id).eq("status", "paid");
+    await db.from("notifications").insert({ user_id: voucher.user_id, type: "diagnose", title: "🔬 شهادة الفحص العميق جاهزة", body: `تقييم جهازك: ${Math.round(Number(report.score) || 0)}/100`, link: `/diagnose/r/${data.id}` });
+  }
   return NextResponse.json({ id: data.id, url: `${base}/diagnose/r/${data.id}`, score: Math.round(Number(report.score) || 0) });
 }

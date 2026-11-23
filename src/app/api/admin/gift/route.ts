@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/apiAuth";
-import { libyaDay } from "@/lib/dailyGift";
+import { libyaDay, redraw } from "@/lib/dailyGift";
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -13,9 +13,14 @@ export async function GET() {
   const ids = [...new Set((draws || []).map((d) => d.winner_user_id).filter(Boolean))];
   const { data: profs } = ids.length ? await db.from("profiles").select("id,full_name,phone,email").in("id", ids) : { data: [] };
   const pm = new Map((profs || []).map((p) => [p.id, p]));
+  // Anti-fraud stats: how many entries were excluded per day and why.
+  const days = (draws || []).map((d) => d.day);
+  const { data: ex } = days.length ? await db.from("daily_draw_entries").select("day,excluded").in("day", days).not("excluded", "is", null) : { data: [] };
+  const stats: Record<string, Record<string, number>> = {};
+  for (const e of ex || []) { stats[e.day] = stats[e.day] || {}; stats[e.day][e.excluded] = (stats[e.day][e.excluded] || 0) + 1; }
   return NextResponse.json({
     plan: plan || [],
-    draws: (draws || []).map((d) => ({ ...d, winner: d.winner_user_id ? pm.get(d.winner_user_id) || null : null })),
+    draws: (draws || []).map((d) => ({ ...d, excluded: stats[d.day] || {}, winner: d.winner_user_id ? pm.get(d.winner_user_id) || null : null })),
   });
 }
 
@@ -30,6 +35,10 @@ export async function POST(req: NextRequest) {
     // If that day's draw row already exists and isn't drawn yet, update its gift too.
     await db.from("daily_draws").update({ gift_title: String(b.gift_title).slice(0, 120), gift_image: b.gift_image || null }).eq("day", b.day).is("drawn_at", null);
     return NextResponse.json({ success: true });
+  }
+  if (b.action === "redraw") {
+    try { const r = await redraw(String(b.day), String(b.reason || "مخالفة شروط المسابقة")); return NextResponse.json({ success: true, ...r }); }
+    catch (e) { return NextResponse.json({ error: (e as Error).message }, { status: 400 }); }
   }
   if (b.action === "unplan") {
     await db.from("daily_gift_plan").delete().eq("day", b.day);
