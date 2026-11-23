@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import WalletModal from "@/components/WalletModal";
 import DiagnoseShowcase from "@/components/DiagnoseShowcase";
+import DailyGift from "@/components/DailyGift";
 import { supabase } from "@/lib/supabaseClient";
 import dynamic from "next/dynamic";
 const HeroRobot = dynamic(() => import("@/components/holo/HeroRobot"), { ssr: false, loading: () => <div className="g-hero g-hero-bot" /> });
@@ -216,6 +217,8 @@ export default function Home() {
           </section>
 
           <DiagnoseShowcase />
+
+          <DailyGift />
 
           <section className="hero" style={img.hero ? { backgroundImage: `linear-gradient(120deg, rgba(8,10,18,.80), rgba(8,10,18,.45)), url(${img.hero})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
             <div className="inner">
