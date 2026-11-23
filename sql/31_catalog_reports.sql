@@ -10,3 +10,5 @@ create table if not exists public.catalog_reports (
 );
 alter table public.catalog_reports enable row level security;
 alter table public.products add column if not exists description_ai boolean not null default false;
+-- grounded descriptions: links the AI read
+alter table public.products add column if not exists description_sources jsonb not null default '[]';

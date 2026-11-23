@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ShieldCheck, AlertTriangle, AlertCircle, Info, Sparkles, RefreshCw, Loader2, Pencil, History } from "lucide-react";
 
 type Issue = { product_id: string; name: string; severity: "high" | "medium" | "low"; code: string; message: string };
-type Fix = { product_id: string; name: string; action: string; detail: string };
+type Fix = { product_id: string; name: string; action: string; detail: string; sources?: { title: string; url: string }[] };
 type Summary = { high: number; medium: number; low: number; ai_descriptions: number; ai_available: boolean; still_missing_descriptions: number };
 type Report = { id: string; created_at: string; trigger: string; checked: number; issues: Issue[]; fixes: Fix[]; summary: Summary };
 type Hist = { id: string; created_at: string; trigger: string; checked: number; summary: Summary };
@@ -52,7 +52,7 @@ export default function CatalogHealthPage() {
         <ShieldCheck className="text-purple-400" />
         <div className="flex-1">
           <h1 className="text-xl font-bold">فحص المنتجات</h1>
-          <p className="text-sm text-[var(--muted)]">فحص تلقائي كل يوم (4:20 صباحاً UTC) — أخطاء البيانات والصور، ويكتب الوصف الناقص بالذكاء الاصطناعي.</p>
+          <p className="text-sm text-[var(--muted)]">فحص تلقائي كل يوم (4:20 صباحاً UTC) — أخطاء البيانات والصور، ويكتب الوصف الناقص من مصادر حقيقية على الإنترنت (مع الروابط).</p>
         </div>
         {history.length > 1 && (
           <label className="flex items-center gap-2 text-sm">
@@ -100,6 +100,12 @@ export default function CatalogHealthPage() {
                     <a href={`/admin/products/${f.product_id}/edit`} className="text-blue-400 flex items-center gap-1 text-xs"><Pencil size={12} /> راجع وعدّل</a>
                   </div>
                   <p className="text-[var(--muted)] whitespace-pre-line leading-7">{f.detail}</p>
+                  {!!f.sources?.length && (
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                      <span className="text-[var(--muted)]">المصادر:</span>
+                      {f.sources.map((s) => <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline underline-offset-2">{s.title}</a>)}
+                    </div>
+                  )}
                 </div>
               ))}
             </section>

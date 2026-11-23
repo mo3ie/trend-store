@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { aiComplete, hasAI } from "@/services/ai";
+import { hasAI } from "@/services/ai";
 
 /**
  * Daily catalog health check («فحص المنتجات»).
@@ -15,9 +15,9 @@ import { aiComplete, hasAI } from "@/services/ai";
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
 export type Issue = { product_id: string; name: string; severity: "high" | "medium" | "low"; code: string; message: string };
-export type Fix = { product_id: string; name: string; action: string; detail: string };
+export type Fix = { product_id: string; name: string; action: string; detail: string; sources?: { title: string; url: string }[] };
 
-const AI_PER_RUN = 12;
+const AI_PER_RUN = 6; // web search takes ~5-15s each; the route has 60s
 const WATERMARK_HOSTS = /citypng|pngtree|freepik|shutterstock|alamy|dreamstime|istockphoto|depositphotos|123rf|pngwing|kindpng|pngegg/i;
 
 type Row = {
@@ -37,24 +37,68 @@ async function imageOk(url: string): Promise<boolean> {
   } catch { return false; }
 }
 
-async function writeDescription(p: Row): Promise<string | null> {
+type Grounded = { text: string; sources: { title: string; url: string }[] } | { error: string };
+
+/**
+ * Description grounded in the web — never written from the model's memory.
+ *
+ * Uses Groq Compound (a model with a built-in web-search tool). The model must
+ * search first and write ONLY facts found in the pages it read. We then verify
+ * on our side that every cited link really came from its search results; a
+ * description with no verified source is rejected and NOT saved.
+ */
+async function writeDescription(p: Row): Promise<Grounded> {
+  const key = (process.env.GROQ_API_KEY || "").trim();
+  if (!key) return { error: "no_search" };
   const variants = (p.variants || []).map((v) => `${v.name}: ${(v.options || []).join("، ")}`).join(" | ");
-  const out = await aiComplete({
-    system: `أنت كاتب وصف منتجات لمحل إلكترونيات ليبي (محل ترند). اكتب وصف عربي احترافي وقصير (3 إلى 6 أسطر).
-قواعد صارمة:
-- اذكر المواصفات فقط إذا كانت معروفة ومؤكدة لهذا الطراز بالضبط (مثل الشاشة، المعالج، الكاميرا، البطارية، القدرة بالواط).
-- إذا لم تكن متأكداً من رقم، لا تكتبه. لا تخترع مواصفات.
-- لا تذكر السعر ولا المخزون ولا الضمان ولا وعود توصيل.
-- بدون مقدمات، بدون عناوين Markdown. أسطر قصيرة يفصلها " · " أو أسطر جديدة.`,
-    user: `المنتج: ${p.name}\nالتصنيف: ${p.category || "-"}${variants ? `\nالخيارات: ${variants}` : ""}\nاكتب الوصف فقط.`,
-    maxTokens: 500,
-    temperature: 0.3,
+  const model = process.env.GROQ_SEARCH_MODEL || "groq/compound-mini";
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+    cache: "no-store",
+    body: JSON.stringify({
+      model,
+      temperature: 0.1,
+      max_tokens: 1200,
+      messages: [
+        { role: "system", content: `You write product descriptions for an electronics shop in Libya. You MUST use web search first.
+Search the official manufacturer page and trusted spec sites (gsmarena.com, apple.com, samsung.com, hihonor.com, mi.com, the brand's own site, Amazon listing).
+Write ONLY facts that appear in the pages you read. Never use memory. If the search does not identify this exact product, return {"found":false}.
+Output JSON only:
+{"found":true,"description_ar":"3-6 short Arabic lines with the key verified specs, separated by newlines, no price/stock/warranty/delivery, no markdown","sources":[{"title":"...","url":"https://..."}]}` },
+        { role: "user", content: `Product name: ${p.name}\nCategory: ${p.category || "-"}${variants ? `\nOptions: ${variants}` : ""}` },
+      ],
+    }),
   });
-  const text = out.replace(/^["'\s]+|["'\s]+$/g, "").replace(/\*\*/g, "").trim();
-  return text.length >= 20 ? text.slice(0, 1200) : null;
+  if (!res.ok) return { error: `search_http_${res.status}` };
+  const data = await res.json() as { choices?: { message?: { content?: string; executed_tools?: { search_results?: { results?: { url?: string; title?: string }[] } }[] } }[] };
+  const msg = data.choices?.[0]?.message;
+  const searched = new Set<string>();
+  for (const t of msg?.executed_tools || []) for (const r of t.search_results?.results || []) if (r.url) searched.add(r.url.replace(/\/$/, ""));
+  if (!searched.size) return { error: "no_search_results" };
+
+  let out: { found?: boolean; description_ar?: string; sources?: { title?: string; url?: string }[] };
+  try {
+    const raw = (msg?.content || "").replace(/^```json\s*|```$/gm, "").trim();
+    out = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
+  } catch { return { error: "bad_json" }; }
+  if (!out.found) return { error: "not_found" };
+
+  const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
+  const searchedHosts = new Set([...searched].map(host));
+  // A cited source counts only if it (or at least its site) was really in the search results.
+  const sources = (out.sources || [])
+    .filter((s) => s.url && /^https?:\/\//.test(s.url) && (searched.has(s.url.replace(/\/$/, "")) || searchedHosts.has(host(s.url))))
+    .slice(0, 5).map((s) => ({ title: String(s.title || host(s.url!)).slice(0, 120), url: s.url! }));
+  if (!sources.length) return { error: "unverified_sources" };
+
+  const text = String(out.description_ar || "").replace(/\*\*/g, "").trim();
+  if (text.length < 20) return { error: "empty" };
+  return { text: text.slice(0, 1200), sources };
 }
 
 export async function runCatalogCheck(trigger: "cron" | "manual") {
+  const started = Date.now();
   const { data, error } = await db.from("products")
     .select("id,name,description,price,category,image_url,images,quantity,stock,variants,description_ai")
     .order("created_at", { ascending: false }).limit(2000);
@@ -98,7 +142,7 @@ export async function runCatalogCheck(trigger: "cron" | "manual") {
     for (const v of p.variants || []) if (!v?.options?.length) add(p, "low", "variants", `مجموعة خيارات «${v?.name || "?"}» بدون خيارات`);
     if (!p.description?.trim()) add(p, "medium", "no_description", "بدون وصف");
     else if (p.description.trim().length < 25) add(p, "low", "short_description", "الوصف قصير جداً");
-    if (p.description_ai) add(p, "low", "ai_description", "الوصف مكتوب بالذكاء الاصطناعي — راجعه مرة وحدة وعدّله لو لزم");
+    if (p.description_ai) add(p, "low", "ai_description", "الوصف مكتوب بالذكاء من مصادر على الإنترنت — راجعه مرة وحدة");
   }
   for (let i = 0; i < httpImages.length; i += 8) {
     const batch = httpImages.slice(i, i + 8);
@@ -108,15 +152,25 @@ export async function runCatalogCheck(trigger: "cron" | "manual") {
 
   // AI: fill missing descriptions
   let aiDone = 0;
+  const NOT_FOUND: Record<string, string> = {
+    not_found: "ما لقيناش المنتج بالضبط في المصادر على الإنترنت — ما كتبناش وصف (اكتبه يدوياً أو صحّح الاسم)",
+    unverified_sources: "الذكاء ما قدرش يثبت مصادر حقيقية — رفضنا الوصف وما حفظناهوش",
+    no_search_results: "البحث على الإنترنت ما رجّعش نتائج — بنحاول مرة ثانية في الفحص الجاي",
+  };
   if (hasAI()) {
     for (const p of rows.filter((r) => !r.description?.trim() && (r.name || "").trim().length >= 3).slice(0, AI_PER_RUN)) {
+      if (Date.now() - started > 42_000) break; // leave time to save the report
       try {
         const d = await writeDescription(p);
-        if (!d) continue;
-        const { error: e } = await db.from("products").update({ description: d, description_ai: true }).eq("id", p.id);
+        if ("error" in d) {
+          if (NOT_FOUND[d.error]) add(p, "low", "ai_no_source", NOT_FOUND[d.error]);
+          else add(p, "low", "ai_error", "تعذّر الوصول لخدمة البحث (" + d.error + ") — بنحاول في الفحص الجاي");
+          continue;
+        }
+        const { error: e } = await db.from("products").update({ description: d.text, description_ai: true, description_sources: d.sources }).eq("id", p.id);
         if (e) continue;
         aiDone++;
-        fixes.push({ product_id: p.id, name: p.name || "", action: "ai_description", detail: d });
+        fixes.push({ product_id: p.id, name: p.name || "", action: "ai_description", detail: d.text, sources: d.sources });
         const k = issues.findIndex((x) => x.product_id === p.id && x.code === "no_description");
         if (k >= 0) issues.splice(k, 1);
       } catch { /* provider busy: try again next run */ }
