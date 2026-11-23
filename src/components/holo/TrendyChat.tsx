@@ -16,7 +16,9 @@ const CHIPS = [
 
 const KEY = "trendy_chat_v1";
 
-export default function TrendyChat({ open, onClose, onTalk }: { open: boolean; onClose: () => void; onTalk?: (on: boolean) => void }) {
+export type ChatState = "thinking" | "speaking" | "idle";
+
+export default function TrendyChat({ open, onClose, onState }: { open: boolean; onClose: () => void; onState?: (s: ChatState) => void }) {
   const [msgs, setMsgs] = useState<M[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,7 +41,7 @@ export default function TrendyChat({ open, onClose, onTalk }: { open: boolean; o
     setMsgs(next);
     setText("");
     setBusy(true);
-    onTalk?.(true);
+    onState?.("thinking");
     try {
       const r = await fetch("/api/ai/assistant", {
         method: "POST",
@@ -52,7 +54,8 @@ export default function TrendyChat({ open, onClose, onTalk }: { open: boolean; o
       setMsgs([...next, { role: "assistant", content: "ما قدرتش نوصل للسيرفر، جرّب مرة ثانية." }]);
     } finally {
       setBusy(false);
-      setTimeout(() => onTalk?.(false), 1800);
+      onState?.("speaking");
+      setTimeout(() => onState?.("idle"), 2200);
     }
   };
 
