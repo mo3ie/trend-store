@@ -133,14 +133,14 @@ async function logoTexture(THREE: typeof THREE_NS) {
     const img = new Image();
     img.src = "/brand/trend-logo.png";
     await img.decode();
-    const h = 120, w = (img.width / img.height) * h;
-    g.drawImage(img, 128 - w / 2, 40, w, h);
+    const h = 158, w = (img.width / img.height) * h;
+    g.drawImage(img, 128 - w / 2, 14, w, h);
   } catch { /* wordmark alone */ }
   g.fillStyle = "#1a222b";
-  g.font = "700 30px 'Segoe UI', Arial, sans-serif";
+  g.font = "800 40px 'Segoe UI', Arial, sans-serif";
   g.textAlign = "center";
   (g as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = "8px";
-  g.fillText("TREND", 132, 205);
+  g.fillText("TREND", 134, 222);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -258,7 +258,7 @@ export async function buildRobotAsync(THREE: typeof THREE_NS, canvas: HTMLCanvas
   }
   // Chest logo plate
   const logoMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.25, clearcoat: 1, map: await logoTexture(THREE) });
-  add(torso, new THREE.CylinderGeometry(0.4, 0.4, 0.3, 32, 1, true, -0.38, 0.76), logoMat, 0, 0.08, 0, 1.0, 1, 0.83);
+  add(torso, new THREE.CylinderGeometry(0.405, 0.405, 0.44, 40, 1, true, -0.52, 1.04), logoMat, 0, 0.06, 0, 1.0, 1, 0.83);
   // Underside glow
   add(torso, new THREE.SphereGeometry(0.05, 16, 12), glowMat, 0, -0.56, 0);
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
+import { safeName } from "@/lib/safeName";
 
 // Image upload for ad creatives (e.g. the Page-likes ad image) — available to any
 // signed-in customer. Files land in the public `products` bucket under a per-user
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
     if (file.size > MAX_BYTES) return NextResponse.json({ error: "حجم الملف يتجاوز 8 ميجابايت" }, { status: 400 });
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const fileName = `ads/${user.id}/${Date.now()}-${file.name.replace(/\s/g, "_")}`;
+    const fileName = `ads/${user.id}/${Date.now()}-${safeName(file.name)}`;
 
     const { error } = await supabaseAdmin.storage
       .from("products").upload(fileName, buffer, { contentType: file.type, upsert: false });

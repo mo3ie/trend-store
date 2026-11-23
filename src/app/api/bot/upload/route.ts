@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
+import { safeName } from "@/lib/safeName";
 
 // Attachment upload for bot replies — available to any signed-in customer (unlike
 // /api/upload which is admin-only). Files land in the public `products` bucket under
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
     if (file.size > MAX_BYTES) return NextResponse.json({ error: "حجم الملف يتجاوز 10 ميجابايت" }, { status: 400 });
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const fileName = `bot/${user.id}/${Date.now()}-${file.name.replace(/\s/g, "_")}`;
+    const fileName = `bot/${user.id}/${Date.now()}-${safeName(file.name)}`;
 
     const { error } = await supabaseAdmin.storage
       .from("products").upload(fileName, buffer, { contentType: file.type, upsert: false });
