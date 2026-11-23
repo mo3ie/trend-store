@@ -44,7 +44,7 @@ export async function readScreenshots(images: string[]): Promise<VisionFacts | {
       headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
       body: JSON.stringify({ model, temperature: 0, max_tokens: 900, messages: [{ role: "user", content }] }),
     });
-    if (!r.ok) { lastStatus = r.status; lastErr = `${model}: ${(await r.text().catch(() => "")).slice(0, 160)}`; if ([400, 403, 404].includes(r.status)) continue; break; }
+    if (!r.ok) { lastStatus = r.status; lastErr += ` | ${model}: ${(await r.text().catch(() => "")).slice(0, 220)}`; if ([400, 403, 404].includes(r.status)) continue; break; }
     const d = await r.json().catch(() => ({}));
     const raw = String(d.choices?.[0]?.message?.content || "");
     let j: Partial<VisionFacts> & Record<string, unknown>;
