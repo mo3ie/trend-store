@@ -1271,3 +1271,5 @@ html[data-ui="glass"] .holo-mini .holo-stage::after { content: "Trend AI"; posit
 @media (min-width: 901px) { html[data-ui="glass"] .holo-mini { width: 190px; height: 170px; left: 10px; bottom: 70px; } }
 .holo-canvas.on{opacity:1}
 @media (min-width: 901px) { html[data-ui="glass"] .holo-mini { width: 150px; height: 170px; left: 8px; bottom: 96px; } }
+@media (max-width: 900px) { html[data-ui="glass"] .home2 .shell { grid-template-columns: 1fr; } }
+@media (min-width: 901px) and (max-width: 1100px) { html[data-ui="glass"] .home2 .shell { grid-template-columns: 190px 1fr; } }
