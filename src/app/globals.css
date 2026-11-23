@@ -1186,3 +1186,6 @@ html[data-ui="glass"] .theme-fab { display: none !important; }
 .fp-cut img, .fp-photo img, .fp-cut .fp-glare, .fp-photo .fp-glare { transform: none; }
 .fp-cut img { filter: drop-shadow(0 16px 18px rgba(6,16,26,.36)) drop-shadow(0 34px 34px rgba(6,16,26,.24)); }
 .fp-photo .fp-glare { display: none; }
+
+/* PREVIEW: robot card without its solid backdrop (badge, tiles and offer box unchanged) */
+.home2 .g-hero.g-hero-bot { background: transparent; box-shadow: none; border: none; overflow: visible; }
