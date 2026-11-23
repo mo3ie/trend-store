@@ -23,9 +23,8 @@ export function isGlassPath(pathname: string): boolean {
 // preference so the first frame is already right (no flash).
 export const preloadScript = `(function(){try{
 var d=document.documentElement,p=location.pathname,x=${JSON.stringify(GLASS_EXCLUDED_PREFIXES)};
-var th=localStorage.getItem('theme');
+if(localStorage.getItem('theme')==='light'){d.classList.add('light');}
 var g=!x.some(function(e){return p===e||p.indexOf(e.charAt(e.length-1)==='/'?e:e+'/')===0||p.indexOf(e+'-')===0;});
 if(g){d.setAttribute('data-ui','glass');}
-if(th==='light'||(g&&th!=='dark')){d.classList.add('light');}
 if(localStorage.getItem('ui-motion')==='auto'){d.classList.add('mo-auto');}
 }catch(e){}})();`;

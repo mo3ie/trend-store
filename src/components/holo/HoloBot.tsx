@@ -9,7 +9,7 @@ import TrendyChat, { type ChatState } from "./TrendyChat";
  * TREND AI as a small floating companion on the store's inner pages.
  * The homepage has the full robot inside its hero card instead.
  */
-const HIDE_ON = [/^\/admin/, /^\/diagnose/, /^\/login/, /^\/register/, /^\/moamalat-pay/, /^\/r\//, /^\/studio/, /^\/tiktok/, /^\/facebook/, /^\/ads/, /^\/bot/, /^\/subscriptions/];
+const HIDE_ON = [/^\/$/, /^\/admin/, /^\/diagnose/, /^\/login/, /^\/register/, /^\/moamalat-pay/, /^\/r\//, /^\/studio/, /^\/tiktok/, /^\/facebook/, /^\/ads/, /^\/bot/, /^\/subscriptions/];
 
 export default function HoloBot() {
   const pathname = usePathname() || "/";
