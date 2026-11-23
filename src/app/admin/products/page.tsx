@@ -46,8 +46,11 @@ export default function AdminProducts() {
   async function handleDelete(id: string) {
     if (!confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
     setDeleting(id);
-    await supabase.from("products").delete().eq("id", id);
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+    // Through the admin API (service role). The browser client is blocked by RLS,
+    // which made the delete fail silently and the product reappear on refresh.
+    const r = await fetch(`/api/products/${id}`, { method: "DELETE" });
+    if (r.ok) setProducts((prev) => prev.filter((p) => p.id !== id));
+    else alert((await r.json().catch(() => ({}))).error || "تعذّر حذف المنتج");
     setDeleting(null);
   }
 
