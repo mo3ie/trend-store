@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getUser } from "@/lib/apiAuth";
 import { analyzeDeep } from "@/lib/deepReport";
 import { rateLimited } from "@/lib/catalog";
+import { readScreenshots, visionUseful, type VisionFacts } from "@/lib/visionExtract";
 
 /**
  * Deep scan from the customer's own iPhone: the browser has already parsed the
@@ -38,23 +39,45 @@ export async function POST(req: Request) {
     const { data: q } = await db.from("device_reports").select("results,created_at,user_id,device").eq("id", body.quickReportId).maybeSingle();
     if (q && (!q.user_id || q.user_id === user.id) && Date.now() - new Date(q.created_at).getTime() < 864e5) quick = { results: (q.results as { results?: unknown })?.results || q.results, device: q.device };
   }
-  if (!useful && !quick) return NextResponse.json({ error: "الملفات ما فيهاش بيانات كافية — جرّب ملف «Analytics» أحدث أو فعّل مشاركة التحليلات وارجع بعد يومين. ما خصمنا شي من كودك.", code: "NO_DATA" }, { status: 422 });
+  // Optional Settings screenshots (Battery Health, About, Parts & Service History) read by AI vision.
+  let vision: VisionFacts | null = null;
+  const imgs = (Array.isArray(body.images) ? body.images : []).filter((u: unknown) => typeof u === "string" && /^data:image\/(jpeg|png|webp);base64,/.test(u) && u.length < 2_500_000).slice(0, 5);
+  if (imgs.length) {
+    const r = await readScreenshots(imgs);
+    if ("error" in r) return NextResponse.json({ error: "تعذّرت قراءة الصور الآن — جرّب مرة ثانية. ما خصمنا شي من كودك.", code: r.error }, { status: 502 });
+    if (visionUseful(r)) vision = r;
+    else if (!useful && !quick) return NextResponse.json({ error: "الصور ما فيهاش شاشة صحة البطارية أو سجل القطع — صوّر الشاشات المطلوبة بالترتيب. ما خصمنا شي من كودك.", code: "NO_DATA" }, { status: 422 });
+  }
+  if (!useful && !quick && !vision) return NextResponse.json({ error: "ما فيش بيانات كافية — ارفع صور الإعدادات أو ملفات التحليلات. ما خصمنا شي من كودك.", code: "NO_DATA" }, { status: 422 });
 
   const { data: v } = await db.from("deep_scan_vouchers").select("id,code").eq("user_id", user.id).eq("status", "paid").order("created_at").limit(1).maybeSingle();
   if (!v) return NextResponse.json({ error: "ما عندكش كود فحص مدفوع", code: "NO_VOUCHER" }, { status: 402 });
 
-  const scan = {
-    device: { model: analytics.device.model, ios: analytics.device.ios },
-    battery: analytics.battery, storage: {},
-    panics: analytics.panics, appCrashes: analytics.appCrashes, jetsam: analytics.jetsam,
-    warnings: [], scannedAt: new Date().toISOString(), period: analytics.period, files: analytics.files,
+  // Battery from Apple's own Settings screen wins over log-derived values.
+  const battery = {
+    ...analytics.battery,
+    ...(vision?.battery.healthPct !== undefined ? { healthPct: vision.battery.healthPct } : {}),
+    ...(vision?.battery.cycles !== undefined ? { cycles: vision.battery.cycles } : {}),
+    ...(vision?.battery.serviceWarning ? { serviceWarning: true } : {}),
+    ...(vision?.battery.peakPerformanceOk !== undefined ? { peakPerformanceOk: vision.battery.peakPerformanceOk } : {}),
   };
-  const report = await analyzeDeep({ analytics: scan, browser_hardware_test: quick, answers: body.answers || null }, "analytics");
+  const model = vision?.device.model || analytics.device.model || (quick?.device as { model?: string })?.model;
+  const os = vision?.device.os || (analytics.device.ios ? `iOS ${analytics.device.ios}` : undefined);
+  const scan = {
+    device: { model, ios: analytics.device.ios || vision?.device.os, storage: vision?.device.storage },
+    battery, storage: {}, parts: vision?.parts || [],
+    panics: analytics.panics, appCrashes: analytics.appCrashes, jetsam: analytics.jetsam,
+    warnings: vision?.warnings || [], scannedAt: new Date().toISOString(), period: analytics.period, files: analytics.files,
+    screens: vision?.screensRead || 0,
+  };
+  const source = vision && !useful ? "screenshots" : "analytics";
+  const report = await analyzeDeep({ scan, browser_hardware_test: quick, parts_and_service_history: vision?.parts || null }, "analytics");
+  report.source = source;
 
   const { data, error } = await db.from("device_reports").insert({
     user_id: user.id,
-    device: { platform: "ios", os: "iOS", osVersion: analytics.device.ios, model: analytics.device.model || (quick?.device as { model?: string })?.model, deep: true, source: "analytics" },
-    results: { deep: scan, quick, source: "analytics" },
+    device: { platform: vision?.platform || "ios", os: os || "iOS", osVersion: analytics.device.ios, model, deep: true, source },
+    results: { deep: scan, quick, source },
     score: report.score, ai_report: JSON.stringify(report),
   }).select("id").single();
   if (error || !data) return NextResponse.json({ error: "تعذّر حفظ الشهادة" }, { status: 500 });

@@ -10,6 +10,8 @@ import {
 import WalletModal from "@/components/WalletModal";
 import DiagnoseShowcase from "@/components/DiagnoseShowcase";
 import DailyGift from "@/components/DailyGift";
+import PromoBanner from "@/components/PromoBanner";
+import SearchBox from "@/components/SearchBox";
 import { supabase } from "@/lib/supabaseClient";
 import dynamic from "next/dynamic";
 const HeroRobot = dynamic(() => import("@/components/holo/HeroRobot"), { ssr: false, loading: () => <div className="g-hero g-hero-bot" /> });
@@ -147,10 +149,8 @@ export default function Home() {
             <span className="wm en">TREND ELECTRONICS</span>
           </span>
         </div>
-        <div className="hide-sm" style={{ position: "relative", flex: "0 1 280px" }}>
-          <Search size={16} style={{ position: "absolute", insetInlineStart: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted)" }} />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("ابحث عن منتج…", "Search products…")}
-            style={{ width: "100%", padding: "10px 36px", borderRadius: 13, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--text)", fontFamily: "inherit", fontSize: 13 }} />
+        <div className="hide-sm" style={{ position: "relative", flex: "0 1 340px" }}>
+          <SearchBox placeholder={t("ابحث عن منتج أو خدمة…", "Search products or services…")} />
         </div>
         {isStaff && <a className="adminbtn" href="/admin" title={t("لوحة الإدارة", "Admin")}><LayoutDashboard size={18} /><span>{t("الإدارة", "Admin")}</span></a>}
         <button className="iconbtn langbtn" onClick={toggleLang}>{lang === "ar" ? "EN" : "ع"}</button>
@@ -159,6 +159,8 @@ export default function Home() {
         <a className="iconbtn cartdot" href="/cart" aria-label="cart" data-cart-icon><ShoppingCart size={20} />{count > 0 && <i>{count > 9 ? "9+" : count}</i>}</a>
         <a className="iconbtn hide-sm" href={user ? "/account" : "/login"} aria-label="account"><svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg></a>
       </header>
+
+      <div className="sbx-mob"><SearchBox placeholder={t("ابحث عن منتج أو خدمة…", "Search products or services…")} /></div>
 
       <div className="shell">
         {menuOpen && <div className="drawer-overlay" onClick={() => setMenuOpen(false)} />}
@@ -224,13 +226,7 @@ export default function Home() {
 
           <DailyGift />
 
-          <section className="hero" style={img.hero ? { backgroundImage: `linear-gradient(120deg, rgba(8,10,18,.80), rgba(8,10,18,.45)), url(${img.hero})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
-            <div className="inner">
-              <h1>{t("كل ما تحتاجه من عالم التقنية", "Everything you need from the world of tech")}</h1>
-              <p>{t("هواتف، لابتوبات، أجهزة وإكسسوارات أصلية — توصيل لكل ليبيا.", "Phones, laptops, devices & genuine accessories — delivery across Libya.")}</p>
-              <a className="btn" href="/products">{t("تسوّق الآن", "Shop now")}</a>
-            </div>
-          </section>
+          <PromoBanner products={products} />
 
           <section>
             <div className="section-h"><h2>{t("الأقسام", "Categories")}</h2></div>
@@ -242,29 +238,14 @@ export default function Home() {
           </section>
 
           <section>
-            <div className="section-h"><h2>{t("عروض وخدمات", "Offers & Services")}</h2></div>
-            <div className="grid2" style={{ marginTop: 13 }}>
-              <a className="card wide" href="/products">
-                <div className="thumb">{img.offer ? <img src={img.offer} alt="" /> : <Laptop />}</div>
-                <div className="body"><span className="badge">{t("عرض الأسبوع", "Weekly deal")}</span><h3>{t("لابتوبات بخصم يصل 25%", "Laptops up to 25% off")}</h3><span className="btn sm">{t("تسوّق الآن", "Shop now")}</span></div>
-              </a>
-              <a className="card wide shein" href="https://order.trendstore-ly.com">
-                <div className="thumb">{img.shein ? <img src={img.shein} alt="" /> : <ShoppingCart />}</div>
-                <div className="body"><span className="badge">{t("حصري", "Exclusive")}</span><h3>{t("اطلب من شي إن إلى ليبيا", "Order Shein to Libya")}</h3><span className="btn sm">{t("ابدأ طلبك", "Start order")}</span></div>
-              </a>
-            </div>
-          </section>
-
-          <section>
             <div className="section-h"><h2>{t("خدماتنا", "Our services")}</h2></div>
-            <div className="grid4" style={{ marginTop: 13 }}>
-              {services.map((s) => { const I = s.icon; return (
-                <div key={s.en} className="card">
-                  <div className="thumb tall"><I /></div>
-                  <div className="body"><h3>{t(s.ar, s.en)}</h3><p>{t(s.dAr, s.dEn)}</p>
-                    <button className="btn sm" onClick={() => (s.onClick ? s.onClick() : go(s.href))}>{s.cta}</button>
-                  </div>
-                </div>
+            <div className="sv-bento">
+              {services.map((s, k) => { const I = s.icon; return (
+                <button key={s.en} className={`sv ${k === 0 ? "big" : ""}`} onClick={() => (s.onClick ? s.onClick() : go(s.href))}>
+                  <span className="sv-ic"><I size={k === 0 ? 26 : 20} /></span>
+                  <span className="sv-t"><b>{t(s.ar, s.en)}</b><small>{t(s.dAr, s.dEn)}</small></span>
+                  <span className="sv-go">{s.cta} <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg></span>
+                </button>
               ); })}
             </div>
           </section>
@@ -275,38 +256,33 @@ export default function Home() {
             ); })}
           </section>
 
-          <section className="maint">
-            <div className="head"><span className="ic"><Wrench size={23} /></span><h2>{t("منظومة الصيانة المتكاملة", "Integrated maintenance system")}</h2></div>
-            <p className="sub">{t("اطلب صيانة جهازك وتابع حالته لحظة بلحظة — وبوابة مستقلة للفنيين.", "Request a repair and track it live — with a dedicated technician portal.")}</p>
-            <div className="two">
-              <div className="mcard"><h3>{t("للزبون", "For customers")}</h3>
-                <ul className="feat">
-                  <li><Check size={16} /><span>{t("طلب بالصور ووصف العطل", "Request with photos & fault")}</span></li>
-                  <li><Check size={16} /><span>{t("عرض سعر قبل البدء وتتبّع الحالة", "Quote first, live status")}</span></li>
-                  <li><Check size={16} /><span>{t("ضمان على الإصلاح", "Repair warranty")}</span></li>
-                </ul>
-                <button className="btn sm" onClick={() => setModal("maint")}>{t("اطلب صيانة الآن", "Request a repair")}</button>
-              </div>
-              <div className="mcard"><h3>{t("لفني الصيانة", "For technicians")}</h3>
-                <ul className="feat">
-                  <li><Check size={16} /><span>{t("بوابة استلام وقبول الطلبات", "Receive & accept jobs")}</span></li>
-                  <li><Check size={16} /><span>{t("تحديث الحالة وإرسال السعر", "Update status & quote")}</span></li>
-                  <li><Check size={16} /><span>{t("لوحة الأرباح والسجل", "Earnings & history")}</span></li>
-                </ul>
-                <button className="btn sm ghost" onClick={() => setModal("soon")}>{t("دخول الفنيين", "Technician login")}</button>
-              </div>
+          <section className="mt2">
+            <div className="mt2-head">
+              <span className="mt2-ic"><Wrench size={22} /></span>
+              <div><h2>{t("منظومة الصيانة المتكاملة", "Integrated maintenance system")}</h2><p>{t("اطلب صيانة جهازك وتابع حالته لحظة بلحظة — وبوابة مستقلة للفنيين.", "Request a repair and track it live — with a dedicated technician portal.")}</p></div>
+            </div>
+            <div className="mt2-flow">
+              {[t("اطلب بالصور ووصف العطل", "Request with photos"), t("عرض سعر قبل البدء", "Quote first"), t("تتبّع الحالة مباشرة", "Live status"), t("استلم بضمان", "Pick up with warranty")].map((x, k) => (
+                <div key={k} className="mt2-step"><i>{k + 1}</i><span>{x}</span></div>
+              ))}
+            </div>
+            <div className="mt2-cta">
+              <button className="btn" onClick={() => setModal("maint")}>{t("اطلب صيانة الآن", "Request a repair")}</button>
+              <button className="btn ghost" onClick={() => setModal("soon")}>{t("دخول الفنيين", "Technician login")}</button>
             </div>
           </section>
 
           <section>
             <div className="section-h"><h2>{query ? t("نتائج البحث", "Search results") : t("أحدث المنتجات", "Latest products")}</h2><a href="/products">{t("عرض الكل", "View all")}</a></div>
-            <div className="grid4" style={{ marginTop: 13 }}>
+            <div className="lp-grid">
               {shown.length === 0 && <p style={{ color: "var(--muted)", gridColumn: "1/-1", padding: "20px 0" }}>{t("لا توجد منتجات.", "No products.")}</p>}
-              {shown.map((p) => (
-                <div key={p.id} className="card">
-                  <a className="thumb tall" href={`/products/${p.id}`}>{p.image_url ? <img src={p.image_url} alt={p.name} /> : <Package />}</a>
-                  <div className="body"><h3 style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</h3><span className="price">{p.price} {t("د.ل", "LYD")}</span>
-                    <button className="btn sm" onClick={() => addToCart(p)}>{t("أضف للسلة", "Add to cart")}</button>
+              {shown.map((p, k) => (
+                <div key={p.id} className="lp" style={{ animationDelay: `${k * 0.06}s` }}>
+                  <a className="lp-img" href={`/products/${p.id}`}>{p.image_url ? <img src={p.image_url} alt={p.name} loading="lazy" /> : <Package />}</a>
+                  <a className="lp-name" href={`/products/${p.id}`}>{p.name}</a>
+                  <div className="lp-row">
+                    <b>{p.price} <small>{t("د.ل", "LYD")}</small></b>
+                    <button className="lp-add" onClick={() => addToCart(p)} aria-label={t("أضف للسلة", "Add to cart")}><ShoppingCart size={16} /></button>
                   </div>
                 </div>
               ))}

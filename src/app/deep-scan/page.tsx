@@ -1,12 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Microscope, ShieldCheck, Loader2, CheckCircle2, Smartphone, FileUp, Settings, ChevronLeft, BatteryCharging, Bug, AppWindow, MemoryStick, Store, Copy, Check, FileCheck2, Lock } from "lucide-react";
+import { Camera, ArrowRight, Microscope, ShieldCheck, Loader2, CheckCircle2, Smartphone, FileUp, Settings, ChevronLeft, BatteryCharging, Bug, AppWindow, MemoryStick, Store, Copy, Check, FileCheck2, Lock } from "lucide-react";
 import WalletModal from "@/components/WalletModal";
 import { summarize, hasUsefulData, type AnalyticsSummary } from "@/lib/iosAnalytics";
 
 type Data = { price: number; signedIn: boolean; vouchers: { code: string; status: string; created_at: string; report_id: string | null }[]; reports: { id: string; score: number; created_at: string; device: { model?: string; source?: string } }[] };
 
+const SHOTS_IOS = [
+  { t: "الإعدادات ← البطارية ← صحة البطارية والشحن", d: "صوّر الشاشة اللي فيها «السعة القصوى» %" },
+  { t: "الإعدادات ← عام ← حول", d: "صوّر أعلى الصفحة (الموديل والسعة) — وانزل وصوّر قسم «البطارية» (عدد الدورات) لو موجود" },
+  { t: "داخل «حول»: سجل القطع والصيانة", d: "Parts and Service History — يوضح كل قطعة أصلية أو «غير معروفة» (iOS 17.4 وأحدث)" },
+];
+const SHOTS_ANDROID = [
+  { t: "الإعدادات ← حول الهاتف", d: "صوّر الموديل ونسخة أندرويد" },
+  { t: "الإعدادات ← البطارية ← معلومات البطارية", d: "سامسونج: «العناية بالجهاز ← البطارية» أو تطبيق Samsung Members ← التشخيص · بكسل: «صحة البطارية»" },
+  { t: "سامسونج (اختياري): اطلب #0228#*", d: "يعرض حالة البطارية (Battery status) — صوّرها" },
+];
 const STEPS_IOS = [
   { t: "افتح «الإعدادات»", d: "تطبيق الإعدادات الرمادي ⚙️" },
   { t: "الخصوصية والأمان", d: "انزل تحت شوية — Privacy & Security" },
@@ -24,6 +34,9 @@ export default function DeepScanPage() {
   const [topup, setTopup] = useState(false);
   const [quick, setQuick] = useState<string | null>(null);
   const [sum, setSum] = useState<AnalyticsSummary | null>(null);
+  const [shots, setShots] = useState<string[]>([]);
+  const [platform, setPlatform] = useState<"ios" | "android">("ios");
+  const shotRef = useRef<HTMLInputElement>(null);
   const [parsing, setParsing] = useState(false);
   const [done, setDone] = useState<{ id: string; score: number } | null>(null);
   const [copied, setCopied] = useState("");
@@ -63,7 +76,7 @@ export default function DeepScanPage() {
   };
   const submit = async () => {
     setBusy(true); setErr("");
-    const r = await fetch("/api/deep-scan/analyze", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ analytics: sum, quickReportId: quick }) });
+    const r = await fetch("/api/deep-scan/analyze", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ analytics: sum, images: shots, quickReportId: quick }) });
     const j = await r.json();
     setBusy(false);
     if (!r.ok) { setErr(j.error); return; }
@@ -71,7 +84,20 @@ export default function DeepScanPage() {
     setDone({ id: j.id, score: j.score }); load();
   };
 
-  const step = !paid && !done ? 1 : done ? 4 : sum && hasUsefulData(sum) ? 3 : 2;
+  const step = !paid && !done ? 1 : done ? 4 : (sum && hasUsefulData(sum)) || shots.length ? 3 : 2;
+
+  // Screenshots are downscaled in the browser (≤1280px JPEG) before upload.
+  const addShots = async (files: FileList | null) => {
+    const out: string[] = [];
+    for (const f of Array.from(files || []).slice(0, 5 - shots.length)) {
+      const bmp = await createImageBitmap(f);
+      const k = Math.min(1, 1280 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement("canvas"); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+      c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+      out.push(c.toDataURL("image/jpeg", 0.82));
+    }
+    setShots((p) => [...p, ...out].slice(0, 5)); setErr("");
+  };
 
   return (
     <div dir="rtl" className="min-h-screen flex flex-col">
@@ -108,7 +134,17 @@ export default function DeepScanPage() {
             </section>
 
             <section className="gp-panel p-5 space-y-3">
-              <h3 className="font-bold flex items-center gap-2"><Settings size={18} /> ملفات النظام من الآيفون</h3>
+              <h3 className="font-bold flex items-center gap-2"><Camera size={18} /> صوّر شاشات الإعدادات <small className="font-normal text-green-400">(الأسهل — دقيقة)</small></h3>
+              <div className="flex gap-2">{(["ios", "android"] as const).map((p) => <button key={p} className={`gp-pill ${platform === p ? "on" : ""}`} onClick={() => setPlatform(p)}>{p === "ios" ? "آيفون" : "أندرويد"}</button>)}</div>
+              <ol className="dsx-guide">{(platform === "ios" ? SHOTS_IOS : SHOTS_ANDROID).map((s, i) => <li key={i}><b>{i + 1}</b><div><span>{s.t}</span><small>{s.d}</small></div></li>)}</ol>
+              {!!shots.length && <div className="dsx-shots">{shots.map((u, i) => <div key={i}><img src={u} alt="" /><button onClick={() => setShots(shots.filter((_, j) => j !== i))}>×</button></div>)}</div>}
+              <button onClick={() => shotRef.current?.click()} className="gp-btn gp-btn-main w-full"><Camera size={18} /> {shots.length ? "أضف صور أخرى" : "اختار الصور"}</button>
+              <input ref={shotRef} type="file" accept="image/*" multiple hidden onChange={(e) => addShots(e.target.files)} />
+              <p className="text-xs text-[var(--muted)] text-center">الذكاء الاصطناعي يقرا الأرقام من الصور — صحة البطارية، الدورات، والقطع الأصلية أو المبدّلة.</p>
+            </section>
+
+            <section className="gp-panel p-5 space-y-3">
+              <h3 className="font-bold flex items-center gap-2"><Settings size={18} /> ملفات النظام <small className="font-normal text-[var(--muted)]">(متقدم — للآيفون: أعطال النظام والتطبيقات)</small></h3>
               <ol className="dsx-guide">{STEPS_IOS.map((s, i) => <li key={i}><b>{i + 1}</b><div><span>{s.t}</span><small>{s.d}</small></div></li>)}</ol>
               <button onClick={() => fileRef.current?.click()} disabled={parsing} className="gp-btn gp-btn-main w-full">{parsing ? <Loader2 className="animate-spin" size={18} /> : <FileUp size={18} />} اختار الملفات</button>
               <input ref={fileRef} type="file" multiple hidden onChange={(e) => pick(e.target.files)} />
@@ -118,15 +154,15 @@ export default function DeepScanPage() {
         )}
 
         {/* 3 — preview + submit */}
-        {step === 3 && sum && (
+        {step === 3 && (
           <section className="gp-panel p-5 space-y-3">
-            <h3 className="font-bold">اللي لقيناه في {sum.files} ملف</h3>
-            <div className="dsx-grid">
+            <h3 className="font-bold">{shots.length ? `${shots.length} صورة` : ""}{shots.length && sum ? " + " : ""}{sum ? `${sum.files} ملف` : ""} — جاهز للتحليل</h3>
+            {sum && <div className="dsx-grid">
               <div><BatteryCharging size={18} /><small>صحة البطارية</small><b>{sum.battery.healthPct != null ? `${sum.battery.healthPct}%` : "—"}</b><small>{sum.battery.cycles != null ? `${sum.battery.cycles} دورة` : ""}</small></div>
               <div><Bug size={18} /><small>أعطال النظام</small><b>{sum.panics.total}</b><small>آخر 30 يوم: {sum.panics.last30d}</small></div>
               <div><AppWindow size={18} /><small>أعطال التطبيقات</small><b>{sum.appCrashes.total}</b><small>{sum.appCrashes.top[0]?.app || ""}</small></div>
               <div><MemoryStick size={18} /><small>ضغط الذاكرة</small><b>{sum.jetsam}</b><small>{sum.device.model || ""} {sum.device.ios ? `· iOS ${sum.device.ios}` : ""}</small></div>
-            </div>
+            </div>}
             <div className="flex gap-2">
               <button onClick={submit} disabled={busy} className="gp-btn gp-btn-main flex-1">{busy ? <Loader2 className="animate-spin" size={18} /> : <FileCheck2 size={18} />} حلّل وأصدر الشهادة</button>
               <button onClick={() => fileRef.current?.click()} className="gp-btn gp-btn-ghost">ملفات أخرى</button>
