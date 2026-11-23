@@ -48,7 +48,7 @@ async function cutout(src: string): Promise<string | null> {
   const near = border.filter((p) => dist(p * 4) < 28).length / border.length;
   if (near < 0.82) { cache.set(src, null); return null; } // real scene → don't cut
 
-  const TOL = 34;
+  const TOL = 44;
   const bg = new Uint8Array(w * h);
   const stack: number[] = [];
   for (const p of border) if (dist(p * 4) < TOL) { bg[p] = 1; stack.push(p); }
@@ -60,6 +60,7 @@ async function cutout(src: string): Promise<string | null> {
     if (y > 0 && !bg[p - w] && dist((p - w) * 4) < TOL) { bg[p - w] = 1; stack.push(p - w); }
     if (y < h - 1 && !bg[p + w] && dist((p + w) * 4) < TOL) { bg[p + w] = 1; stack.push(p + w); }
   }
+  for (let p = 0; p < w * h; p++) if (!bg[p] && dist(p * 4) < 16) bg[p] = 1;
   let minX = w, minY = h, maxX = 0, maxY = 0, kept = 0;
   for (let p = 0; p < w * h; p++) {
     if (bg[p]) { d[p * 4 + 3] = 0; continue; }
