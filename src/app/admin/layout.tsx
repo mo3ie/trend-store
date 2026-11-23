@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Package, ShoppingBag, Users, Settings, LogOut, ChevronRight, Menu, X, Megaphone, Building2, Image as ImageIcon, Wrench, Bot, CreditCard } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, Users, Settings, LogOut, ChevronRight, Menu, X, Megaphone, Building2, Image as ImageIcon, Wrench, Bot, CreditCard, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabaseClient";
 const allNavItems = [
   { label: "الرئيسية",    icon: LayoutDashboard, href: "/admin",           adminOnly: false },
   { label: "المنتجات",    icon: Package,          href: "/admin/products",  adminOnly: false },
+  { label: "فحص المنتجات", icon: ShieldCheck,     href: "/admin/catalog",   adminOnly: false },
   { label: "الطلبات",     icon: ShoppingBag,      href: "/admin/orders",    adminOnly: false },
   { label: "الصيانة",     icon: Wrench,            href: "/admin/maintenance", adminOnly: false },
   { label: "الإعلانات",   icon: Megaphone,        href: "/admin/ads",       adminOnly: false },

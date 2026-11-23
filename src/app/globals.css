@@ -1201,3 +1201,6 @@ html.mo-auto .fp-float, html.mo-auto .fp-shadow { animation: none !important; }
 @media (prefers-reduced-motion: no-preference) { html.mo-auto .fp-float { animation: fpFloat 4.8s ease-in-out infinite !important; } html.mo-auto .fp-shadow { animation: fpShadow 4.8s ease-in-out infinite !important; } }
 /* Robot companion sits beside the sound button, not on top of it */
 .holo-mini { left: 70px !important; }
+/* Calmer float (user: the previous one was too strong) */
+@keyframes fpFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3%); } }
+@keyframes fpShadow { 0%, 100% { transform: scale(1); opacity: .9; } 50% { transform: scale(.88); opacity: .7; } }

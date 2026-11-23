@@ -56,6 +56,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Params }) {
         image_url: image_url || null,
         images: images || [],
         variants: variants || [],
+        // Saved by a person → no longer an unreviewed AI description.
+        description_ai: false,
       })
       .eq("id", id);
 
