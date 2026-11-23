@@ -69,7 +69,10 @@ export async function readScreenshots(images: string[]): Promise<VisionFacts | {
       screensRead: Math.min(images.length, 5),
     };
   }
-  return { error: `vision_http_${lastStatus} ${lastErr}` };
+  // Diagnostics: which models does this account actually have?
+  const ms = await fetch("https://api.groq.com/openai/v1/models", { headers: { authorization: `Bearer ${key}` } }).then((r) => r.json()).catch(() => ({}));
+  const ids = ((ms as { data?: { id: string }[] }).data || []).map((m) => m.id).join(",");
+  return { error: `vision_http_${lastStatus} models=[${ids}]` };
 }
 
 export const visionUseful = (v: VisionFacts) => v.battery.healthPct !== undefined || v.battery.cycles !== undefined || v.parts.length > 0 || !!v.device.model;
