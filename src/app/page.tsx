@@ -5,7 +5,7 @@ import {
   Home as HomeIcon, ShoppingCart, Wrench, Laptop, Gamepad2, Globe, Smartphone,
   Megaphone, Package, Heart, Wallet, Settings, Menu, Search, Sun, Moon,
   Building2, Headphones, Phone, MapPin, ShieldCheck, Truck, RotateCcw, Lock,
-  BadgeCheck, MessageCircle, Check, X, MessagesSquare, Music2,
+  BadgeCheck, MessageCircle, Check, X, MessagesSquare, Music2, Stethoscope,
 } from "lucide-react";
 import WalletModal from "@/components/WalletModal";
 import NotificationBell from "@/components/NotificationBell";
@@ -51,6 +51,7 @@ export default function Home() {
   useEffect(() => {
     setLight(document.documentElement.classList.contains("light"));
     fetch("/api/products?limit=12").then((r) => r.json()).then((d) => setProducts(Array.isArray(d) ? d : []));
+    try { if (new URLSearchParams(window.location.search).get("repair") === "1") setModal("maint"); } catch {}
     fetch("/api/site-settings").then((r) => r.json()).then((d) => setSettings(d || null)).catch(() => {});
   }, []);
 
@@ -106,6 +107,7 @@ export default function Home() {
     { ar: "مواقعنا", en: "Our Sites", sub: "SITES", icon: Building2, href: "/our-sites" },
   ];
   const services = [
+    { ar: "افحص جهازك", en: "Check your phone", dAr: "فحص ذكي للأعطال من المتصفح", dEn: "Smart fault scan in your browser", icon: Stethoscope, cta: t("ابدأ الفحص", "Start scan"), href: "/diagnose" },
     { ar: "صيانة الأجهزة", en: "Device repair", dAr: "إصلاح احترافي بضمان", dEn: "Pro repair, warranted", icon: Wrench, cta: t("احجز صيانة", "Book repair"), onClick: () => setModal("maint") },
     { ar: "الإكسسوارات", en: "Accessories", dAr: "ملحقات أصلية", dEn: "Genuine add-ons", icon: Headphones, cta: t("تصفّح", "Browse"), href: "/products?category=إكسسوارات" },
     { ar: "خدمات رقمية", en: "Digital services", dAr: "اشتراكات وبطاقات", dEn: "Subs & cards", icon: Globe, cta: t("اطلب خدمة", "Request"), onClick: () => setModal("soon") },

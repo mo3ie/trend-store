@@ -141,6 +141,13 @@ export default function AdminProducts() {
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-2">
                         <a
+                          href={`/admin/products/${product.id}/3d`}
+                          title="استوديو 3D / 360°"
+                          className="px-2 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-xs font-bold transition-colors"
+                        >
+                          3D
+                        </a>
+                        <a
                           href={`/admin/products/${product.id}/edit`}
                           className="p-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-colors"
                         >
