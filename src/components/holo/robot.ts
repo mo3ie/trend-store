@@ -156,8 +156,8 @@ export async function buildRobotAsync(THREE: typeof THREE_NS, canvas: HTMLCanvas
   scene.environment = envTex;
 
   const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 50);
-  camera.position.set(0, 1.25, 7.4);
-  camera.lookAt(0, 1.12, 0);
+  camera.position.set(0, 1.2, 6.1);
+  camera.lookAt(0, 1.05, 0);
 
   // Studio lighting: warm key, cool rim, soft fill.
   const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(3, 5, 4); scene.add(key);
@@ -363,7 +363,7 @@ export async function buildRobotAsync(THREE: typeof THREE_NS, canvas: HTMLCanvas
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       // Keep the full body in frame on tall/narrow boxes.
-      camera.position.z = w / h < 0.75 ? 8.6 : 7.4;
+      camera.position.z = w / h < 0.75 ? 7.2 : 6.1;
       camera.updateProjectionMatrix();
     },
     lookAt(nx, ny) { look = { x: Math.max(-1, Math.min(1, nx)), y: Math.max(-1, Math.min(1, ny)) }; },
