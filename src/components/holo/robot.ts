@@ -189,8 +189,8 @@ export async function buildRobotAsync(THREE: typeof THREE_NS, canvas: HTMLCanvas
   scene.environment = envTex;
 
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
-  camera.position.set(0, 1.15, 6.4);
-  camera.lookAt(0, 1.05, 0);
+  camera.position.set(0, 1.3, 6.6);
+  camera.lookAt(0, 1.22, 0);
 
   const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(3, 5, 4); scene.add(key);
   const rim = new THREE.DirectionalLight(0x9fd8ff, 1.8); rim.position.set(-4, 2, -3); scene.add(rim);
