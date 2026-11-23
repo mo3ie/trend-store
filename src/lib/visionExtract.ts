@@ -18,6 +18,7 @@ export type VisionFacts = {
 
 const MODELS = [
   process.env.GROQ_VISION_MODEL,
+  "qwen/qwen3.8-27b",
   "meta-llama/llama-4-scout-17b-16e-instruct",
   "meta-llama/llama-4-maverick-17b-128e-instruct",
   "llama-3.2-90b-vision-preview",
@@ -33,20 +34,50 @@ peak performance capability message; "Service" / "صيانة" battery warning; m
 Return JSON only:
 {"platform":"ios|android","device":{"model":"","storage":"","os":""},"battery":{"healthPct":0,"cycles":0,"peakPerformanceOk":true,"serviceWarning":false,"note":""},"parts":[{"part":"Battery","status":"genuine|unknown|replaced|used","note":""}],"warnings":[""]}`;
 
-export async function readScreenshots(images: string[]): Promise<VisionFacts | { error: string }> {
-  const key = (process.env.GROQ_API_KEY || "").trim();
-  if (!key) return { error: "no_vision" };
-  const content = [{ type: "text", text: PROMPT }, ...images.slice(0, 5).map((url) => ({ type: "image_url", image_url: { url } }))];
-  let lastStatus = 0, lastErr = "";
-  for (const model of MODELS) {
-    const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST", cache: "no-store",
-      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model, temperature: 0, max_tokens: 900, messages: [{ role: "user", content }] }),
+/** Asks a vision-capable model for the JSON text: Groq first, then Claude, then Gemini (whichever keys exist). */
+async function visionRaw(images: string[]): Promise<{ raw: string } | { error: string }> {
+  const errs: string[] = [];
+  const groq = (process.env.GROQ_API_KEY || "").trim();
+  if (groq) {
+    const content = [{ type: "text", text: PROMPT }, ...images.map((url) => ({ type: "image_url", image_url: { url } }))];
+    for (const model of MODELS) {
+      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST", cache: "no-store", headers: { "content-type": "application/json", authorization: `Bearer ${groq}` },
+        body: JSON.stringify({ model, temperature: 0, max_tokens: 900, messages: [{ role: "user", content }] }),
+      });
+      if (r.ok) { const d = await r.json().catch(() => ({})); const raw = String(d.choices?.[0]?.message?.content || ""); if (raw.includes("{")) return { raw }; errs.push(`${model}: empty`); continue; }
+      errs.push(`${model}: ${r.status}`);
+      if (![400, 403, 404].includes(r.status)) break;
+    }
+  }
+  const anthropic = (process.env.ANTHROPIC_API_KEY || "").trim();
+  if (anthropic) {
+    const blocks = images.map((u) => { const m = u.match(/^data:(image\/[a-z]+);base64,(.+)$/); return m ? { type: "image", source: { type: "base64", media_type: m[1], data: m[2] } } : null; }).filter(Boolean);
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST", headers: { "content-type": "application/json", "x-api-key": anthropic, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({ model: process.env.VISION_CLAUDE_MODEL || "claude-haiku-5-5", max_tokens: 900, messages: [{ role: "user", content: [...blocks, { type: "text", text: PROMPT }] }] }),
     });
-    if (!r.ok) { lastStatus = r.status; lastErr += ` | ${model}: ${(await r.text().catch(() => "")).slice(0, 220)}`; if ([400, 403, 404].includes(r.status)) continue; break; }
-    const d = await r.json().catch(() => ({}));
-    const raw = String(d.choices?.[0]?.message?.content || "");
+    if (r.ok) { const d = await r.json().catch(() => ({})); const raw = (d.content || []).map((c: { text?: string }) => c.text || "").join(""); if (raw.includes("{")) return { raw }; }
+    errs.push(`claude: ${r.status}`);
+  }
+  const gemini = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "").trim();
+  if (gemini) {
+    const parts = images.map((u) => { const m = u.match(/^data:(image\/[a-z]+);base64,(.+)$/); return m ? { inline_data: { mime_type: m[1], data: m[2] } } : null; }).filter(Boolean);
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_VISION_MODEL || "gemini-2.0-flash"}:generateContent?key=${encodeURIComponent(gemini)}`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [...parts, { text: PROMPT }] }], generationConfig: { temperature: 0, maxOutputTokens: 900 } }),
+    });
+    if (r.ok) { const d = await r.json().catch(() => ({})); const raw = (d.candidates?.[0]?.content?.parts || []).map((p: { text?: string }) => p.text || "").join(""); if (raw.includes("{")) return { raw }; }
+    errs.push(`gemini: ${r.status}`);
+  }
+  return { error: errs.length ? `no_vision_model (${errs.join(", ")})` : "no_vision_key" };
+}
+
+export async function readScreenshots(images: string[]): Promise<VisionFacts | { error: string }> {
+  const got = await visionRaw(images.slice(0, 5));
+  if ("error" in got) return got;
+  const raw = got.raw;
+  {
     let j: Partial<VisionFacts> & Record<string, unknown>;
     try { j = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)); } catch { return { error: "bad_json" }; }
     const num = (v: unknown, lo: number, hi: number) => { const x = Number(v); return isFinite(x) && x >= lo && x <= hi && x !== 0 ? Math.round(x) : undefined; };
@@ -69,10 +100,6 @@ export async function readScreenshots(images: string[]): Promise<VisionFacts | {
       screensRead: Math.min(images.length, 5),
     };
   }
-  // Diagnostics: which models does this account actually have?
-  const ms = await fetch("https://api.groq.com/openai/v1/models", { headers: { authorization: `Bearer ${key}` } }).then((r) => r.json()).catch(() => ({}));
-  const ids = ((ms as { data?: { id: string }[] }).data || []).map((m) => m.id).join(",");
-  return { error: `vision_http_${lastStatus} models=[${ids}]` };
 }
 
 export const visionUseful = (v: VisionFacts) => v.battery.healthPct !== undefined || v.battery.cycles !== undefined || v.parts.length > 0 || !!v.device.model;
