@@ -297,14 +297,14 @@ export async function buildRobotAsync(THREE: typeof THREE_NS, canvas: HTMLCanvas
   const disc = document.createElement("canvas"); disc.width = disc.height = 128;
   const dg = disc.getContext("2d")!;
   const rg = dg.createRadialGradient(64, 64, 2, 64, 64, 64);
-  rg.addColorStop(0, "rgba(140,240,255,.85)"); rg.addColorStop(0.5, "rgba(120,200,255,.25)"); rg.addColorStop(1, "rgba(120,200,255,0)");
+  rg.addColorStop(0, "rgba(120,225,255,.55)"); rg.addColorStop(0.5, "rgba(110,190,255,.14)"); rg.addColorStop(1, "rgba(120,200,255,0)");
   dg.fillStyle = rg; dg.fillRect(0, 0, 128, 128);
   const pad = add(root, new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(disc), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }), 0, -0.06, 0);
   pad.rotation.x = -Math.PI / 2;
   const col = document.createElement("canvas"); col.width = 4; col.height = 128;
   const cg = col.getContext("2d")!;
   const lg = cg.createLinearGradient(0, 128, 0, 0);
-  lg.addColorStop(0, "rgba(140,235,255,.45)"); lg.addColorStop(1, "rgba(140,235,255,0)");
+  lg.addColorStop(0, "rgba(140,235,255,.16)"); lg.addColorStop(1, "rgba(140,235,255,0)");
   cg.fillStyle = lg; cg.fillRect(0, 0, 4, 128);
   add(root, new THREE.CylinderGeometry(0.42, 0.5, 0.9, 48, 1, true), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(col), transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, toneMapped: false }), 0, 0.38, 0);
 
@@ -361,7 +361,7 @@ export async function buildRobotAsync(THREE: typeof THREE_NS, canvas: HTMLCanvas
     armL.shoulder.rotation.z = -0.22 - Math.sin(t * 1.3) * 0.04;
     armL.shoulder.rotation.x = 0.15;
     armL.elbow.rotation.x = -0.35;
-    let rz = 1.05, ex = -1.1;
+    let rz = 0.75, ex = -1.25;
     if (waveT >= 0) {
       const w = t - waveT;
       if (w > 2.4) waveT = -1;
@@ -369,6 +369,7 @@ export async function buildRobotAsync(THREE: typeof THREE_NS, canvas: HTMLCanvas
     }
     armR.shoulder.rotation.z += (rz - armR.shoulder.rotation.z) * 0.1;
     armR.elbow.rotation.x += (ex - armR.elbow.rotation.x) * 0.12;
+    armR.elbow.rotation.z = waveT >= 0 ? 0 : 0.55; // forearm lifts, palm up
 
     rings.forEach((r, i) => { r.scale.setScalar(1 + 0.04 * Math.sin(t * 2 + i)); r.rotation.z = t * (0.2 + i * 0.1); });
     tiles.forEach(({ m, base, ph }) => { m.position.y = base.y + Math.sin(t * 1.1 + ph) * 0.06; });
@@ -392,8 +393,8 @@ export async function buildRobotAsync(THREE: typeof THREE_NS, canvas: HTMLCanvas
       camera.aspect = w / h;
       camera.position.z = w / h < 0.8 ? 8.2 : 6.4;
       // The glass tiles need room; a small companion shows just the robot.
-      tiles.forEach(({ m }) => (m.visible = w > 170));
-      if (w <= 170) camera.position.z = 5.2;
+      tiles.forEach(({ m }) => (m.visible = w > 260));
+      if (w <= 260) camera.position.z = 5.6;
       camera.updateProjectionMatrix();
     },
     lookAt(nx, ny) { look = { x: Math.max(-1, Math.min(1, nx)), y: Math.max(-1, Math.min(1, ny)) }; },
