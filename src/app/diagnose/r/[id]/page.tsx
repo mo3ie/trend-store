@@ -9,18 +9,22 @@ type Deep = {
   battery: { healthPct?: number; cycles?: number; designMah?: number; fullMah?: number };
   storage: { totalGb?: number; freeGb?: number };
   panics: { last30d: number; total: number; reasons: string[] };
+  appCrashes?: { total: number; top: { app: string; count: number }[] };
+  jetsam?: number;
+  period?: { from?: string; to?: string };
   scannedAt: string;
 };
 
 /** «شهادة فحص عميق» — data read straight from the iPhone over USB at the shop. */
-function DeepCert({ d, notes }: { d: Deep; notes?: string | null }) {
+function DeepCert({ d, notes, source }: { d: Deep; notes?: string | null; source?: string }) {
+  const usb = source !== "analytics";
   const h = d.battery.healthPct;
   const hc = h == null ? "" : h >= 85 ? "text-green-400" : h >= 80 ? "text-amber-400" : "text-red-400";
   return (
     <section className="gp-panel p-5 space-y-3">
       <div className="flex items-center gap-2">
         <ShieldCheck className="text-cyan-300" />
-        <div className="flex-1"><b>شهادة فحص عميق — محل ترند</b><p className="text-xs text-[var(--muted)]">قراءة مباشرة من الجهاز بالكابل · {new Date(d.scannedAt).toLocaleString("ar-LY")}</p></div>
+        <div className="flex-1"><b>شهادة فحص عميق — محل ترند</b><p className="text-xs text-[var(--muted)]">{usb ? "✅ موثّقة: قراءة مباشرة بالكابل في المحل" : "من ملفات نظام الجهاز رفعها صاحبه"} · {new Date(d.scannedAt).toLocaleString("ar-LY")}{d.period?.from ? ` · بيانات من ${d.period.from} إلى ${d.period.to}` : ""}</p></div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
         <div className="rounded-xl bg-white/5 p-3"><small className="text-[var(--muted)] block">الجهاز</small><b>{d.device.model}</b><small className="block">iOS {d.device.ios} · {d.device.serialMasked}</small></div>
@@ -28,6 +32,10 @@ function DeepCert({ d, notes }: { d: Deep; notes?: string | null }) {
         <div className="rounded-xl bg-white/5 p-3"><small className="text-[var(--muted)] block">التخزين</small><b>{d.storage.totalGb ? d.storage.totalGb + "GB" : "—"}</b><small className="block">{d.storage.freeGb != null ? "فاضي " + d.storage.freeGb + "GB" : ""}</small></div>
         <div className="rounded-xl bg-white/5 p-3"><small className="text-[var(--muted)] block">أعطال النظام (30 يوم)</small><b className={"text-xl " + (d.panics.last30d ? "text-red-400" : "text-green-400")}>{d.panics.last30d}</b><small className="block">الكل {d.panics.total}</small></div>
       </div>
+      {!!(d.appCrashes?.total || d.jetsam) && (
+        <p className="text-sm text-[var(--muted)]">أعطال التطبيقات: <b>{d.appCrashes?.total || 0}</b>{d.appCrashes?.top?.length ? ` (${d.appCrashes.top.slice(0, 3).map((x) => `${x.app} ×${x.count}`).join("، ")})` : ""} · ضغط الذاكرة: <b>{d.jetsam || 0}</b></p>
+      )}
+      {!!d.panics.reasons?.length && <details className="text-xs text-[var(--muted)]"><summary>أسباب أعطال النظام</summary><ul dir="ltr" className="mt-1 space-y-0.5">{d.panics.reasons.map((r) => <li key={r}>{r}</li>)}</ul></details>}
       {notes && <p className="text-sm"><b>ملاحظات الفني:</b> {notes}</p>}
     </section>
   );
@@ -59,7 +67,7 @@ export default function SharedReport({ params }: { params: Promise<{ id: string 
         ) : data.report ? (
           <>
             {data.created_at && <p className="dg-note">تاريخ الفحص: {new Date(data.created_at).toLocaleString("ar-EG")}</p>}
-            {data.results?.deep && <DeepCert d={data.results.deep} notes={data.results.notes} />}
+            {data.results?.deep && <DeepCert d={data.results.deep} notes={data.results.notes} source={(data.device as { source?: string } | undefined)?.source} />}
             <ReportView report={data.report} device={data.device} />
             <a href="/diagnose" className="gp-btn gp-btn-ghost w-full">افحص جهازك أنت</a>
           </>

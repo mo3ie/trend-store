@@ -148,6 +148,9 @@ export default function DiagnosePage() {
       <div className="gp-wrap gp-narrow w-full space-y-5">
         {report ? (
           <>
+            {repId && typeof window !== "undefined" && (() => { try { return localStorage.getItem("trend_deep_pending") === "1"; } catch { return false; } })() && (
+              <a href={`/deep-scan?quick=${repId}`} className="gp-btn gp-btn-main w-full">🔬 كمّل الفحص العميق (الخطوة التالية)</a>
+            )}
             <ReportView report={report} id={repId} device={dev || undefined} />
             <button className="gp-btn gp-btn-ghost w-full" onClick={() => { setReport(null); setRepId(null); }}>رجوع للفحص</button>
           </>
