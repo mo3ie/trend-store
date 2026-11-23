@@ -5,9 +5,11 @@ import {
   Home as HomeIcon, ShoppingCart, Wrench, Laptop, Gamepad2, Globe, Smartphone,
   Megaphone, Package, Heart, Wallet, Settings, Menu, Search, Sun, Moon,
   Building2, Headphones, Phone, MapPin, ShieldCheck, Truck, RotateCcw, Lock,
-  BadgeCheck, MessageCircle, Check, X, MessagesSquare, Music2, Stethoscope,
+  BadgeCheck, MessageCircle, Check, X, MessagesSquare, Music2, Stethoscope, LayoutDashboard,
 } from "lucide-react";
 import WalletModal from "@/components/WalletModal";
+import DiagnoseShowcase from "@/components/DiagnoseShowcase";
+import { supabase } from "@/lib/supabaseClient";
 import dynamic from "next/dynamic";
 const HeroRobot = dynamic(() => import("@/components/holo/HeroRobot"), { ssr: false, loading: () => <div className="g-hero g-hero-bot" /> });
 import NotificationBell from "@/components/NotificationBell";
@@ -48,6 +50,7 @@ export default function Home() {
   const [mImages, setMImages] = useState<string[]>([]);
   const [mBusy, setMBusy] = useState(false);
   const [mDoneId, setMDoneId] = useState<string | null>(null);
+  const [isStaff, setIsStaff] = useState(false);
   const [pickOff, setPickOff] = useState(0); // Instant Visual carousel offset (UI only)
 
   useEffect(() => {
@@ -56,6 +59,13 @@ export default function Home() {
     try { if (new URLSearchParams(window.location.search).get("repair") === "1") setModal("maint"); } catch {}
     fetch("/api/site-settings").then((r) => r.json()).then((d) => setSettings(d || null)).catch(() => {});
   }, []);
+
+  // Admin/employee accounts get a quick way into the dashboard.
+  useEffect(() => {
+    if (!user) { setIsStaff(false); return; }
+    supabase.from("profiles").select("role").eq("id", user.id).single()
+      .then(({ data }) => setIsStaff(data?.role === "admin" || data?.role === "employee"));
+  }, [user]);
 
   // settings with sensible fallbacks (everything is admin-editable in /admin/appearance)
   const branches = settings?.branches?.length ? settings.branches : BRANCHES;
@@ -140,6 +150,7 @@ export default function Home() {
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("ابحث عن منتج…", "Search products…")}
             style={{ width: "100%", padding: "10px 36px", borderRadius: 13, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--text)", fontFamily: "inherit", fontSize: 13 }} />
         </div>
+        {isStaff && <a className="adminbtn" href="/admin" title={t("لوحة الإدارة", "Admin")}><LayoutDashboard size={18} /><span>{t("الإدارة", "Admin")}</span></a>}
         <button className="iconbtn langbtn" onClick={toggleLang}>{lang === "ar" ? "EN" : "ع"}</button>
         <button className="iconbtn" aria-label="theme" onClick={toggleTheme}>{light ? <Moon size={19} /> : <Sun size={19} />}</button>
         {user && <span className="hide-sm flex"><NotificationBell /></span>}
@@ -203,6 +214,8 @@ export default function Home() {
               </div>
             </div>
           </section>
+
+          <DiagnoseShowcase />
 
           <section className="hero" style={img.hero ? { backgroundImage: `linear-gradient(120deg, rgba(8,10,18,.80), rgba(8,10,18,.45)), url(${img.hero})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
             <div className="inner">
