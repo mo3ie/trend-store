@@ -10,6 +10,7 @@ import {
 import WalletModal from "@/components/WalletModal";
 import DiagnoseShowcase from "@/components/DiagnoseShowcase";
 import DailyGift from "@/components/DailyGift";
+import PromoBanner from "@/components/PromoBanner";
 import { supabase } from "@/lib/supabaseClient";
 import dynamic from "next/dynamic";
 const HeroRobot = dynamic(() => import("@/components/holo/HeroRobot"), { ssr: false, loading: () => <div className="g-hero g-hero-bot" /> });
@@ -224,47 +225,26 @@ export default function Home() {
 
           <DailyGift />
 
-          <section className="hero" style={img.hero ? { backgroundImage: `linear-gradient(120deg, rgba(8,10,18,.80), rgba(8,10,18,.45)), url(${img.hero})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
-            <div className="inner">
-              <h1>{t("كل ما تحتاجه من عالم التقنية", "Everything you need from the world of tech")}</h1>
-              <p>{t("هواتف، لابتوبات، أجهزة وإكسسوارات أصلية — توصيل لكل ليبيا.", "Phones, laptops, devices & genuine accessories — delivery across Libya.")}</p>
-              <a className="btn" href="/products">{t("تسوّق الآن", "Shop now")}</a>
-            </div>
-          </section>
+          <PromoBanner products={products} />
 
           <section>
             <div className="section-h"><h2>{t("الأقسام", "Categories")}</h2></div>
-            <div className="cats" style={{ marginTop: 13 }}>
-              {categories.map((c) => { const I = c.icon; return (
-                <a key={c.sub} className="cat" href={c.href}><span className="ic"><I size={23} /></span><span>{t(c.ar, c.en)}</span><small>{c.sub}</small></a>
+            <div className="ct-rail">
+              {categories.map((c, k) => { const I = c.icon; return (
+                <a key={c.sub} className="ct" href={c.href} style={{ animationDelay: `${k * 0.05}s` }}><span className="ct-ic"><I size={18} /></span><span>{t(c.ar, c.en)}</span></a>
               ); })}
             </div>
           </section>
 
           <section>
-            <div className="section-h"><h2>{t("عروض وخدمات", "Offers & Services")}</h2></div>
-            <div className="grid2" style={{ marginTop: 13 }}>
-              <a className="card wide" href="/products">
-                <div className="thumb">{img.offer ? <img src={img.offer} alt="" /> : <Laptop />}</div>
-                <div className="body"><span className="badge">{t("عرض الأسبوع", "Weekly deal")}</span><h3>{t("لابتوبات بخصم يصل 25%", "Laptops up to 25% off")}</h3><span className="btn sm">{t("تسوّق الآن", "Shop now")}</span></div>
-              </a>
-              <a className="card wide shein" href="https://order.trendstore-ly.com">
-                <div className="thumb">{img.shein ? <img src={img.shein} alt="" /> : <ShoppingCart />}</div>
-                <div className="body"><span className="badge">{t("حصري", "Exclusive")}</span><h3>{t("اطلب من شي إن إلى ليبيا", "Order Shein to Libya")}</h3><span className="btn sm">{t("ابدأ طلبك", "Start order")}</span></div>
-              </a>
-            </div>
-          </section>
-
-          <section>
             <div className="section-h"><h2>{t("خدماتنا", "Our services")}</h2></div>
-            <div className="grid4" style={{ marginTop: 13 }}>
-              {services.map((s) => { const I = s.icon; return (
-                <div key={s.en} className="card">
-                  <div className="thumb tall"><I /></div>
-                  <div className="body"><h3>{t(s.ar, s.en)}</h3><p>{t(s.dAr, s.dEn)}</p>
-                    <button className="btn sm" onClick={() => (s.onClick ? s.onClick() : go(s.href))}>{s.cta}</button>
-                  </div>
-                </div>
+            <div className="sv-bento">
+              {services.map((s, k) => { const I = s.icon; return (
+                <button key={s.en} className={`sv ${k === 0 ? "big" : ""}`} onClick={() => (s.onClick ? s.onClick() : go(s.href))}>
+                  <span className="sv-ic"><I size={k === 0 ? 26 : 20} /></span>
+                  <span className="sv-t"><b>{t(s.ar, s.en)}</b><small>{t(s.dAr, s.dEn)}</small></span>
+                  <span className="sv-go">{s.cta} <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg></span>
+                </button>
               ); })}
             </div>
           </section>
@@ -275,38 +255,33 @@ export default function Home() {
             ); })}
           </section>
 
-          <section className="maint">
-            <div className="head"><span className="ic"><Wrench size={23} /></span><h2>{t("منظومة الصيانة المتكاملة", "Integrated maintenance system")}</h2></div>
-            <p className="sub">{t("اطلب صيانة جهازك وتابع حالته لحظة بلحظة — وبوابة مستقلة للفنيين.", "Request a repair and track it live — with a dedicated technician portal.")}</p>
-            <div className="two">
-              <div className="mcard"><h3>{t("للزبون", "For customers")}</h3>
-                <ul className="feat">
-                  <li><Check size={16} /><span>{t("طلب بالصور ووصف العطل", "Request with photos & fault")}</span></li>
-                  <li><Check size={16} /><span>{t("عرض سعر قبل البدء وتتبّع الحالة", "Quote first, live status")}</span></li>
-                  <li><Check size={16} /><span>{t("ضمان على الإصلاح", "Repair warranty")}</span></li>
-                </ul>
-                <button className="btn sm" onClick={() => setModal("maint")}>{t("اطلب صيانة الآن", "Request a repair")}</button>
-              </div>
-              <div className="mcard"><h3>{t("لفني الصيانة", "For technicians")}</h3>
-                <ul className="feat">
-                  <li><Check size={16} /><span>{t("بوابة استلام وقبول الطلبات", "Receive & accept jobs")}</span></li>
-                  <li><Check size={16} /><span>{t("تحديث الحالة وإرسال السعر", "Update status & quote")}</span></li>
-                  <li><Check size={16} /><span>{t("لوحة الأرباح والسجل", "Earnings & history")}</span></li>
-                </ul>
-                <button className="btn sm ghost" onClick={() => setModal("soon")}>{t("دخول الفنيين", "Technician login")}</button>
-              </div>
+          <section className="mt2">
+            <div className="mt2-head">
+              <span className="mt2-ic"><Wrench size={22} /></span>
+              <div><h2>{t("منظومة الصيانة المتكاملة", "Integrated maintenance system")}</h2><p>{t("اطلب صيانة جهازك وتابع حالته لحظة بلحظة — وبوابة مستقلة للفنيين.", "Request a repair and track it live — with a dedicated technician portal.")}</p></div>
+            </div>
+            <div className="mt2-flow">
+              {[t("اطلب بالصور ووصف العطل", "Request with photos"), t("عرض سعر قبل البدء", "Quote first"), t("تتبّع الحالة مباشرة", "Live status"), t("استلم بضمان", "Pick up with warranty")].map((x, k) => (
+                <div key={k} className="mt2-step"><i>{k + 1}</i><span>{x}</span></div>
+              ))}
+            </div>
+            <div className="mt2-cta">
+              <button className="btn" onClick={() => setModal("maint")}>{t("اطلب صيانة الآن", "Request a repair")}</button>
+              <button className="btn ghost" onClick={() => setModal("soon")}>{t("دخول الفنيين", "Technician login")}</button>
             </div>
           </section>
 
           <section>
             <div className="section-h"><h2>{query ? t("نتائج البحث", "Search results") : t("أحدث المنتجات", "Latest products")}</h2><a href="/products">{t("عرض الكل", "View all")}</a></div>
-            <div className="grid4" style={{ marginTop: 13 }}>
+            <div className="lp-grid">
               {shown.length === 0 && <p style={{ color: "var(--muted)", gridColumn: "1/-1", padding: "20px 0" }}>{t("لا توجد منتجات.", "No products.")}</p>}
-              {shown.map((p) => (
-                <div key={p.id} className="card">
-                  <a className="thumb tall" href={`/products/${p.id}`}>{p.image_url ? <img src={p.image_url} alt={p.name} /> : <Package />}</a>
-                  <div className="body"><h3 style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</h3><span className="price">{p.price} {t("د.ل", "LYD")}</span>
-                    <button className="btn sm" onClick={() => addToCart(p)}>{t("أضف للسلة", "Add to cart")}</button>
+              {shown.map((p, k) => (
+                <div key={p.id} className="lp" style={{ animationDelay: `${k * 0.06}s` }}>
+                  <a className="lp-img" href={`/products/${p.id}`}>{p.image_url ? <img src={p.image_url} alt={p.name} loading="lazy" /> : <Package />}</a>
+                  <a className="lp-name" href={`/products/${p.id}`}>{p.name}</a>
+                  <div className="lp-row">
+                    <b>{p.price} <small>{t("د.ل", "LYD")}</small></b>
+                    <button className="lp-add" onClick={() => addToCart(p)} aria-label={t("أضف للسلة", "Add to cart")}><ShoppingCart size={16} /></button>
                   </div>
                 </div>
               ))}
