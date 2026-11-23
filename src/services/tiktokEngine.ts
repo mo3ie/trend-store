@@ -469,6 +469,37 @@ export async function processClaimedComment(
   let reply: string | null;
   if (privateSent) {
     reply = decision.publicText || decision.privateText;
+  } else if (decision.privateText && target.privateDelivery === "assist" && comment.username) {
+    /*
+     * Assisted mode: the price goes to a queue a human sends from the real
+     * TikTok app, and the comment says only that an answer is coming.
+     *
+     * This exists because the Message button on a commenter’s profile works
+     * while the API to press it does not. Pressing it for them would be the
+     * one thing TikTok bans accounts for, so the queue removes the searching,
+     * the looking-up and the typing -- and leaves the tap.
+     */
+    const { error } = await supabaseAdmin.from("dm_tasks").insert({
+      config_id: target.configId,
+      user_id: target.userId,
+      platform: "tiktok",
+      page_id: target.pageId,
+      comment_id: comment.commentId,
+      video_id: comment.videoId,
+      commenter: comment.username,
+      comment_text: comment.text,
+      body: decision.privateText,
+    });
+    // 23505 means this comment is already queued -- the webhook and the sweep
+    // can both arrive. That is success, not a failure to fall back from.
+    if (!error || error.code === "23505") {
+      reply = decision.publicText || "تم تجهيز ردّك — تفقّد رسائلك ✉️";
+      patch.private_status = "queued";
+    } else {
+      // Queueing failed: answer publicly rather than leave the customer with
+      // a promise of a message nobody was told to send.
+      reply = decision.privateText || decision.publicText;
+    }
   } else if (decision.privateText && target.privateDelivery === "link") {
     const url = await createPrivateLink({
       configId: target.configId,

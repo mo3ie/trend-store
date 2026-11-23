@@ -50,7 +50,8 @@ export function PrivateReplyPanel({
   patch: (fields: Record<string, unknown>) => Promise<boolean>;
   siteHost: string;
 }) {
-  const on = (config.private_delivery || "off") === "link";
+  const mode = (config.private_delivery || "off") as "off" | "link" | "assist";
+  const on = mode !== "off";
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState("");
 
@@ -112,21 +113,55 @@ export function PrivateReplyPanel({
           </div>
         </div>
 
-        <button
-          onClick={() => save({ private_delivery: on ? "off" : "link" })}
-          disabled={busy}
-          style={{
-            width: "100%", marginTop: 14, padding: "12px 0", borderRadius: 11,
-            border: `1.5px solid ${on ? c.ok : c.border}`,
-            background: on ? `${c.ok}1a` : "transparent",
-            color: on ? c.ok : c.text, fontSize: 14, fontWeight: 800,
-            fontFamily: "inherit", cursor: busy ? "wait" : "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-          }}
-        >
-          {busy ? <Loader2 size={15} className="spin" /> : on ? <CheckCircle2 size={16} /> : <Lock size={15} />}
-          {on ? t("مُفعّل — السعر مخفي", "On — the price is hidden") : t("مُعطّل — السعر يظهر في التعليقات", "Off — the price shows in comments")}
-        </button>
+        {/*
+          Three modes, not a switch, because they are genuinely different products
+          and the merchant has to see the trade before choosing. Each option names
+          its own cost: the comments show the price, the customer types a code, or
+          someone presses send.
+        */}
+        <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
+          {([
+            { key: "assist",
+              ar: "رسالة خاصة بضغطة — الأقوى",
+              en: "Private message, one tap — strongest",
+              arSub: "رسالة خاصة حقيقية. البوت يردّ علنياً وحده، وأنت تضغط «إرسال» من تبويب «طابور الرسائل».",
+              enSub: "A real DM. The bot answers publicly on its own; you press send from the Queue tab." },
+            { key: "link",
+              ar: "رابط وكود",
+              en: "Link and code",
+              arSub: "آلي بالكامل، لكن على الزبون فتح رابط البايو وكتابة الكود.",
+              enSub: "Fully automatic, but the customer must open your bio link and type the code." },
+            { key: "off",
+              ar: "بلا إخفاء",
+              en: "No hiding",
+              arSub: "السعر يُنشر في التعليقات للجميع.",
+              enSub: "The price is posted in the comments for everyone." },
+          ] as const).map((opt) => {
+            const active = mode === opt.key;
+            return (
+              <button key={opt.key} onClick={() => { if (!active) save({ private_delivery: opt.key }); }}
+                disabled={busy}
+                style={{
+                  textAlign: rtl ? "right" : "left", padding: "12px 13px", borderRadius: 11,
+                  border: `1.5px solid ${active ? c.ok : c.border}`,
+                  background: active ? `${c.ok}14` : "transparent",
+                  fontFamily: "inherit", cursor: busy ? "wait" : "pointer",
+                }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {busy && active ? <Loader2 size={14} className="spin" />
+                    : active ? <CheckCircle2 size={15} color={c.ok} />
+                    : <Lock size={14} color={c.muted} />}
+                  <span style={{ fontSize: 13.5, fontWeight: 800, color: active ? c.ok : c.text }}>
+                    {t(opt.ar, opt.en)}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11.5, color: c.muted, lineHeight: 1.7, marginTop: 4 }}>
+                  {t(opt.arSub, opt.enSub)}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {on && (
@@ -173,6 +208,7 @@ export function PrivateReplyPanel({
           </Field>
 
           {/* ── 2. The public comment ──────────────────────────────────────── */}
+          {mode === "link" && (<>
           <Field
             c={c} n={2}
             title={t("ما يُكتب في التعليقات", "What is posted in the comments")}
@@ -240,6 +276,8 @@ export function PrivateReplyPanel({
           </Field>
 
           {/* ── The report ─────────────────────────────────────────────────── */}
+          </>)}
+          {mode === "link" && (<>
           <div style={{ ...ttCard(c), padding: 16 }}>
             <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>
               {t("التقرير", "Report")}
@@ -296,6 +334,7 @@ export function PrivateReplyPanel({
               )}
             </div>
           </div>
+          </>)}
         </>
       )}
 

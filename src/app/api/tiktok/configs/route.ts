@@ -132,7 +132,7 @@ export async function PATCH(req: NextRequest) {
   if ("whatsapp_number" in patch) {
     patch.whatsapp_number = normalizeWhatsApp(patch.whatsapp_number as string | null);
   }
-  if ("private_delivery" in patch && !["off", "link"].includes(String(patch.private_delivery))) {
+  if ("private_delivery" in patch && !["off", "link", "assist"].includes(String(patch.private_delivery))) {
     patch.private_delivery = "off";
   }
   for (const [k, lo, hi] of [["private_link_ttl_hours", 1, 720], ["private_link_max_opens", 1, 50]] as const) {

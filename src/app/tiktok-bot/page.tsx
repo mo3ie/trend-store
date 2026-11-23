@@ -21,6 +21,7 @@ import {
 } from "@/components/bot/ReplySettings";
 import { PostOverrideEditor, type PostOverrideValue } from "@/components/bot/PostOverrideEditor";
 import { PrivateReplyPanel } from "@/components/tiktok/PrivateReplyPanel";
+import { DmQueue } from "@/components/tiktok/DmQueue";
 import { botColors } from "@/lib/botTheme";
 
 /**
@@ -100,7 +101,7 @@ function TikTokBotInner() {
   const [config, setConfig] = useState<Config | null>(null);
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"try" | "videos" | "rules" | "smart" | "private" | "activity" | "settings">("try");
+  const [tab, setTab] = useState<"try" | "videos" | "rules" | "smart" | "private" | "queue" | "activity" | "settings">("try");
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [webhook, setWebhook] = useState<{ subscribed: boolean; last_event_at: string | null } | null>(null);
@@ -508,6 +509,9 @@ function TikTokBotInner() {
             { key: "rules" as const,    label: `${t("القواعد", "Rules")}${rules.length ? ` (${rules.length})` : ""}` },
             { key: "smart" as const,    label: t("الردّ الذكي", "Smart reply") },
             { key: "private" as const,  label: t("الردّ الخاص", "Private reply") },
+            ...((config?.private_delivery || "off") === "assist"
+              ? [{ key: "queue" as const, label: t("طابور الرسائل", "Queue") }]
+              : []),
             { key: "activity" as const, label: t("النشاط", "Activity") },
             { key: "settings" as const, label: t("الإعدادات", "Settings") },
           ]}
@@ -606,6 +610,13 @@ function TikTokBotInner() {
               {t("جارٍ تجهيز الإعدادات…", "Preparing your settings…")}
             </div>
           )
+        )}
+
+        {/* ── DM QUEUE ─────────────────────────────── */}
+        {tab === "queue" && config && (
+          <div style={{ marginTop: 14 }}>
+            <DmQueue c={c} t={t} configId={config.id} />
+          </div>
         )}
 
         {tab === "activity" && (
