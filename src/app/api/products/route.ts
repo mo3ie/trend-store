@@ -10,13 +10,17 @@ const supabaseAdmin = createClient(
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category");
-  const search   = searchParams.get("search");
-  const limit    = parseInt(searchParams.get("limit") || "50");
+  // Characters that would break PostgREST's or() filter syntax are stripped.
+  const search   = (searchParams.get("search") || "").replace(/[,()%*\\]/g, " ").trim().slice(0, 60);
+  const limit    = Math.min(200, Math.max(1, parseInt(searchParams.get("limit") || "50") || 50));
 
   let query = supabaseAdmin.from("products").select("*").order("created_at", { ascending: false }).limit(limit);
 
   if (category) query = query.eq("category", category);
-  if (search)   query = query.or(`name.ilike.%${search}%,category.ilike.%${search}%`);
+  if (search) {
+    // Every word must match (name, category or description): "ايفون 15 برو" finds "iPhone 15 Pro" style names too.
+    for (const w of search.split(/\s+/).filter(Boolean).slice(0, 4)) query = query.or(`name.ilike.%${w}%,category.ilike.%${w}%,description.ilike.%${w}%`);
+  }
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

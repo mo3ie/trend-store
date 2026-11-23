@@ -11,6 +11,7 @@ import WalletModal from "@/components/WalletModal";
 import DiagnoseShowcase from "@/components/DiagnoseShowcase";
 import DailyGift from "@/components/DailyGift";
 import PromoBanner from "@/components/PromoBanner";
+import SearchBox from "@/components/SearchBox";
 import { supabase } from "@/lib/supabaseClient";
 import dynamic from "next/dynamic";
 const HeroRobot = dynamic(() => import("@/components/holo/HeroRobot"), { ssr: false, loading: () => <div className="g-hero g-hero-bot" /> });
@@ -148,10 +149,8 @@ export default function Home() {
             <span className="wm en">TREND ELECTRONICS</span>
           </span>
         </div>
-        <div className="hide-sm" style={{ position: "relative", flex: "0 1 280px" }}>
-          <Search size={16} style={{ position: "absolute", insetInlineStart: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted)" }} />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("ابحث عن منتج…", "Search products…")}
-            style={{ width: "100%", padding: "10px 36px", borderRadius: 13, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--text)", fontFamily: "inherit", fontSize: 13 }} />
+        <div className="hide-sm" style={{ position: "relative", flex: "0 1 340px" }}>
+          <SearchBox placeholder={t("ابحث عن منتج أو خدمة…", "Search products or services…")} />
         </div>
         {isStaff && <a className="adminbtn" href="/admin" title={t("لوحة الإدارة", "Admin")}><LayoutDashboard size={18} /><span>{t("الإدارة", "Admin")}</span></a>}
         <button className="iconbtn langbtn" onClick={toggleLang}>{lang === "ar" ? "EN" : "ع"}</button>
@@ -160,6 +159,8 @@ export default function Home() {
         <a className="iconbtn cartdot" href="/cart" aria-label="cart" data-cart-icon><ShoppingCart size={20} />{count > 0 && <i>{count > 9 ? "9+" : count}</i>}</a>
         <a className="iconbtn hide-sm" href={user ? "/account" : "/login"} aria-label="account"><svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg></a>
       </header>
+
+      <div className="sbx-mob"><SearchBox placeholder={t("ابحث عن منتج أو خدمة…", "Search products or services…")} /></div>
 
       <div className="shell">
         {menuOpen && <div className="drawer-overlay" onClick={() => setMenuOpen(false)} />}
@@ -229,9 +230,9 @@ export default function Home() {
 
           <section>
             <div className="section-h"><h2>{t("الأقسام", "Categories")}</h2></div>
-            <div className="ct-rail">
-              {categories.map((c, k) => { const I = c.icon; return (
-                <a key={c.sub} className="ct" href={c.href} style={{ animationDelay: `${k * 0.05}s` }}><span className="ct-ic"><I size={18} /></span><span>{t(c.ar, c.en)}</span></a>
+            <div className="cats" style={{ marginTop: 13 }}>
+              {categories.map((c) => { const I = c.icon; return (
+                <a key={c.sub} className="cat" href={c.href}><span className="ic"><I size={23} /></span><span>{t(c.ar, c.en)}</span><small>{c.sub}</small></a>
               ); })}
             </div>
           </section>

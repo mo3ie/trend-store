@@ -50,6 +50,13 @@ export default function ProductsPage() {
   const [sort, setSort] = useState("newest");
   const [showFilters, setShowFilters] = useState(false);
 
+  // Deep links: /products?search=… and /products?category=… (homepage search + category cards).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("search")) setSearch(p.get("search")!);
+    if (p.get("category")) setActiveCategory(p.get("category")!);
+  }, []);
+
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();

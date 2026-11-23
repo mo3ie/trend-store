@@ -51,30 +51,42 @@ async function writeDescription(p: Row): Promise<Grounded> {
   const key = (process.env.GROQ_API_KEY || "").trim();
   if (!key) return { error: "no_search" };
   const variants = (p.variants || []).map((v) => `${v.name}: ${(v.options || []).join("، ")}`).join(" | ");
-  const model = process.env.GROQ_SEARCH_MODEL || "groq/compound-mini";
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-    cache: "no-store",
-    body: JSON.stringify({
-      model,
-      temperature: 0.1,
-      max_tokens: 1200,
-      messages: [
+  // Groq has renamed its web-search models several times (404 = name unknown on this
+  // account), so try the known names in order, then gpt-oss with the browser_search tool.
+  const candidates: { model: string; tools?: unknown[] }[] = [
+    ...(process.env.GROQ_SEARCH_MODEL ? [{ model: process.env.GROQ_SEARCH_MODEL }] : []),
+    { model: "groq/compound" }, { model: "groq/compound-mini" }, { model: "compound-beta" }, { model: "compound-beta-mini" },
+    { model: "openai/gpt-oss-120b", tools: [{ type: "browser_search" }] },
+    { model: "openai/gpt-oss-20b", tools: [{ type: "browser_search" }] },
+  ];
+  const messages = [
         { role: "system", content: `You write product descriptions for an electronics shop in Libya. You MUST use web search first.
 Search the official manufacturer page and trusted spec sites (gsmarena.com, apple.com, samsung.com, hihonor.com, mi.com, the brand's own site, Amazon listing).
 Write ONLY facts that appear in the pages you read. Never use memory. If the search does not identify this exact product, return {"found":false}.
 Output JSON only:
 {"found":true,"description_ar":"3-6 short Arabic lines with the key verified specs, separated by newlines, no price/stock/warranty/delivery, no markdown","sources":[{"title":"...","url":"https://..."}]}` },
         { role: "user", content: `Product name: ${p.name}\nCategory: ${p.category || "-"}${variants ? `\nOptions: ${variants}` : ""}` },
-      ],
-    }),
-  });
-  if (!res.ok) return { error: `search_http_${res.status}` };
+  ];
+  let res: Response | null = null, lastStatus = 0;
+  for (const c of candidates) {
+    res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+      cache: "no-store",
+      body: JSON.stringify({ model: c.model, temperature: 0.1, max_tokens: 1500, messages, ...(c.tools ? { tools: c.tools, reasoning_effort: "low" } : {}) }),
+    });
+    if (res.ok) break;
+    lastStatus = res.status;
+    if (![400, 403, 404].includes(res.status)) break; // 429/5xx: stop now, retry next run
+    res = null;
+  }
+  if (!res || !res.ok) return { error: `search_http_${res?.status || lastStatus}` };
   const data = await res.json() as { choices?: { message?: { content?: string; executed_tools?: { search_results?: { results?: { url?: string; title?: string }[] } }[] } }[] };
   const msg = data.choices?.[0]?.message;
   const searched = new Set<string>();
   for (const t of msg?.executed_tools || []) for (const r of t.search_results?.results || []) if (r.url) searched.add(r.url.replace(/\/$/, ""));
+  // The tool-output shape differs per model: also take every URL the search tools returned.
+  for (const u of JSON.stringify(msg?.executed_tools || []).match(/https?:\/\/[^\s"'\\)<>]+/g) || []) searched.add(u.replace(/\/$/, ""));
   if (!searched.size) return { error: "no_search_results" };
 
   let out: { found?: boolean; description_ar?: string; sources?: { title?: string; url?: string }[] };
