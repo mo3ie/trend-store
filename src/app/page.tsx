@@ -5,7 +5,7 @@ import {
   Home as HomeIcon, ShoppingCart, Wrench, Laptop, Gamepad2, Globe, Smartphone,
   Megaphone, Package, Heart, Wallet, Settings, Menu, Search, Sun, Moon,
   Building2, Headphones, Phone, MapPin, ShieldCheck, Truck, RotateCcw, Lock,
-  BadgeCheck, MessageCircle, Check, X, MessagesSquare, Music2, Stethoscope, LayoutDashboard,
+  BadgeCheck, MessageCircle, Check, X, MessagesSquare, Music2, Stethoscope, LayoutDashboard, Gift,
 } from "lucide-react";
 import WalletModal from "@/components/WalletModal";
 import DiagnoseShowcase from "@/components/DiagnoseShowcase";
@@ -112,7 +112,8 @@ export default function Home() {
     { ar: "هواتف", en: "Phones", sub: "PHONES", icon: Smartphone, href: "/products?category=هواتف" },
     { ar: "لابتوبات", en: "Laptops", sub: "LAPTOPS", icon: Laptop, href: "/products?category=لابتوبات" },
     { ar: "بلايستيشن", en: "PlayStation", sub: "PLAYSTATION", icon: Gamepad2, href: "/products?category=بلايستيشن" },
-    { ar: "خدمات رقمية", en: "Digital", sub: "DIGITAL", icon: Globe, href: "/products" },
+    { ar: "خدمات رقمية", en: "Digital", sub: "DIGITAL", icon: Globe, href: "/cards" },
+    { ar: "سوق المستعمل", en: "Used Market", sub: "USED", icon: ShieldCheck, href: "/market" },
     { ar: "طلب من المواقع", en: "Order Online", sub: "SHOPPING", icon: ShoppingCart, href: "https://order.trendstore-ly.com" },
     { ar: "أدوات فيسبوك", en: "Facebook Tools", sub: "FACEBOOK", icon: MessagesSquare, href: "/facebook" },
     { ar: "أدوات تيك توك", en: "TikTok Tools", sub: "TIKTOK", icon: Music2, href: "/tiktok" },
@@ -122,7 +123,7 @@ export default function Home() {
     { ar: "افحص جهازك", en: "Check your phone", dAr: "فحص ذكي للأعطال من المتصفح", dEn: "Smart fault scan in your browser", icon: Stethoscope, cta: t("ابدأ الفحص", "Start scan"), href: "/diagnose" },
     { ar: "صيانة الأجهزة", en: "Device repair", dAr: "إصلاح احترافي بضمان", dEn: "Pro repair, warranted", icon: Wrench, cta: t("احجز صيانة", "Book repair"), onClick: () => setModal("maint") },
     { ar: "الإكسسوارات", en: "Accessories", dAr: "ملحقات أصلية", dEn: "Genuine add-ons", icon: Headphones, cta: t("تصفّح", "Browse"), href: "/products?category=إكسسوارات" },
-    { ar: "خدمات رقمية", en: "Digital services", dAr: "اشتراكات وبطاقات", dEn: "Subs & cards", icon: Globe, cta: t("اطلب خدمة", "Request"), onClick: () => setModal("soon") },
+    { ar: "خدمات رقمية", en: "Digital services", dAr: "كروت محلية ودولية", dEn: "Local & intl cards", icon: Globe, cta: t("تصفّح الكروت", "Browse cards"), href: "/cards" },
     { ar: "بيع الأجهزة", en: "Buy devices", dAr: "أحدث الأجهزة بضمان", dEn: "Latest, warranted", icon: Smartphone, cta: t("تصفّح", "Browse"), href: "/products" },
   ];
   const trust = [
@@ -172,7 +173,9 @@ export default function Home() {
           <div className="navitem" onClick={() => go("/products")}><Smartphone size={19} /><span>{t("متجر الإلكترونيات", "Electronics")}</span></div>
           <div className="navitem" onClick={() => go("https://order.trendstore-ly.com")}><ShoppingCart size={19} /><span>{t("طلب من شي إن", "Order from Shein")}</span></div>
           <div className="navitem" onClick={() => setModal("maint")}><Wrench size={19} /><span>{t("الصيانة", "Maintenance")}</span></div>
-          <div className="navitem" onClick={() => setModal("soon")}><Globe size={19} /><span>{t("خدمات رقمية", "Digital Services")}</span></div>
+          <div className="navitem" onClick={() => go("/cards")}><Globe size={19} /><span>{t("الكروت والخدمات الرقمية", "Cards & Digital")}</span></div>
+          <div className="navitem" onClick={() => go("/market")}><ShieldCheck size={19} /><span>{t("سوق المستعمل بضمان", "Used Market")}</span></div>
+          <div className="navitem" onClick={() => go("/gift")}><Gift size={19} /><span>{t("هدية اليوم", "Daily Gift")}</span></div>
           <div className="navitem" onClick={() => go("/our-sites")}><Building2 size={19} /><span>{t("مواقعنا", "Our Sites")}</span></div>
           <div className="side-group">{t("حسابي", "My account")}</div>
           <div className="navitem" onClick={() => go("/orders")}><Package size={19} /><span>{t("تتبّع طلبك", "Track order")}</span></div>

@@ -12,6 +12,7 @@ const allNavItems = [
   { label: "فحص المنتجات", icon: ShieldCheck,     href: "/admin/catalog",   adminOnly: false },
   { label: "هدية اليوم",  icon: Gift,             href: "/admin/gift",      adminOnly: false },
   { label: "سوق المستعمل", icon: Store,           href: "/admin/market",    adminOnly: false },
+  { label: "الكروت",      icon: CreditCard,        href: "/admin/cards",     adminOnly: false },
   { label: "الطلبات",     icon: ShoppingBag,      href: "/admin/orders",    adminOnly: false },
   { label: "الصيانة",     icon: Wrench,            href: "/admin/maintenance", adminOnly: false },
   { label: "الإعلانات",   icon: Megaphone,        href: "/admin/ads",       adminOnly: false },

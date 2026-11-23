@@ -1272,3 +1272,21 @@ html.mo-auto .fp-float, html.mo-auto .fp-shadow { animation: none !important; }
 .mk-msg.me{align-self:flex-start;background:linear-gradient(135deg,#0e7490,#2563eb);color:#fff}
 .mk-msg.adm{align-self:center;background:rgba(251,191,36,.15);color:#fde68a}
 .mk-msg small{display:block;font-size:10px;opacity:.6;margin-top:2px}
+
+/* ───────── الكروت ───────── */
+.cd-hero{display:flex;align-items:center;gap:14px;padding:18px 20px}.cd-hero h2{margin:0;font-size:18px;font-weight:900}.cd-hero p{margin:4px 0 0;font-size:13px;color:var(--muted)}
+.cd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.cd-card{--c:#0e7490;position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:6px;aspect-ratio:1.6;padding:12px 14px;border-radius:18px;border:1px solid rgba(255,255,255,.25);color:#fff;text-align:start;cursor:pointer;overflow:hidden;
+  background:linear-gradient(135deg,var(--c),color-mix(in oklab,var(--c) 55%,#000));box-shadow:0 14px 28px -16px rgba(0,0,0,.6);transition:transform .2s}
+.cd-card::after{content:"";position:absolute;inset:0;background:linear-gradient(120deg,rgba(255,255,255,.28),transparent 40%);pointer-events:none}
+.cd-card:hover{transform:translateY(-3px) rotate(-.6deg)}
+.cd-card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.9}
+.cd-card b{position:relative;font-size:18px;font-weight:900;margin-top:auto}
+.cd-brand{position:relative;font-size:12px;font-weight:800;opacity:.9}
+.cd-price{position:relative;font-size:13px;font-weight:800;padding:2px 9px;border-radius:99px;background:rgba(255,255,255,.22)}
+.cd-card.big{width:100%;max-width:300px;margin:0 auto;cursor:default}
+.cd-sheet{position:relative;width:100%;max-width:380px;padding:20px;display:flex;flex-direction:column;gap:12px;text-align:center;background:var(--surface,#121826)}
+.cd-x{position:absolute;top:10px;inset-inline-end:10px;background:none;border:0;color:inherit;opacity:.7}
+.cd-qty{display:flex;align-items:center;justify-content:center;gap:16px}.cd-qty button{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:inherit}.cd-qty b{font-size:22px;min-width:30px}
+.cd-code{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:rgba(127,243,255,.08);border:1px dashed rgba(127,243,255,.45)}
+.cd-code span{flex:1;font-size:16px;letter-spacing:1.5px}.cd-code small{font-size:11px;opacity:.7}.cd-code button{background:none;border:0;color:#7ff3ff;cursor:pointer}
