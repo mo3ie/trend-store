@@ -626,7 +626,7 @@ export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Pr
               <div className="text-center">
                 <div className="text-5xl mb-3">🔐</div>
                 <h3 className="font-bold text-[var(--text)] mb-1">رمز التحقق</h3>
-                {otpProvider === "mobicash" ? (
+                {otpProvider === "mobicash" || otpProvider === "bank" ? (
                   <p className="text-[var(--muted)] text-sm">
                     أُرسل رمز التحقق إلى هاتفك المرتبط بالبطاقة — صالح لمدة <strong>5 دقائق</strong>
                   </p>
@@ -642,7 +642,7 @@ export default function WalletModal({ onClose, payAmount, payLabel, onPaid }: Pr
                 type="tel"
                 inputMode="numeric"
                 maxLength={8}
-                placeholder={otpProvider === "mobicash" ? "000000" : "0000"}
+                placeholder={otpProvider === "edfali" ? "0000" : "000000"}
                 value={otpCode}
                 onChange={e => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
                 className="w-full px-4 py-4 rounded-2xl bg-[var(--input)] border border-purple-500/40 text-[var(--text)] text-3xl text-center font-black tracking-widest focus:outline-none focus:border-purple-500 transition-all"
