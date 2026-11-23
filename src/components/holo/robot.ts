@@ -230,8 +230,8 @@ export async function buildRobotAsync(THREE: typeof THREE_NS, canvas: HTMLCanvas
   add(torso, new THREE.CapsuleGeometry(0.33, 0.34, 12, 40), ceramic, 0, 0.02, 0, 1.18, 1, 0.82);
   // Chest glass plate with the TREND mark
   const logoMat = new THREE.MeshPhysicalMaterial({ color: 0x06080c, roughness: 0.08, clearcoat: 1, emissive: 0xffffff, emissiveMap: logoTexture(THREE), emissiveIntensity: 0.9 });
-  const plate = add(torso, new THREE.CapsuleGeometry(0.055, 0.2, 6, 20), logoMat, 0, 0.1, 0.262, 1, 1, 0.35);
-  plate.rotation.z = Math.PI / 2;
+  // Curved panel that follows the chest (elliptical torso: x-radius 0.39, z-radius 0.27).
+  add(torso, new THREE.CylinderGeometry(0.398, 0.398, 0.12, 32, 1, true, -0.42, 0.84), logoMat, 0, 0.12, 0, 1, 1, 0.71);
   // Waist: black band + glow line
   add(torso, new THREE.CylinderGeometry(0.31, 0.27, 0.1, 40), black, 0, -0.34, 0, 1.1, 1, 0.8);
   const wr = ring(torso, 0.3, -0.31); wr.scale.set(1.1, 0.8, 1);
