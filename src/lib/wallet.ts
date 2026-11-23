@@ -28,22 +28,19 @@ export async function getBalance(userId: string): Promise<number> {
  * insufficient-funds case is handled in one place.
  */
 export async function creditWallet(userId: string, amount: number): Promise<number> {
-  const current = await getBalance(userId);
-  const next = current + amount;
-  const nowIso = new Date().toISOString();
-
-  await supabaseAdmin.from("wallets")
-    .upsert({ user_id: userId, balance: next, updated_at: nowIso }, { onConflict: "user_id" });
-
-  return next;
+  // Atomic (row-locked) in the database — see sql/33_wallet_atomic.sql.
+  const { data, error } = await supabaseAdmin.rpc("wallet_adjust", { p_user: userId, p_delta: amount, p_allow_negative: true });
+  if (error) throw new Error(error.message);
+  return Number(data);
 }
 
 /**
  * Take money out, refusing rather than going negative.
  * Returns the new balance, or null when the wallet cannot cover it.
+ * Atomic: two debits racing for the same balance cannot both succeed.
  */
 export async function debitWallet(userId: string, amount: number): Promise<number | null> {
-  const current = await getBalance(userId);
-  if (current < amount) return null;
-  return await creditWallet(userId, -amount);
+  const { data, error } = await supabaseAdmin.rpc("wallet_adjust", { p_user: userId, p_delta: -amount, p_allow_negative: false });
+  if (error) throw new Error(error.message);
+  return data === null ? null : Number(data);
 }
