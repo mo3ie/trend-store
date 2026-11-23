@@ -10,6 +10,7 @@ import {
 import dynamic from "next/dynamic";
 const Spin360 = dynamic(() => import("@/components/three/Spin360"), { ssr: false });
 const Model3D = dynamic(() => import("@/components/three/Model3D"), { ssr: false });
+const FloatingProduct = dynamic(() => import("@/components/three/FloatingProduct"), { ssr: false });
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
 import { useLang } from "@/hooks/useLang";
@@ -154,7 +155,7 @@ export default function ProductView() {
                   ) : view === "model" && product.model_url ? (
                     <Model3D src={product.model_url} poster={images[0]} alt={product.name} />
                   ) : images.length > 0 ? (
-                    <img key={activeImage} src={images[activeImage]} alt={product.name} className="gp-shot" />
+                    <FloatingProduct key={activeImage} src={images[activeImage]} alt={product.name} />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-[#8aa0ad] gap-3"><Package size={64} /><span className="text-sm">{t("لا توجد صورة", "No image")}</span></div>
                   )}
