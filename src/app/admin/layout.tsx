@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Package, ShoppingBag, Users, Settings, LogOut, ChevronRight, Menu, X, Megaphone, Building2, Image as ImageIcon, Wrench, Bot, CreditCard, ShieldCheck, Gift, Store, Gamepad2 } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, Users, Settings, LogOut, ChevronRight, Menu, X, Megaphone, Building2, Image as ImageIcon, Wrench, Bot, CreditCard, Zap, ShieldCheck, Gift, Store, Gamepad2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -14,6 +14,7 @@ const allNavItems = [
   { label: "التحديات والألعاب", icon: Gamepad2,   href: "/admin/games",     adminOnly: false },
   { label: "سوق المستعمل", icon: Store,           href: "/admin/market",    adminOnly: false },
   { label: "الكروت",      icon: CreditCard,        href: "/admin/cards",     adminOnly: false },
+  { label: "الكهرباء والشحن", icon: Zap,           href: "/admin/utilities", adminOnly: false },
   { label: "الطلبات",     icon: ShoppingBag,      href: "/admin/orders",    adminOnly: false },
   { label: "الصيانة",     icon: Wrench,            href: "/admin/maintenance", adminOnly: false },
   { label: "الإعلانات",   icon: Megaphone,        href: "/admin/ads",       adminOnly: false },

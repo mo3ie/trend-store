@@ -125,5 +125,10 @@ export function anisRefusalAr(code: string): string {
     card_unavailable: "الكرت غير متوفر حالياً",
     daily_limit_exceeded: "تم الوصول لحد الشراء اليومي",
     spending_limit_exceeded: "تم الوصول لحد الشراء اليومي",
+    validation_failed: "بيانات غير صحيحة — تأكد من الرقم والمبلغ",
+    amount_out_of_range: "المبلغ خارج الحدود المسموحة",
+    meter_rejected: "رقم العداد غير مقبول — تأكد منه",
+    package_unavailable: "الباقة غير متوفرة حالياً",
+    direct_recharge_product_unavailable: "الخدمة غير متاحة حالياً",
   } as Record<string, string>)[code] || `رفض المزوّد (${code})`;
 }

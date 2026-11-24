@@ -39,6 +39,7 @@ export default function CardsPage() {
       <header className="gp-top flex items-center gap-4 px-6 py-4">
         <a href="/" className="text-[var(--muted)] hover:text-[var(--text)]"><ArrowRight size={20} /></a>
         <h1 className="text-lg font-bold flex-1">الكروت والخدمات الرقمية</h1>
+        <a href="/utilities" className="gp-btn gp-btn-ghost text-sm px-3 py-2"><Zap size={15} /> كهرباء وشحن مباشر</a>
         <a href="/cards/orders" className="gp-btn gp-btn-ghost text-sm px-3 py-2"><Ticket size={15} /> كروتي</a>
       </header>
       <div className="gp-wrap w-full space-y-5">
