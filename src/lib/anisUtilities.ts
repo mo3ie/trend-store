@@ -194,7 +194,7 @@ export async function settleUtility(id: string, resume = true): Promise<string> 
       const v = meterView(m);
       if (m.status === "succeeded") {
         const { data: done } = await db.from("utility_orders").update({ status: "succeeded", provider_status: "succeeded", result: v, updated_at: new Date().toISOString() }).eq("id", id).eq("status", "processing").select("id").maybeSingle();
-        if (done) await notify(o.user_id, "⚡ تم شحن الكهرباء", `${o.title} — العداد ${String(q.meterNumber)}. الرموز في «طلباتي».`);
+        if (done) await notify(o.user_id, "⚡ تم شحن الكهرباء", `${o.title} — العداد ${String(q.meterNumber)}. الرموز في «شحناتي».`);
         return "succeeded";
       }
       if (m.status === "failed") {

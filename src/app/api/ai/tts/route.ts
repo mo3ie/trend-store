@@ -11,7 +11,8 @@ const VOICE = process.env.TRENDY_VOICE || "fahad";
 
 export async function POST(req: NextRequest) {
   const key = process.env.GROQ_API_KEY;
-  if (!key) return NextResponse.json({ error: "no_tts" }, { status: 503 });
+  // Paid voice — off until explicitly enabled (free browser voice is used meanwhile).
+  if (process.env.NEXT_PUBLIC_TRENDY_TTS !== "groq" || !key) return NextResponse.json({ error: "no_tts" }, { status: 503 });
   const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "x";
   if (rateLimited(`tts:${ip}`, 40, 10 * 60_000)) return NextResponse.json({ error: "rate" }, { status: 429 });
   const { text } = await req.json().catch(() => ({ text: "" }));
