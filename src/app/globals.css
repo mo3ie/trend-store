@@ -1471,3 +1471,8 @@ html.light .sbx-drop{background:rgba(255,255,255,.97);color:#18232c}
 .holo-mini.roam.left .holo-stage{animation-name:holoWalkL}
 @keyframes holoWalk{0%,100%{transform:rotate(-4deg) translateY(0)}50%{transform:rotate(4deg) translateY(-3px)}}
 @keyframes holoWalkL{0%,100%{transform:rotate(4deg) translateY(0)}50%{transform:rotate(-4deg) translateY(-3px)}}
+
+/* Fallback when a photo can't be cut out: NO inner card/frame — the photo melts into the big stage */
+.fp-photo img{border-radius:0 !important;box-shadow:none !important;
+  -webkit-mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,#000 62%,transparent 100%);mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,#000 62%,transparent 100%)}
+.fp-photo .fp-glare{display:none}

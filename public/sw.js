@@ -8,7 +8,7 @@
 //  • page navigations                                  → network-first (3.5 s) → cached copy → /offline
 //  • EVERYTHING ELSE under /api (wallet, orders, auth, payments, cards/utilities purchases, admin…)
 //    and every non-GET request                         → straight to the network, never cached.
-const V = "v4";
+const V = "v5";
 const STATIC = `trend-static-${V}`, PAGES = `trend-pages-${V}`, IMG = `trend-img-${V}`, API = `trend-api-${V}`;
 const PRECACHE = ["/", "/offline", "/icon-192.png", "/icon-512.png", "/apple-icon.png", "/brand/trend-logo.png", "/manifest.webmanifest"];
 
@@ -36,7 +36,7 @@ async function trim(name, max) {
   const c = await caches.open(name), keys = await c.keys();
   for (let i = 0; i < keys.length - max; i++) await c.delete(keys[i]);
 }
-const okToStore = (res) => res && (res.ok || res.type === "opaque") && !res.headers.get("set-cookie");
+const okToStore = (res) => res && res.ok && res.type !== "opaque";   // never keep opaque (unreadable, quota-heavy) copies
 
 async function cacheFirst(req, name, max) {
   const hit = await caches.match(req);
@@ -90,8 +90,10 @@ self.addEventListener("fetch", (event) => {
     if (/\.(?:glb|gltf|usdz)$/.test(p)) return event.respondWith(cacheFirst(req, IMG, 300));
     return;                                                // RSC/data requests etc. → network
   }
-  if (SUPA_IMG.test(req.url)) return event.respondWith(staleWhileRevalidate(event, req, IMG, 300));
-  if (CDN.test(req.url)) return event.respondWith(cacheFirst(req, STATIC, 400));
+  // Supabase images are fetched by the worker in CORS mode so the cached copy stays READABLE
+  // (the floating product cut-out reads pixels; an opaque/no-cors copy would block it).
+  if (SUPA_IMG.test(req.url)) return event.respondWith(staleWhileRevalidate(event, new Request(req.url, { mode: "cors", credentials: "omit" }), IMG, 300));
+  if (CDN.test(req.url)) return event.respondWith(cacheFirst(new Request(req.url, { mode: "cors", credentials: "omit" }), STATIC, 400));
 });
 
 self.addEventListener("message", (e) => { if (e.data === "skipWaiting") self.skipWaiting(); });
