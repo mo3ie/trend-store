@@ -5,7 +5,7 @@ import { ShieldCheck, AlertTriangle, AlertCircle, Info, Sparkles, RefreshCw, Loa
 
 type Issue = { product_id: string; name: string; severity: "high" | "medium" | "low"; code: string; message: string };
 type Fix = { product_id: string; name: string; action: string; detail: string; sources?: { title: string; url: string }[] };
-type Summary = { high: number; medium: number; low: number; ai_descriptions: number; ai_available: boolean; still_missing_descriptions: number };
+type Summary = { high: number; medium: number; low: number; ai_descriptions: number; ai_available: boolean; still_missing_descriptions: number; search_rate_limited?: number };
 type Report = { id: string; created_at: string; trigger: string; checked: number; issues: Issue[]; fixes: Fix[]; summary: Summary };
 type Hist = { id: string; created_at: string; trigger: string; checked: number; summary: Summary };
 
@@ -89,6 +89,12 @@ export default function CatalogHealthPage() {
               <div className="text-xs">وصف كتبه الذكاء{report.summary.ai_available ? "" : " (الذكاء غير متاح)"}</div>
             </div>
           </div>
+
+          {!!report.summary.search_rate_limited && (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-300">
+              ⏳ خدمة البحث المجانية وصلت حدّها المؤقت — {report.summary.search_rate_limited} منتج تأجّل وصفه للفحص الجاي (تلقائياً، ما تحتاج تدير شي). الحد يتجدد مع الوقت.
+            </div>
+          )}
 
           {report.fixes.length > 0 && (
             <section className="rounded-2xl border border-cyan-500/30 bg-[var(--surface)] p-5 space-y-3">

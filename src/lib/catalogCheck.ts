@@ -47,6 +47,9 @@ type Grounded = { text: string; sources: { title: string; url: string }[] } | { 
  * on our side that every cited link really came from its search results; a
  * description with no verified source is rejected and NOT saved.
  */
+// Models whose free quota ran out during the current run (reset every run).
+let exhausted = new Set<string>();
+
 async function writeDescription(p: Row): Promise<Grounded> {
   const key = (process.env.GROQ_API_KEY || "").trim();
   if (!key) return { error: "no_search" };
@@ -68,19 +71,28 @@ Output JSON only:
         { role: "user", content: `Product name: ${p.name}\nCategory: ${p.category || "-"}${variants ? `\nOptions: ${variants}` : ""}` },
   ];
   let res: Response | null = null, lastStatus = 0;
+  const call = (c: { model: string; tools?: unknown[] }) => fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+    cache: "no-store",
+    body: JSON.stringify({ model: c.model, temperature: 0.1, max_tokens: 1500, messages, ...(c.tools ? { tools: c.tools, reasoning_effort: "low" } : {}) }),
+  });
   for (const c of candidates) {
-    res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-      cache: "no-store",
-      body: JSON.stringify({ model: c.model, temperature: 0.1, max_tokens: 1500, messages, ...(c.tools ? { tools: c.tools, reasoning_effort: "low" } : {}) }),
-    });
+    if (exhausted.has(c.model)) continue;
+    res = await call(c);
+    // 429 = this model's free quota is spent for now. A short wait (Retry-After ≤ 8s) → retry once;
+    // otherwise move on to the next model (each has its own quota) and skip it for the rest of this run.
+    if (res.status === 429) {
+      const wait = Number(res.headers.get("retry-after")) || 0;
+      if (wait > 0 && wait <= 8) { await new Promise((r) => setTimeout(r, wait * 1000 + 300)); res = await call(c); }
+      if (res.status === 429) exhausted.add(c.model);
+    }
     if (res.ok) break;
     lastStatus = res.status;
-    if (![400, 403, 404].includes(res.status)) break; // 429/5xx: stop now, retry next run
+    if (![400, 403, 404, 429].includes(res.status)) break; // 5xx: provider down, retry next run
     res = null;
   }
-  if (!res || !res.ok) return { error: `search_http_${res?.status || lastStatus}` };
+  if (!res || !res.ok) return { error: (res?.status || lastStatus) === 429 ? "rate_limited" : `search_http_${res?.status || lastStatus}` };
   const data = await res.json() as { choices?: { message?: { content?: string; executed_tools?: { search_results?: { results?: { url?: string; title?: string }[] } }[] } }[] };
   const msg = data.choices?.[0]?.message;
   const searched = new Set<string>();
@@ -164,17 +176,21 @@ export async function runCatalogCheck(trigger: "cron" | "manual") {
   }
 
   // AI: fill missing descriptions
-  let aiDone = 0;
+  let aiDone = 0, searchLimited = 0;
   const NOT_FOUND: Record<string, string> = {
     not_found: "ما لقيناش المنتج بالضبط في المصادر على الإنترنت — ما كتبناش وصف (اكتبه يدوياً أو صحّح الاسم)",
     unverified_sources: "الذكاء ما قدرش يثبت مصادر حقيقية — رفضنا الوصف وما حفظناهوش",
     no_search_results: "البحث على الإنترنت ما رجّعش نتائج — بنحاول مرة ثانية في الفحص الجاي",
   };
   if (hasAI()) {
-    for (const p of rows.filter((r) => !r.description?.trim() && (r.name || "").trim().length >= 3).slice(0, AI_PER_RUN)) {
+    exhausted = new Set();
+    const todo = rows.filter((r) => !r.description?.trim() && (r.name || "").trim().length >= 3).slice(0, AI_PER_RUN);
+    for (const p of todo) {
       if (Date.now() - started > 42_000) break; // leave time to save the report
+      if (searchLimited) break; // free search quota spent → stop quietly, the next run continues
       try {
         const d = await writeDescription(p);
+        if ("error" in d && d.error === "rate_limited") { searchLimited = todo.length - todo.indexOf(p); continue; }
         if ("error" in d) {
           if (NOT_FOUND[d.error]) add(p, "low", "ai_no_source", NOT_FOUND[d.error]);
           else add(p, "low", "ai_error", "تعذّر الوصول لخدمة البحث (" + d.error + ") — بنحاول في الفحص الجاي");
@@ -199,6 +215,7 @@ export async function runCatalogCheck(trigger: "cron" | "manual") {
     ai_descriptions: aiDone,
     ai_available: hasAI(),
     still_missing_descriptions: rows.filter((r) => !r.description?.trim()).length - aiDone,
+    search_rate_limited: searchLimited, // products postponed because the free web-search quota ran out
   };
   const { data: rep } = await db.from("catalog_reports")
     .insert({ trigger, checked: rows.length, issues, fixes, summary }).select("id,created_at").single();
