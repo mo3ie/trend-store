@@ -21,6 +21,30 @@ export default function HoloBot() {
   const [chat, setChat] = useState(false);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null); // px from left/top
   const drag = useRef<{ sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
+  const [roam, setRoam] = useState<"" | "right" | "left">("");
+  const restUntil = useRef(0); // after a drag the robot stays where it was put for a while
+
+  // Free roaming: every few seconds glide to a random spot on the screen (not while chatting or being dragged).
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout>, stop: ReturnType<typeof setTimeout>;
+    const step = () => {
+      t = setTimeout(() => {
+        if (!chat && !drag.current && Date.now() > restUntil.current && document.visibilityState === "visible" && box.current) {
+          const w = box.current.offsetWidth || 90, h = box.current.offsetHeight || 110;
+          const cur = box.current.getBoundingClientRect();
+          const target = clamp({ x: 8 + Math.random() * (window.innerWidth - w - 16), y: 90 + Math.random() * (window.innerHeight - h - 110) });
+          setRoam(target.x < cur.left ? "left" : "right");
+          setPos(target);
+          if (Math.random() < 0.35) bot.current?.setMood("happy");
+          stop = setTimeout(() => { setRoam(""); if (Math.random() < 0.4) bot.current?.wave(); bot.current?.setMood("neutral"); }, 3300);
+        }
+        step();
+      }, 6500 + Math.random() * 6000);
+    };
+    step();
+    return () => { clearTimeout(t); clearTimeout(stop); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat]);
 
   useEffect(() => {
     try { const p = JSON.parse(localStorage.getItem(KEY) || "null"); if (p && typeof p.x === "number") setPos(clamp(p)); } catch {}
@@ -39,6 +63,7 @@ export default function HoloBot() {
   const onDown = (e: React.PointerEvent) => {
     const r = box.current!.getBoundingClientRect();
     drag.current = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, moved: false };
+    setRoam("");
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
   };
   const onMove = (e: React.PointerEvent) => {
@@ -53,7 +78,7 @@ export default function HoloBot() {
     const d = drag.current;
     drag.current = null;
     if (!d) return;
-    if (d.moved) { setPos((p) => { try { if (p) localStorage.setItem(KEY, JSON.stringify(p)); } catch {} return p; }); return; }
+    if (d.moved) { restUntil.current = Date.now() + 25000; setPos((p) => { try { if (p) localStorage.setItem(KEY, JSON.stringify(p)); } catch {} return p; }); return; }
     setChat((c) => !c); bot.current?.wave(); bot.current?.setMood("listening");
   };
 
@@ -65,7 +90,7 @@ export default function HoloBot() {
 
   return (
     <>
-      <div ref={box} className={`holo holo-mini ${pos ? "placed" : ""}`} style={pos ? { left: pos.x, top: pos.y, bottom: "auto", right: "auto" } : undefined}>
+      <div ref={box} className={`holo holo-mini ${pos ? "placed" : ""} ${roam ? `roam ${roam}` : ""}`} style={pos ? { left: pos.x, top: pos.y, bottom: "auto", right: "auto" } : undefined}>
         <button className="holo-stage" aria-label="TREND AI — اسأل ترندي (اسحبه لتحريكه)" title="اضغط للمحادثة — اسحب لتحريكه"
           onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { drag.current = null; }}
           style={{ touchAction: "none", cursor: "grab" }}>

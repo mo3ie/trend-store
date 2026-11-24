@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Send, Stethoscope, Wrench, Sparkles } from "lucide-react";
+import { X, Send, Stethoscope, Wrench, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { speak, stopVoice, voiceOn, setVoiceOn } from "./trendyVoice";
 
 type P = { id: string; name: string; price: number; image_url: string | null; inStock: boolean };
 type M = { role: "user" | "assistant"; content: string; products?: P[]; action?: string | null };
@@ -24,6 +25,9 @@ export default function TrendyChat({ open, onClose, onState }: { open: boolean; 
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
+  const [voice, setVoice] = useState(true);
+  useEffect(() => { setVoice(voiceOn()); }, []);
+  useEffect(() => { if (!open) stopVoice(); }, [open]);
 
   useEffect(() => {
     setMounted(true);
@@ -42,6 +46,7 @@ export default function TrendyChat({ open, onClose, onState }: { open: boolean; 
     setText("");
     setBusy(true);
     onState?.("thinking");
+    let reply = "";
     try {
       const r = await fetch("/api/ai/assistant", {
         method: "POST",
@@ -50,12 +55,13 @@ export default function TrendyChat({ open, onClose, onState }: { open: boolean; 
       });
       const d = await r.json();
       setMsgs([...next, { role: "assistant", content: d.reply || "…", products: d.products || [], action: d.action }]);
+      reply = d.reply || "";
     } catch {
       setMsgs([...next, { role: "assistant", content: "ما قدرتش نوصل للسيرفر، جرّب مرة ثانية." }]);
     } finally {
       setBusy(false);
-      onState?.("speaking");
-      setTimeout(() => onState?.("idle"), 2200);
+      if (reply && voiceOn()) speak(reply, { start: () => onState?.("speaking"), end: () => onState?.("idle") });
+      else { onState?.("speaking"); setTimeout(() => onState?.("idle"), 2200); }
     }
   };
 
@@ -67,6 +73,7 @@ export default function TrendyChat({ open, onClose, onState }: { open: boolean; 
         <header className="tc-head">
           <span className="tc-orb" aria-hidden><Sparkles size={16} /></span>
           <div className="tc-title"><b>ترندي</b><small>مساعدك الذكي في محل ترند</small></div>
+          <button className="tc-x" onClick={() => { const n = !voice; setVoice(n); setVoiceOn(n); if (n) speak("هلا! أنا ترندي، تحت أمرك."); }} aria-label={voice ? "إيقاف الصوت" : "تشغيل الصوت"} title={voice ? "إيقاف صوت ترندي" : "تشغيل صوت ترندي"}>{voice ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
           <button className="tc-x" onClick={onClose} aria-label="إغلاق"><X size={18} /></button>
         </header>
 
