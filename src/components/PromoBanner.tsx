@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Gift, ShieldCheck, Microscope, ShoppingBag, CreditCard, Trophy, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { Gift, ShieldCheck, Microscope, ShoppingBag, CreditCard, Trophy, ChevronLeft, ChevronRight, Sparkles, Zap, Send } from "lucide-react";
 
 type Product = { id: string; name: string; price: number; image_url?: string | null };
 type Slide = { key: string; kicker: string; title: string; sub: string; cta: string; href: string; theme: string; Icon: typeof Gift; img?: string | null };
@@ -18,6 +18,8 @@ export default function PromoBanner({ products }: { products: Product[] }) {
     { key: "market", kicker: "جديد", title: "سوق المستعمل بضمان", sub: "بيع واشري مستعمل — ترند تمسك الفلوس لين تستلم وتتأكد", cta: "ادخل السوق", href: "/market", theme: "teal", Icon: ShieldCheck },
     { key: "deep", kicker: "5 د.ل فقط", title: "الفحص العميق للآيفون", sub: "صحة البطارية الحقيقية وأعطال النظام — من جوالك بدون كابل", cta: "افحص جهازك", href: "/deep-scan", theme: "violet", Icon: Microscope },
     { key: "shein", kicker: "توصيل لكل ليبيا", title: "اطلب من شي إن", sub: "سعر السلة بالدينار في ثواني — وادفع بالطريقة اللي تناسبك", cta: "ابدأ طلبك", href: "https://order.trendstore-ly.com", theme: "pink", Icon: ShoppingBag },
+    { key: "electricity", kicker: "خالص ⚡ جديد", title: "اشحن عداد الكهرباء", sub: "اختار الباقة واكتب رقم العداد — رموز الشحن توصلك في ثواني من محفظتك", cta: "اشحن الآن", href: "/electricity", theme: "amber", Icon: Zap },
+    { key: "recharge", kicker: "جديد", title: "الشحن المباشر", sub: "فودافون كاش، إنستا باي و USDT — ادفع بالدينار والمستلم يوصله المبلغ", cta: "أرسل شحنة", href: "/recharge", theme: "emerald", Icon: Send },
     { key: "cards", kicker: "محلية ودولية", title: "كروت الشحن والألعاب", sub: "ليبيانا، المدار، PlayStation، iTunes، PUBG… من محفظتك", cta: "تصفّح الكروت", href: "/cards", theme: "blue", Icon: CreditCard },
     { key: "games", kicker: "جوائز أسبوعية", title: "تحديات ترند", sub: "العب كل يوم، اجمع نقاط، وأعلى 3 يفوزوا", cta: "العب الآن", href: "/games", theme: "lime", Icon: Trophy },
   ];

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Home as HomeIcon, ShoppingCart, Wrench, Laptop, Gamepad2, Globe, Smartphone, Megaphone, Package, Heart, Wallet, Settings, Menu, Search, Sun, Moon, Building2, Headphones, Phone, MapPin, ShieldCheck, Truck, RotateCcw, Lock, BadgeCheck, MessageCircle, Check, X, MessagesSquare, Music2, Stethoscope, LayoutDashboard, Gift, Zap, Send } from "lucide-react";
+import { Home as HomeIcon, ShoppingCart, Wrench, Laptop, Gamepad2, Globe, Smartphone, Megaphone, Package, Heart, Wallet, Settings, Menu, Search, Sun, Moon, Building2, Headphones, Phone, MapPin, ShieldCheck, Truck, RotateCcw, Lock, BadgeCheck, MessageCircle, Check, X, MessagesSquare, Music2, Stethoscope, LayoutDashboard, Gift, Zap, Send, Download } from "lucide-react";
 import WalletModal from "@/components/WalletModal";
 import DiagnoseShowcase from "@/components/DiagnoseShowcase";
 import DailyGift from "@/components/DailyGift";
 import PromoBanner from "@/components/PromoBanner";
 import SearchBox from "@/components/SearchBox";
+import InstallApp from "@/components/InstallApp";
 import { supabase } from "@/lib/supabaseClient";
 import dynamic from "next/dynamic";
 const HeroRobot = dynamic(() => import("@/components/holo/HeroRobot"), { ssr: false, loading: () => <div className="g-hero g-hero-bot" /> });
@@ -150,6 +151,7 @@ export default function Home() {
           <SearchBox placeholder={t("ابحث عن منتج أو خدمة…", "Search products or services…")} />
         </div>
         {isStaff && <a className="adminbtn" href="/admin" title={t("لوحة الإدارة", "Admin")}><LayoutDashboard size={18} /><span>{t("الإدارة", "Admin")}</span></a>}
+        <InstallApp label={t("حمّل التطبيق", "Get the app")} />
         <button className="iconbtn langbtn" onClick={toggleLang}>{lang === "ar" ? "EN" : "ع"}</button>
         <button className="iconbtn" aria-label="theme" onClick={toggleTheme}>{light ? <Moon size={19} /> : <Sun size={19} />}</button>
         {user && <span className="hide-sm flex"><NotificationBell /></span>}
@@ -179,6 +181,7 @@ export default function Home() {
           <div className="navitem" onClick={() => go("/gift")}><Gift size={19} /><span>{t("هدية اليوم", "Daily Gift")}</span></div>
           <div className="navitem" onClick={() => go("/games")}><Gamepad2 size={19} /><span>{t("تحديات وألعاب", "Games")}</span></div>
           <div className="navitem" onClick={() => go("/our-sites")}><Building2 size={19} /><span>{t("مواقعنا", "Our Sites")}</span></div>
+          <div className="navitem navinstall" onClick={() => { setMenuOpen(false); window.dispatchEvent(new Event("trend:install")); }}><Download size={19} /><span>{t("حمّل تطبيق ترند", "Install the app")}</span></div>
           <div className="side-group">{t("حسابي", "My account")}</div>
           <div className="navitem" onClick={() => go("/orders")}><Package size={19} /><span>{t("تتبّع طلبك", "Track order")}</span></div>
           <div className="navitem" onClick={() => go("/account?tab=favorites")}><Heart size={19} /><span>{t("المفضلة", "Favorites")}</span></div>

@@ -1342,10 +1342,12 @@ html.mo-auto .fp-float, html.mo-auto .fp-shadow { animation: none !important; }
 .pb-slide.t-pink{background:radial-gradient(120% 140% at 85% 30%,#6a1d4d 0%,#2a1638 55%,#0f0f1e 100%)}
 .pb-slide.t-blue{background:radial-gradient(120% 140% at 85% 30%,#173d8a 0%,#14224a 55%,#0a1020 100%)}
 .pb-slide.t-lime{background:radial-gradient(120% 140% at 85% 30%,#355c12 0%,#1b2f2a 55%,#0b1416 100%)}
+.pb-slide.t-amber{background:radial-gradient(120% 140% at 85% 30%,#6b4a06 0%,#33240f 55%,#110f12 100%)}
+.pb-slide.t-emerald{background:radial-gradient(120% 140% at 85% 30%,#065f46 0%,#0f2f33 55%,#0a1416 100%)}
 .pb-orb{position:absolute;border-radius:50%;filter:blur(40px);opacity:.55;pointer-events:none;z-index:-1}
 .pb-orb.o1{width:260px;height:260px;right:-60px;top:-80px;background:var(--pb-a,#38e8ff);animation:pbOrb 9s ease-in-out infinite}
 .pb-orb.o2{width:200px;height:200px;left:30%;bottom:-120px;background:var(--pb-b,#a78bfa);animation:pbOrb 11s ease-in-out infinite reverse}
-.t-gold{--pb-a:#fbbf24;--pb-b:#f97316}.t-cyan{--pb-a:#38e8ff;--pb-b:#3b82f6}.t-teal{--pb-a:#2dd4bf;--pb-b:#22c55e}.t-violet{--pb-a:#a78bfa;--pb-b:#ec4899}.t-pink{--pb-a:#f472b6;--pb-b:#a855f7}.t-blue{--pb-a:#60a5fa;--pb-b:#22d3ee}.t-lime{--pb-a:#a3e635;--pb-b:#facc15}
+.t-gold{--pb-a:#fbbf24;--pb-b:#f97316}.t-cyan{--pb-a:#38e8ff;--pb-b:#3b82f6}.t-teal{--pb-a:#2dd4bf;--pb-b:#22c55e}.t-violet{--pb-a:#a78bfa;--pb-b:#ec4899}.t-pink{--pb-a:#f472b6;--pb-b:#a855f7}.t-blue{--pb-a:#60a5fa;--pb-b:#22d3ee}.t-lime{--pb-a:#a3e635;--pb-b:#facc15}.t-amber{--pb-a:#fde047;--pb-b:#f59e0b}.t-emerald{--pb-a:#34d399;--pb-b:#06b6d4}
 @keyframes pbOrb{0%,100%{transform:translate(0,0)}50%{transform:translate(-30px,25px)}}
 .pb-grid{position:absolute;inset:0;z-index:-1;opacity:.18;background-image:linear-gradient(rgba(255,255,255,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.12) 1px,transparent 1px);background-size:34px 34px;mask-image:radial-gradient(circle at 80% 40%,#000,transparent 70%)}
 .pb-copy{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
@@ -1445,3 +1447,20 @@ html.light .sbx-drop{background:rgba(255,255,255,.97);color:#18232c}
 .holo-mini.placed{transition:none}.holo-mini .holo-stage:active{cursor:grabbing}
 .dsx-shots{display:flex;gap:8px;flex-wrap:wrap}.dsx-shots div{position:relative;width:70px;height:120px;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.2)}
 .dsx-shots img{width:100%;height:100%;object-fit:cover}.dsx-shots button{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;line-height:1;cursor:pointer}
+
+/* ── Install app (PWA) ── */
+.home2 .installbtn{flex:none;height:42px;display:inline-flex;align-items:center;gap:7px;padding:0 14px;border-radius:13px;font-size:13px;font-weight:800;border:0;cursor:pointer;color:#fff;
+  background:linear-gradient(90deg,#7c3aed,#2563eb);box-shadow:0 8px 22px -10px rgba(124,58,237,.9);animation:instPulse 2.6s ease-in-out infinite}
+.home2 .installbtn:hover{transform:translateY(-1px)}
+@keyframes instPulse{0%,100%{box-shadow:0 8px 22px -10px rgba(124,58,237,.9)}50%{box-shadow:0 0 0 5px rgba(124,58,237,.18),0 8px 22px -10px rgba(124,58,237,.9)}}
+@media (max-width:560px){.home2 .installbtn{padding:0;width:42px;justify-content:center}.home2 .installbtn span{display:none}}
+.home2 .navinstall{color:#c4b5fd;font-weight:800}
+.inst-back{position:fixed;inset:0;z-index:1000;background:rgba(3,6,15,.6);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center}
+@media (min-width:640px){.inst-back{align-items:center}}
+.inst-sheet{position:relative;width:min(420px,100%);background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.1);border-radius:22px 22px 0 0;padding:22px 20px 26px;text-align:center}
+@media (min-width:640px){.inst-sheet{border-radius:22px}}
+.inst-sheet h3{font-size:18px;font-weight:900;margin:8px 0 4px}.inst-sub{font-size:13px;opacity:.7;margin-bottom:14px}
+.inst-logo{width:64px;height:64px;border-radius:16px;margin:0 auto}
+.inst-sheet ol{text-align:start;display:grid;gap:10px;font-size:14px}.inst-sheet li{display:flex;gap:10px;align-items:center;background:rgba(255,255,255,.05);padding:10px 12px;border-radius:12px}
+.inst-sheet li svg{flex:none;color:#a78bfa}
+.inst-x{position:absolute;top:12px;inset-inline-start:12px;opacity:.7}
