@@ -28,7 +28,7 @@ export default function EditProduct() {
   const [error,          setError]          = useState("");
 
   useEffect(() => {
-    fetch(`/api/products/${id}`)
+    fetch(`/api/products/${id}?admin=1`)
       .then(r => r.json())
       .then(data => {
         if (data?.error) { setError("فشل تحميل بيانات المنتج"); setLoading(false); return; }

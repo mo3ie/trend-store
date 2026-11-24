@@ -27,7 +27,7 @@ export default function ViewProduct() {
   const [activeImage, setActiveImage] = useState(0);
 
   useEffect(() => {
-    fetch(`/api/products/${id}`)
+    fetch(`/api/products/${id}?admin=1`)
       .then((r) => r.json())
       .then((data) => { setProduct(data?.error ? null : data); setLoading(false); })
       .catch(() => { setError("فشل تحميل بيانات المنتج"); setLoading(false); });

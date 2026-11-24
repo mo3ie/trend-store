@@ -14,7 +14,10 @@ export async function GET(req: NextRequest) {
   const search   = (searchParams.get("search") || "").replace(/[,()%*\\]/g, " ").trim().slice(0, 60);
   const limit    = Math.min(200, Math.max(1, parseInt(searchParams.get("limit") || "50") || 50));
 
+  // Customers only ever see what is in stock, and never the quantity. `?all=1` (admins only) shows everything.
+  const all = searchParams.get("all") === "1" && (await requireAdmin()).ok;
   let query = supabaseAdmin.from("products").select("*").order("created_at", { ascending: false }).limit(limit);
+  if (!all) query = query.gt("quantity", 0);
 
   if (category) query = query.eq("category", category);
   if (search) {
@@ -26,7 +29,7 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   // `quantity` is the canonical DB column; a legacy `stock` column lingers at 0.
   // Prefer quantity (?? falls back only when quantity is null, not when stock is 0).
-  return NextResponse.json(data?.map((p: any) => ({ ...p, stock: p.quantity ?? p.stock })));
+  return NextResponse.json(data?.map((p: any) => all ? { ...p, stock: p.quantity ?? p.stock } : { ...p, quantity: undefined, stock: 999 }));
 }
 
 export async function POST(req: NextRequest) {

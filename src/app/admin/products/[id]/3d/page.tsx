@@ -114,7 +114,7 @@ export default function Product3DStudio() {
   const glbRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch(`/api/products/${id}`).then((r) => r.json()).then((d) => {
+    fetch(`/api/products/${id}?admin=1`).then((r) => r.json()).then((d) => {
       setP(d); setFrames(d.spin_images || []); setModel(d.model_url || null);
     });
   }, [id]);

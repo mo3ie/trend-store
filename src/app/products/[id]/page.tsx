@@ -194,14 +194,7 @@ export default function ProductView() {
                 <div className="gp-price">
                   <b>{product.price}</b><span>{t("دينار", "LYD")}</span>
                 </div>
-                <div className={`gp-stock ${!isOwner || inStock ? "ok" : "out"}`}>
-                  {!isOwner || inStock ? <CheckCircle size={15} /> : <XCircle size={15} />}
-                  {!isOwner
-                    ? t("متوفر", "Available")
-                    : inStock
-                      ? (product.stock < 5 ? `${t("متبقي", "Only")} ${product.stock} ${t("فقط", "left")}` : t("متوفر في المخزن", "In stock"))
-                      : t("نفذ من المخزن", "Sold out")}
-                </div>
+                <div className="gp-stock ok"><CheckCircle size={15} />{t("متوفر", "Available")}</div>
 
                 {product.variants && product.variants.length > 0 && (
                   <div className="space-y-4">
@@ -242,7 +235,7 @@ export default function ProductView() {
 
                 <dl className="gp-specs">
                   <div><dt>{t("التصنيف", "Category")}</dt><dd>{product.category}</dd></div>
-                  <div><dt>{t("الحالة", "Status")}</dt><dd className={!isOwner || inStock ? "ok" : "out"}>{!isOwner || inStock ? t("متوفر", "Available") : t("نفذ", "Sold out")}</dd></div>
+                  <div><dt>{t("الحالة", "Status")}</dt><dd className="ok">{t("متوفر", "Available")}</dd></div>
                   {product.created_at && (
                     <div><dt>{t("تاريخ الإضافة", "Added on")}</dt><dd>{new Date(product.created_at).toLocaleDateString(rtl ? "ar-EG" : "en-GB", { year: "numeric", month: "long", day: "numeric" })}</dd></div>
                   )}

@@ -19,7 +19,13 @@ export async function GET(_req: NextRequest, { params }: { params: Params }) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
   // `quantity` is canonical; legacy `stock` column lingers at 0, so prefer quantity.
-  return NextResponse.json({ ...data, stock: data.quantity ?? data.stock });
+  const qty = Number(data.quantity ?? data.stock ?? 0);
+  // Admin screens get the real numbers; customers never see quantities, and sold-out products don't exist for them.
+  if (qty <= 0 || _req.nextUrl.searchParams.get("admin") === "1") {
+    if ((await requireAdmin()).ok) return NextResponse.json({ ...data, stock: qty });
+    if (qty <= 0) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+  return NextResponse.json({ ...data, quantity: undefined, stock: 999 });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Params }) {

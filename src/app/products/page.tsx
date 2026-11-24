@@ -210,11 +210,7 @@ export default function ProductsPage() {
                   <p className="text-sm font-semibold text-[var(--text)] leading-tight line-clamp-2">{product.name}</p>
                   <div className="flex items-center justify-between pt-1">
                     <span className="font-black text-base bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">{product.price} {t("د", "LYD")}</span>
-                    <span className={`text-xs font-medium ${isOwner && product.stock === 0 ? "text-red-400" : isOwner && product.stock < 5 ? "text-yellow-400" : "text-green-400"}`}>
-                      {!isOwner
-                        ? t("متوفر", "In stock")
-                        : product.stock === 0 ? t("نفذ", "Out") : product.stock < 5 ? `${product.stock} ${t("متبقي", "left")}` : t("متوفر", "In stock")}
-                    </span>
+                    <span className="text-xs font-medium text-green-400">{t("متوفر", "In stock")}</span>
                   </div>
                 </div>
               </a>

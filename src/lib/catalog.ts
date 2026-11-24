@@ -26,6 +26,7 @@ export async function getCatalog(): Promise<CatalogItem[]> {
   const { data } = await db
     .from("products")
     .select("id,name,price,category,image_url,quantity,stock,created_at,spin_images,model_url")
+    .gt("quantity", 0) // sold-out products don't exist for customers (Trendy never suggests them)
     .order("created_at", { ascending: false })
     .limit(600);
   const items: CatalogItem[] = (data || []).map((p: Record<string, unknown>) => ({
