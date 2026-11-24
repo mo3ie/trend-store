@@ -8,7 +8,7 @@
 //  • page navigations                                  → network-first (3.5 s) → cached copy → /offline
 //  • EVERYTHING ELSE under /api (wallet, orders, auth, payments, cards/utilities purchases, admin…)
 //    and every non-GET request                         → straight to the network, never cached.
-const V = "v3";
+const V = "v4";
 const STATIC = `trend-static-${V}`, PAGES = `trend-pages-${V}`, IMG = `trend-img-${V}`, API = `trend-api-${V}`;
 const PRECACHE = ["/", "/offline", "/icon-192.png", "/icon-512.png", "/apple-icon.png", "/brand/trend-logo.png", "/manifest.webmanifest"];
 
