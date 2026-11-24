@@ -1,12 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Home as HomeIcon, ShoppingCart, Wrench, Laptop, Gamepad2, Globe, Smartphone,
-  Megaphone, Package, Heart, Wallet, Settings, Menu, Search, Sun, Moon,
-  Building2, Headphones, Phone, MapPin, ShieldCheck, Truck, RotateCcw, Lock,
-  BadgeCheck, MessageCircle, Check, X, MessagesSquare, Music2, Stethoscope, LayoutDashboard, Gift,
-} from "lucide-react";
+import { Home as HomeIcon, ShoppingCart, Wrench, Laptop, Gamepad2, Globe, Smartphone, Megaphone, Package, Heart, Wallet, Settings, Menu, Search, Sun, Moon, Building2, Headphones, Phone, MapPin, ShieldCheck, Truck, RotateCcw, Lock, BadgeCheck, MessageCircle, Check, X, MessagesSquare, Music2, Stethoscope, LayoutDashboard, Gift, Zap, Send } from "lucide-react";
 import WalletModal from "@/components/WalletModal";
 import DiagnoseShowcase from "@/components/DiagnoseShowcase";
 import DailyGift from "@/components/DailyGift";
@@ -115,6 +110,8 @@ export default function Home() {
     { ar: "لابتوبات", en: "Laptops", sub: "LAPTOPS", icon: Laptop, href: "/products?category=لابتوبات" },
     { ar: "بلايستيشن", en: "PlayStation", sub: "PLAYSTATION", icon: Gamepad2, href: "/products?category=بلايستيشن" },
     { ar: "خدمات رقمية", en: "Digital", sub: "DIGITAL", icon: Globe, href: "/cards" },
+    { ar: "شحن الكهرباء", en: "Electricity", sub: "KHALES", icon: Zap, href: "/electricity" },
+    { ar: "الشحن المباشر", en: "Direct Recharge", sub: "TRANSFER", icon: Send, href: "/recharge" },
     { ar: "سوق المستعمل", en: "Used Market", sub: "USED", icon: ShieldCheck, href: "/market" },
     { ar: "طلب من المواقع", en: "Order Online", sub: "SHOPPING", icon: ShoppingCart, href: "https://order.trendstore-ly.com" },
     { ar: "أدوات فيسبوك", en: "Facebook Tools", sub: "FACEBOOK", icon: MessagesSquare, href: "/facebook" },
@@ -176,6 +173,8 @@ export default function Home() {
           <div className="navitem" onClick={() => go("https://order.trendstore-ly.com")}><ShoppingCart size={19} /><span>{t("طلب من شي إن", "Order from Shein")}</span></div>
           <div className="navitem" onClick={() => setModal("maint")}><Wrench size={19} /><span>{t("الصيانة", "Maintenance")}</span></div>
           <div className="navitem" onClick={() => go("/cards")}><Globe size={19} /><span>{t("الكروت والخدمات الرقمية", "Cards & Digital")}</span></div>
+          <div className="navitem" onClick={() => go("/electricity")}><Zap size={19} /><span>{t("خالص — شحن الكهرباء", "Electricity top-up")}</span></div>
+          <div className="navitem" onClick={() => go("/recharge")}><Send size={19} /><span>{t("الشحن المباشر", "Direct recharge")}</span></div>
           <div className="navitem" onClick={() => go("/market")}><ShieldCheck size={19} /><span>{t("سوق المستعمل بضمان", "Used Market")}</span></div>
           <div className="navitem" onClick={() => go("/gift")}><Gift size={19} /><span>{t("هدية اليوم", "Daily Gift")}</span></div>
           <div className="navitem" onClick={() => go("/games")}><Gamepad2 size={19} /><span>{t("تحديات وألعاب", "Games")}</span></div>

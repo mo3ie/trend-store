@@ -24,7 +24,7 @@ export default function AdminUtilities() {
 
   return (
     <div dir="rtl" className="p-6 max-w-6xl mx-auto space-y-6 text-[var(--text)]">
-      <div className="flex items-center gap-3"><Zap className="text-amber-400" /><h1 className="text-xl font-bold flex-1">الكهرباء (خالص) والشحن المباشر</h1><a href="/utilities" target="_blank" className="text-sm text-blue-400">صفحة الزبائن ↗</a></div>
+      <div className="flex items-center gap-3"><Zap className="text-amber-400" /><h1 className="text-xl font-bold flex-1">الكهرباء (خالص) والشحن المباشر</h1><a href="/electricity" target="_blank" className="text-sm text-blue-400">صفحة الكهرباء ↗</a><a href="/recharge" target="_blank" className="text-sm text-blue-400">صفحة الشحن المباشر ↗</a></div>
 
       <section className={`rounded-2xl border p-4 text-sm flex items-center gap-3 ${d.connected ? "border-green-500/30 bg-green-500/10" : "border-amber-500/30 bg-amber-500/10"}`}>
         <Plug size={18} />{d.connected ? <span>أنيس متصل{d.balance ? ` · رصيد المحفظة ${d.balance.amount} ${d.balance.currency}` : ""} · ربح آخر 50 طلب ناجح: <b>{margin.toFixed(3)} د.ل</b></span> : <span>أنيس غير متصل بعد (ANIS_* في إعدادات الخادم).</span>}

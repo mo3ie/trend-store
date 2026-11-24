@@ -29,8 +29,8 @@ export async function settings(): Promise<UtilSettings> {
 export const sellPrice = (cost: number, pct: number, fee: number) => Math.max(cost, Math.ceil((cost * (1 + pct / 100) + fee) * 4) / 4);
 
 const r3 = (x: number | string) => Number(x).toFixed(3);
-async function notify(userId: string, title: string, body: string) {
-  await db.from("notifications").insert({ user_id: userId, type: "utilities", title, body, link: "/utilities" });
+async function notify(userId: string, title: string, body: string, kind: "meter" | "recharge" = "meter") {
+  await db.from("notifications").insert({ user_id: userId, type: "utilities", title, body, link: `${kind === "meter" ? "/electricity" : "/recharge"}?tab=orders` });
 }
 
 // ───────────────────────── catalogue ─────────────────────────
@@ -145,7 +145,7 @@ async function refund(o: Row, amount: number, why: string, final: "refunded" | "
   if (!ok || amt <= 0) return;
   await creditWallet(o.user_id, amt);
   await db.from("wallet_transactions").insert({ user_id: o.user_id, amount: amt, type: "credit", method: o.kind === "meter" ? "electricity" : "direct_recharge", status: "completed", note: `استرجاع — ${o.title}` });
-  await notify(o.user_id, "↩️ رجعلك المبلغ", `${amt} د.ل رجعت لمحفظتك — ${why}`);
+  await notify(o.user_id, "↩️ رجعلك المبلغ", `${amt} د.ل رجعت لمحفظتك — ${why}`, o.kind);
 }
 
 function meterView(m: MeterCharge) {
@@ -226,7 +226,7 @@ export async function settleUtility(id: string, resume = true): Promise<string> 
       case "completed": {
         if (d.partialRefund) { await set({ result: v, provider_status: "completed_partial" }); await refund(o, Number(o.price) * (Number(d.partialRefund.refundedTotal.amount) / Number(o.cost)), "استرجاع جزئي", "succeeded"); return "succeeded"; }
         const { data: done } = await db.from("utility_orders").update({ status: "succeeded", provider_status: "completed", result: v, updated_at: new Date().toISOString() }).eq("id", id).in("status", ["processing", "action_needed"]).select("id").maybeSingle();
-        if (done) await notify(o.user_id, "✅ تم الشحن المباشر", o.title);
+        if (done) await notify(o.user_id, "✅ تم الشحن المباشر", o.title, "recharge");
         return "succeeded";
       }
       case "paymentFailed": await set({ result: v, provider_status: d.status }); await refund(o, o.price, "لم يتم الخصم", "refunded"); return "refunded";
@@ -235,7 +235,7 @@ export async function settleUtility(id: string, resume = true): Promise<string> 
       case "suspendedDataError": {
         const was = o.status;
         await set({ result: v, provider_status: d.status, status: "action_needed", error: d.reason || "بيانات المستلم تحتاج تصحيح" });
-        if (was !== "action_needed") await notify(o.user_id, "✏️ صحّح بيانات المستلم", `${o.title} — ${d.reason || "البيانات تحتاج تصحيح"}`);
+        if (was !== "action_needed") await notify(o.user_id, "✏️ صحّح بيانات المستلم", `${o.title} — ${d.reason || "البيانات تحتاج تصحيح"}`, "recharge");
         return "action_needed";
       }
       default: await set({ result: v, provider_status: d.status, status: "processing" }); return "processing";
