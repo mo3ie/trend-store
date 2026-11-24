@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { creditWallet, debitWallet } from "@/lib/wallet";
+import { anisEnabled, anisOrder, anisRefusalAr } from "@/lib/anis";
 
 /**
  * Digital cards (local top-ups + international gift cards).
@@ -71,6 +72,15 @@ export async function buyCard(userId: string, productId: string, qty: number) {
   if (error || !o) { await creditWallet(userId, total); throw new Error("تعذّر إنشاء الطلب — رجّعنا المبلغ"); }
   await db.from("wallet_transactions").insert({ user_id: userId, amount: total, type: "debit", method: "cards", status: "completed", note: `شراء ${qty} × ${p.name}` });
 
+  // Anis: signed + verified, resumable under our order id (never refunded unless Anis says "not placed").
+  if (p.provider === "anis" && p.provider_sku && p.provider_cost && anisEnabled()) {
+    if (Number(p.price) < Number(p.provider_cost)) { await refundCardOrder(o.id, "سعر البيع أقل من التكلفة", true); throw new Error("الكرت غير متاح حالياً — رجعلك المبلغ"); }
+    await db.from("card_orders").update({ provider: "anis", provider_card_id: p.provider_sku, provider_cost: p.provider_cost, provider_state: "sent" }).eq("id", o.id);
+    const r = await settleAnis(o.id, false);
+    if (r === "notPlaced") throw new Error("تعذّر إصدار الكرت من المزوّد — رجعلك المبلغ لمحفظتك");
+    return { orderId: o.id, status: r === "delivered" ? "delivered" : "pending", balance: bal };
+  }
+
   const prov = provider();
   if (prov && p.provider_sku) {
     try {
@@ -87,7 +97,11 @@ export async function buyCard(userId: string, productId: string, qty: number) {
   return { orderId: o.id, status: "pending", balance: bal };
 }
 
-export async function refundCardOrder(orderId: string, reason: string) {
+export async function refundCardOrder(orderId: string, reason: string, force = false) {
+  if (!force) {
+    const { data: chk } = await db.from("card_orders").select("provider,provider_state").eq("id", orderId).maybeSingle();
+    if (chk?.provider === "anis" && !String(chk.provider_state || "").startsWith("notPlaced")) throw new Error("طلب عند المزوّد ولم يُحسم بعد — استعمل «تحديث من المزوّد» أولاً");
+  }
   const { data: o } = await db.from("card_orders").update({ status: "refunded", error: reason.slice(0, 300) })
     .eq("id", orderId).in("status", ["pending", "failed"]).select("user_id,total").maybeSingle();
   if (!o) return false;
@@ -104,4 +118,41 @@ export async function fulfillManually(orderId: string, codes: CardCode[]) {
   await db.from("card_orders").update({ status: "delivered", codes }).eq("id", orderId).eq("status", "pending");
   const name = (o.card_products as unknown as { name?: string } | null)?.name || "الكرت";
   await notify(o.user_id, "🎫 وصلك الكرت", `${o.qty} × ${name} — الأكواد في «كروتي».`);
+}
+
+/**
+ * Push an Anis order to a final state. Safe to call repeatedly (same operation id + same stored request).
+ * delivered → codes saved; notPlaced → refunded; pending → try again later (customer/admin page open).
+ */
+export async function settleAnis(orderId: string, resume = true): Promise<"delivered" | "notPlaced" | "pending"> {
+  const { data: o } = await db.from("card_orders").select("id,user_id,qty,status,provider,provider_card_id,provider_cost,provider_tries,card_products(name)").eq("id", orderId).maybeSingle();
+  if (!o || o.provider !== "anis" || o.status !== "pending" || !o.provider_card_id || !o.provider_cost) return "pending";
+  await db.from("card_orders").update({ provider_tries: (o.provider_tries || 0) + 1, updated_at: new Date().toISOString() }).eq("id", orderId);
+  const r = await anisOrder(o.id, { cardId: o.provider_card_id, qty: o.qty, unitCost: String(o.provider_cost) }, resume);
+  if (r.kind === "delivered") {
+    if (r.codes.length !== o.qty) { await db.from("card_orders").update({ provider_state: "count_mismatch" }).eq("id", orderId); return "pending"; }
+    const { data: done } = await db.from("card_orders").update({ status: "delivered", codes: r.codes, provider_ref: r.invoiceId || null, provider_state: "completed" })
+      .eq("id", orderId).eq("status", "pending").select("id").maybeSingle();
+    const name = (o.card_products as unknown as { name?: string } | null)?.name || "الكرت";
+    if (done) await notify(o.user_id, "🎫 وصلك الكرت", `${o.qty} × ${name} — الأكواد في «كروتي».`);
+    return "delivered";
+  }
+  if (r.kind === "notPlaced") {
+    await db.from("card_orders").update({ provider_state: `notPlaced:${r.code}` }).eq("id", orderId);
+    await refundCardOrder(orderId, anisRefusalAr(r.code));
+    return "notPlaced";
+  }
+  await db.from("card_orders").update({ provider_state: r.reason }).eq("id", orderId);
+  return "pending";
+}
+
+/** Resume every unresolved Anis order (optionally for one customer). */
+export async function settlePendingAnis(userId?: string) {
+  if (!anisEnabled()) return 0;
+  let q = db.from("card_orders").select("id").eq("provider", "anis").eq("status", "pending").order("created_at").limit(10);
+  if (userId) q = q.eq("user_id", userId);
+  const { data } = await q;
+  let n = 0;
+  for (const r of data || []) if ((await settleAnis(r.id)) !== "pending") n++;
+  return n;
 }

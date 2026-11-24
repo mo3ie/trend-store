@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/apiAuth";
 import { db, buyCard, provider } from "@/lib/cards";
+import { anisEnabled } from "@/lib/anis";
 
 export async function GET() {
-  const { data } = await db.from("card_products").select("id,name,brand,region,category,face_value,price,image").eq("active", true).order("sort").order("brand").order("price");
-  return NextResponse.json({ products: data || [], instant: !!provider() });
+  const { data } = await db.from("card_products").select("id,name,brand,region,category,face_value,price,image,provider_note").eq("active", true).or("provider_available.is.null,provider_available.eq.true").order("sort").order("brand").order("price");
+  return NextResponse.json({ products: data || [], instant: !!provider() || anisEnabled() });
 }
 
 // POST { product_id, qty }
