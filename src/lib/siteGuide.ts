@@ -51,3 +51,35 @@ export const SITE_GUIDE = `دليل موقع محل ترند (trendstore-ly.com)
 • ترندي (أنا): أساعدك تختار منتج، أشرح أي ميزة، وأوجّهك للصفحة. أقدر نتكلم بصوت (زر السماعة فوق).
 • تطبيق ترند: تقدر تثبّت الموقع كتطبيق على جوالك من زر «حمّل التطبيق» فوق، ويفتح بسرعة وبعض الصفحات تشتغل حتى بدون نت.
 • الخصوصية والشروط: /privacy و /terms.`;
+
+const GUIDE_LINES = SITE_GUIDE.split("\n").filter((l) => l.startsWith("•"));
+// Words customers actually type, per section (matched together with the section text).
+const EXTRA: [string, string][] = [
+  ["(/account)", "محفظه رصيد شحن المحفظه دفع ادفع موبي كاش يسر مصرفي معاملات بطاقه تحويل حساب تسجيل"],
+  ["(/cards)", "كرت كروت ببجي شدات ايتونز جوجل بلاي بلايستيشن فري فاير ستيم نتفليكس كود"],
+  ["(/electricity)", "عداد كهربا كهرباء ضوء توكن خالص"],
+  ["(/recharge)", "تحويل انستاباي فودافون كاش usdt دولار مصر شحن مباشر"],
+  ["(/market)", "مستعمل نبيع بيع اشتري ضمان سوق"],
+  ["(/diagnose)", "بطء بطيء بطاريه عطل خربان فحص سخونه"],
+  ["(/deep-scan)", "ايفون قطع اصليه شهاده فحص عميق"],
+  ["(/?repair=1", "صيانه تصليح شاشه مكسوره حجز"],
+  ["(/gift)", "هديه سحب جايزه"],
+  ["(/games)", "لعبه العاب مسابقه جوائز"],
+  ["(/products", "طلب سله توصيل شراء منتج"],
+  ["خدمات أصحاب", "اعلان ممول ترويج صفحه فيسبوك تيك توك بوت رد تعليقات محتوى منشورات اشتراك"],
+  ["تطبيق ترند", "تطبيق تحميل تثبيت"],
+];
+const extraFor = (l: string) => EXTRA.filter(([k]) => l.includes(k)).map(([, v]) => v).join(" ");
+const norm = (s: string) => s.replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/[^\p{L}\p{N}\s]/gu, " ").toLowerCase();
+const STOP = new Set(["كيف", "شن", "شنو", "في", "من", "على", "الي", "اللي", "هل", "ممكن", "نبي", "ابي", "انا", "عندي", "the", "how", "what"]);
+
+/** Compact guide for one question: the 3 most relevant feature sections + a one-line index of the rest
+ *  (keeps the prompt small so the free AI tier's per-minute token limit isn't hit). */
+export function guideFor(text: string): string {
+  const words = norm(text).split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w));
+  const roots = words.map((w) => w.replace(/^(وال|بال|لل|ال|و)/, "").slice(0, 5)).filter((w) => w.length > 2);
+  const scored = GUIDE_LINES.map((l) => { const n = norm(l + " " + extraFor(l)); return { l, s: roots.reduce((a, r) => a + (n.includes(r) ? 1 : 0), 0) }; })
+    .filter((x) => x.s > 0).sort((a, b) => b.s - a.s).slice(0, 3).map((x) => x.l);
+  const index = "صفحات الموقع: " + Object.entries(PAGES).map(([p, n]) => `${n} ${p}`).join("، ");
+  return `دليل موقع محل ترند — اشرح الميزة من هنا فقط، واختر رابط صفحتها في "page":\n${scored.join("\n") || "(السؤال مش على ميزة محددة)"}\n${index}`;
+}

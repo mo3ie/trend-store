@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { aiComplete, hasAI, parseJsonReply } from "@/services/ai";
 import { getCatalog, shortlist, rateLimited } from "@/lib/catalog";
-import { PAGES, SITE_GUIDE } from "@/lib/siteGuide";
+import { PAGES, guideFor } from "@/lib/siteGuide";
 import { settings as utilSettings } from "@/lib/anisUtilities";
 
 /**
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
   const [catalog, status] = await Promise.all([getCatalog(), liveStatus()]);
   const context = messages.map((m) => m.content).join(" ");
-  const list = shortlist(catalog, context, 40);
+  const list = shortlist(catalog, context, 30);
   const listText = list
     .map((p) => `${p.id} | ${p.name} | ${p.category} | ${p.price} د.ل | ${p.inStock ? "متوفر" : "غير متوفر"}`)
     .join("\n");
@@ -63,15 +63,17 @@ export async function POST(req: NextRequest) {
   const convo = messages.map((m) => `${m.role === "user" ? "الزبون" : "ترندي"}: ${m.content}`).join("\n");
 
   try {
-    const raw = await aiComplete({
+    const ask = () => aiComplete({
       system: SYSTEM,
-      user: `${SITE_GUIDE}
+      user: `${guideFor(messages.slice(-3).map((m) => m.content).join(" "))}
 ${status}
 
 قائمة المنتجات:\n${listText}\n\nالمحادثة:\n${convo}\n\nرد على آخر رسالة للزبون. JSON فقط.`,
       maxTokens: 900,
       temperature: 0.5,
     });
+    // free tier: a burst can hit the per-minute limit → wait a moment and try once more
+    const raw = await ask().catch(async () => { await new Promise((r) => setTimeout(r, 2500)); return ask(); });
     let out: { reply?: string; products?: string[]; action?: string | null; page?: string | null };
     try { out = parseJsonReply(raw); } catch { out = { reply: raw.slice(0, 800), products: [] }; }
 
