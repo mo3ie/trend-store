@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { creditWallet, debitWallet } from "@/lib/wallet";
 import { anisEnabled, anisOrder, anisRefusalAr } from "@/lib/anis";
+import { notifyUser } from "@/lib/notify";
 
 /**
  * Digital cards (local top-ups + international gift cards).
@@ -58,7 +59,7 @@ export function provider(): CardsProvider | null {
 }
 
 async function notify(userId: string, title: string, body: string) {
-  await db.from("notifications").insert({ user_id: userId, type: "cards", title, body, link: "/cards/orders" });
+  await notifyUser(userId, { type: "cards", title, body, link: "/cards/orders" });
 }
 
 export async function buyCard(userId: string, productId: string, qty: number) {

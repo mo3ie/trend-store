@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { readAdvertiserToken } from "@/lib/tiktokAdsTokens";
 import { pauseCampaign } from "@/services/tiktokAdsCampaigns";
+import { notifyUser, NOTICES } from "@/lib/notify";
 
 export const maxDuration = 60;
 
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   const nowIso = new Date().toISOString();
   const { data: due, error } = await supabaseAdmin
     .from("ad_campaigns")
-    .select("id, user_id, advertiser_id, external_campaign_id, daily_price_lyd, status")
+    .select("id, user_id, page_name, advertiser_id, external_campaign_id, daily_price_lyd, status")
     .eq("platform", "tiktok")
     .eq("continuous", true)
     .in("status", ["active", "in_review"])
@@ -85,6 +86,7 @@ export async function GET(req: NextRequest) {
         : "نفد رصيد المحفظة وتعذّر إيقاف الحملة على تيك توك — اشحن محفظتك أو أوقفها من TikTok Ads Manager.",
       updated_at: nowIso,
     }).eq("id", c.id);
+    await notifyUser(c.user_id, NOTICES.adPaused(c.page_name, "تيك توك"));
     paused++;
   }
 

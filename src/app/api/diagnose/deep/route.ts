@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "crypto";
 import { analyzeDeep } from "@/lib/deepReport";
+import { notifyUser } from "@/lib/notify";
 
 /**
  * Deep (USB) iPhone scan from Trend POS → AI analysis → saved certificate.
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
   const base = process.env.NEXT_PUBLIC_SITE_URL || "https://www.trendstore-ly.com";
   if (voucher) {
     await db.from("deep_scan_vouchers").update({ status: "used", report_id: data.id, used_at: new Date().toISOString() }).eq("id", voucher.id).eq("status", "paid");
-    await db.from("notifications").insert({ user_id: voucher.user_id, type: "diagnose", title: "🔬 شهادة الفحص العميق جاهزة", body: `تقييم جهازك: ${Math.round(Number(report.score) || 0)}/100`, link: `/diagnose/r/${data.id}` });
+    await notifyUser(voucher.user_id, { type: "diagnose", important: true, title: "🔬 شهادة الفحص العميق جاهزة", body: `تقييم جهازك: ${Math.round(Number(report.score) || 0)}/100`, link: `/diagnose/r/${data.id}` });
   }
   return NextResponse.json({ id: data.id, url: `${base}/diagnose/r/${data.id}`, score: Math.round(Number(report.score) || 0) });
 }

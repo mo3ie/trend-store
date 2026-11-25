@@ -71,6 +71,10 @@ export async function POST(req: NextRequest) {
   const startDate = body.startDate ? new Date(body.startDate) : new Date();
   const types = Array.isArray(body.types) ? body.types.map(String).filter(Boolean).slice(0, 20) : [];
   const guidance = typeof body.guidance === "string" ? body.guidance.slice(0, 800).trim() : "";
+  // Free text, deliberately not a list of dialects — see sql/38. A per-plan value
+  // wins over the saved brand default, so the owner can write one campaign in
+  // English without changing what their shop normally sounds like.
+  const languageOverride = typeof body.language === "string" ? body.language.slice(0, 200).trim() : "";
 
   const [{ data: brand }, { data: products }, { data: memory }] = await Promise.all([
     supabaseAdmin.from("studio_brands").select("*").eq("user_id", user.id).eq("page_id", pageId).maybeSingle(),
@@ -91,37 +95,66 @@ export async function POST(req: NextRequest) {
   ].filter(Boolean).join("\n");
   const catalog = items.map((p) => `- ${p.name}${p.category ? ` [${p.category}]` : ""}${p.price_text ? ` — ${p.price_text}` : ""}`).join("\n");
 
+  /*
+   * The language the posts are written in.
+   *
+   * This used to be welded into the system prompt ("...in LIBYA", "LIBYAN-friendly
+   * ARABIC"), which was right for one shop and wrong for every other subscriber.
+   * Worse, it was invisible and unreachable: an owner could type "اكتب بالفصحى"
+   * into the guidance box and lose the argument to an instruction they could not
+   * see.
+   *
+   * Now it is the owner's own words, passed through verbatim, and it is stated
+   * TWICE — once at the top of the prompt and once as the last line. A single
+   * mention early in a long instruction list is the first thing a model drops.
+   *
+   * Empty means Libyan Arabic, so nothing changes for anyone who had a plan
+   * before this field existed.
+   */
+  const lang = languageOverride || (brand?.language as string | null)?.trim() || "";
+  const languageLine = lang
+    ? `LANGUAGE — this overrides every other style instruction: write ALL customer-facing text (caption, hook, on-screen text, CTA, hashtags) in exactly this language/dialect/style as the owner described it: "${lang}". Do not translate it into anything else, and do not default to Libyan Arabic.`
+    : "LANGUAGE: write all customer-facing text in warm, natural LIBYAN Arabic.";
+  const languageReminder = lang
+    ? `FINAL REMINDER — the language is non-negotiable: "${lang}".`
+    : "";
+
   // The two platforms get different prompts because they are different deliverables:
   // a Facebook post is a caption plus an image, a TikTok is a SCRIPT whose first two
   // seconds decide whether anyone watches at all. Asking one prompt to serve both
   // produced Facebook captions with a TikTok label on them.
-  const tiktokSystem = [
-    "You are an expert Arabic TikTok content strategist for a small business in LIBYA.",
+  const tiktokSystem = (n: number, avoid: string[]) => [
+    "You are an expert TikTok content strategist for a small retail business.",
+    languageLine,
     "Design a plan of SHORT VERTICAL VIDEOS (9:16). Every item is a video to FILM, never a photo post.",
-    `Produce EXACTLY ${total} videos total, spread as ${postsPerDay} per day over ${durationDays} days.`,
+    `Produce EXACTLY ${n} videos.`,
+    avoid.length ? `These angles/products were already used earlier in the same plan — do NOT repeat them, find genuinely different ideas: ${avoid.join(" | ")}` : "",
     types.length
       ? `Use ONLY these angles (rotate among them): ${types.join(" | ")}. The "type" field must be one of these (in Arabic).`
       : "Vary the angle: product reveal, before/after, unboxing, a common customer question answered, a price reveal, a quick how-to, a trend/duet idea.",
     guidance ? `Follow the owner's guidance closely: ${guidance}` : "",
     memory?.style ? `This owner's established STYLE/voice (keep to it): ${memory.style}` : "",
     memory?.notes ? `The owner's accumulated preferences over time (respect them): ${memory.notes}` : "",
-    "hook: the FIRST 0-2 SECONDS of on-screen text, in ARABIC, at most 40 characters. This is the most important line — it must stop the scroll. Never a greeting, never the brand name.",
-    "scenes: 3-5 ordered beats the owner can film from. Each: t (a time range like \"0-3s\"), do (what to SHOW, in Arabic, concrete and filmable with a phone), text (optional on-screen text, Arabic).",
-    "screen_text: the main text overlay across the video, ARABIC, short.",
-    "sound: a suggested sound or trend DESCRIBED in Arabic words (for example: صوت ترند سريع، موسيقى هادئة) — never a made-up song id.",
+    "hook: the FIRST 0-2 SECONDS of on-screen text, at most 40 characters. This is the most important line — it must stop the scroll. Never a greeting, never the brand name.",
+    "scenes: 3-5 ordered beats the owner can film from. Each: t (a time range like \"0-3s\"), do (what to SHOW — concrete and filmable with a phone), text (optional on-screen text).",
+    "screen_text: the main text overlay across the video, short.",
+    "sound: a suggested sound or trend DESCRIBED in words (for example: a fast trending sound, calm music) — never a made-up song id.",
     "duration_sec: 12-30.",
-    "caption: the description under the video, ARABIC, short, with ONE clear call to action and the price when relevant.",
+    "caption: the description under the video, short, with ONE clear call to action and the price when relevant.",
     "IMPORTANT: on TikTok there are no automated private messages, so if the video is about a product, the PRICE must appear in the caption or the on-screen text — not left for a DM.",
     "Only use products from the catalog. Pick the best product for each video.",
-    "image_prompt: a short ENGLISH visual description for the COVER FRAME of the video (vertical, product-focused, well-lit).",
+    "image_prompt: a short ENGLISH visual description for the COVER FRAME of the video (vertical, product-focused, well-lit). This one field is ALWAYS English — it feeds an image generator, it is never shown to a customer.",
+    languageReminder,
     "Return ONLY JSON, no prose, exactly:",
-    '{"summary": "<one short Arabic sentence>", "posts": [{"day": <1..N>, "slot": <1..postsPerDay>, "product": "<exact catalog name or empty>", "type": "<short Arabic label>", "hook": "<Arabic, <=40 chars>", "scenes": [{"t":"0-3s","do":"<Arabic>","text":"<Arabic>"}], "screen_text": "<Arabic>", "sound": "<Arabic>", "duration_sec": <12..30>, "caption": "<Arabic>", "hashtags": "<#.. #..>", "cta": "<short Arabic>", "image_prompt": "<English>"}]}',
-  ].join(" ");
+    '{"summary": "<one short sentence>", "posts": [{"product": "<exact catalog name or empty>", "type": "<short label>", "hook": "<<=40 chars>", "scenes": [{"t":"0-3s","do":"...","text":"..."}], "screen_text": "...", "sound": "...", "duration_sec": <12..30>, "caption": "...", "hashtags": "<#.. #..>", "cta": "<short>", "image_prompt": "<English>"}]}',
+  ].filter(Boolean).join(" ");
 
-  const metaSystem = [
-    "You are an expert Arabic social-media manager for a small business in LIBYA.",
-    "Design a Facebook content plan. Write engaging LIBYAN-friendly ARABIC captions that sell without being pushy.",
-    `Produce EXACTLY ${total} posts total, spread as ${postsPerDay} per day over ${durationDays} days.`,
+  const metaSystem = (n: number, avoid: string[]) => [
+    "You are an expert social-media manager for a small retail business.",
+    languageLine,
+    "Design a Facebook content plan. Write engaging captions that sell without being pushy.",
+    `Produce EXACTLY ${n} posts.`,
+    avoid.length ? `These angles/products were already used earlier in the same plan — do NOT repeat them, find genuinely different ideas: ${avoid.join(" | ")}` : "",
     types.length
       ? `Use ONLY these post angles (rotate among them): ${types.join(" | ")}. The "type" field must be one of these (in Arabic).`
       : "Vary the angle: single-product highlight, offer/discount, bundle, tip/how-to, question/engagement, testimonial-style, new-arrival.",
@@ -130,24 +163,79 @@ export async function POST(req: NextRequest) {
     memory?.notes ? `The owner's accumulated preferences over time (respect them): ${memory.notes}` : "",
     "Each caption: a strong hook, value, ONE clear call to action, the store's phone or link when relevant, and 2-5 fitting emojis.",
     "Only use products from the catalog. Pick the best product(s) for each post.",
-    "image_prompt: a short ENGLISH visual description to generate a photo for the post (product-focused, clean, well-lit).",
+    "image_prompt: a short ENGLISH visual description to generate a photo for the post (product-focused, clean, well-lit). This one field is ALWAYS English — it feeds an image generator, it is never shown to a customer.",
+    languageReminder,
     "Return ONLY JSON, no prose, exactly:",
-    '{"summary": "<one short Arabic sentence>", "posts": [{"day": <1..N>, "slot": <1..postsPerDay>, "product": "<exact catalog name or empty>", "type": "<short Arabic label>", "caption": "<Arabic>", "hashtags": "<#.. #..>", "cta": "<short Arabic>", "image_prompt": "<English>"}]}',
-  ].join(" ");
+    '{"summary": "<one short sentence>", "posts": [{"product": "<exact catalog name or empty>", "type": "<short label>", "caption": "...", "hashtags": "<#.. #..>", "cta": "<short>", "image_prompt": "<English>"}]}',
+  ].filter(Boolean).join(" ");
 
-  const system = platform === "tiktok" ? tiktokSystem : metaSystem;
+  const buildSystem = platform === "tiktok" ? tiktokSystem : metaSystem;
   const userMsg = `STORE INFO:\n${brandLines || "(none)"}\n\nCATALOG (${items.length} items):\n${catalog}`;
 
-  let parsed: { summary?: string; posts?: AIPost[] };
-  try {
-    const text = await aiComplete({ system, user: userMsg, maxTokens: 12000, temperature: 0.85 });
-    parsed = parseJsonReply(text);
-  } catch (e) {
-    console.error("studio plan generate failed:", e instanceof Error ? e.message : e);
+  /*
+   * Generated in BATCHES, not in one call.
+   *
+   * The plan used to be a single request for up to 40 posts inside a 12,000-token
+   * budget — about 300 tokens per post, and a TikTok post has to carry a hook,
+   * 3-5 scenes, on-screen text, a sound, a caption, hashtags, a CTA and an English
+   * image prompt. There was no room to be good, and quality visibly decayed down
+   * the list as the model rationed what was left.
+   *
+   * Smaller batches give each post roughly five times the room, and each call
+   * carries the ideas already used so later batches diverge instead of
+   * rediscovering the same three angles.
+   *
+   * The cost is real and worth stating: four calls repeat the catalog four times,
+   * so a plan spends noticeably more of the free daily token budget than it did.
+   * That is the trade — fewer plans per day, each one worth posting.
+   *
+   * Partial success is kept. A model that fails on batch 3 of 4 has still written
+   * 30 usable posts, and throwing them away to show one error message would be a
+   * worse outcome for the owner than a slightly short plan they can top up.
+   */
+  const BATCH = 10;
+  const batches: number[] = [];
+  for (let left = total; left > 0; left -= BATCH) batches.push(Math.min(BATCH, left));
+
+  const aiPosts: AIPost[] = [];
+  const used: string[] = [];
+  let summary: string | null = null;
+  let lastErr: unknown = null;
+
+  for (const n of batches) {
+    try {
+      const text = await aiComplete({
+        system: buildSystem(n, used.slice(-18)),
+        user: userMsg,
+        // ~600 tokens per post plus room to think, instead of ~300 with no room.
+        maxTokens: Math.max(4000, n * 700),
+        // Lowered from 0.85. With a model this size, high temperature buys
+        // randomness, not depth — and the variety we actually wanted now comes
+        // from the "already used" list, which is a far more reliable source of it.
+        temperature: 0.7,
+        // The whole point of this route is ideas, and `gpt-oss` is a reasoning
+        // model that was being told not to reason. The token budget above is
+        // deliberately generous so thinking cannot starve the answer.
+        reasoningEffort: "medium",
+      });
+      const parsed = parseJsonReply<{ summary?: string; posts?: AIPost[] }>(text);
+      const got = Array.isArray(parsed.posts) ? parsed.posts.slice(0, n) : [];
+      if (summary === null && typeof parsed.summary === "string") summary = parsed.summary;
+      for (const p of got) {
+        aiPosts.push(p);
+        const tag = [p.type, p.product].filter(Boolean).join(" · ");
+        if (tag) used.push(tag);
+      }
+    } catch (e) {
+      lastErr = e;
+      console.error("studio plan batch failed:", e instanceof Error ? e.message : e);
+    }
+  }
+
+  if (aiPosts.length === 0) {
+    console.error("studio plan generate failed:", lastErr instanceof Error ? lastErr.message : lastErr);
     return NextResponse.json({ error: "تعذّر توليد الخطة، حاول مجدداً" }, { status: 502 });
   }
-  const aiPosts = Array.isArray(parsed.posts) ? parsed.posts.slice(0, total) : [];
-  if (aiPosts.length === 0) return NextResponse.json({ error: "لم يُنتج المساعد منشورات، حاول مجدداً" }, { status: 502 });
 
   // Match an AI product string to a catalog item (loose containment match).
   const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
@@ -168,13 +256,18 @@ export async function POST(req: NextRequest) {
     .from("studio_plans").insert({
       user_id: user.id, page_id: pageId, posts_per_day: postsPerDay, duration_days: durationDays,
       start_date: startDate.toISOString().slice(0, 10), status: "draft", platform,
-      summary: typeof parsed.summary === "string" ? parsed.summary : null,
+      summary,
     }).select().single();
   if (planErr || !plan) return NextResponse.json({ error: planErr?.message || "تعذّر إنشاء الخطة" }, { status: 500 });
 
   const rows = aiPosts.map((ap, i) => {
-    const day = Math.max(1, Math.min(durationDays, Number(ap.day) || Math.floor(i / postsPerDay) + 1));
-    const slot = Math.max(1, Math.min(postsPerDay, Number(ap.slot) || (i % postsPerDay) + 1));
+    // Position comes from the merged index, not from the model.
+    // Each batch numbers its own posts from 1, so asking the model for a day and
+    // slot would now produce four posts all claiming day 1 slot 1. The index is
+    // also simply more reliable: it guarantees an even spread, which the model
+    // only approximated even when it was answering for the whole plan at once.
+    const day = Math.max(1, Math.min(durationDays, Math.floor(i / postsPerDay) + 1));
+    const slot = (i % postsPerDay) + 1;
     const when = new Date(startDate);
     when.setDate(when.getDate() + (day - 1));
     when.setHours(slotTime(slot), 0, 0, 0);

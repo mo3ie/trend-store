@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextRequest, NextResponse } from "next/server";
+import { notifyUser, NOTICES } from "@/lib/notify";
 
 async function requireAdmin(req: NextRequest) {
   const auth = req.headers.get("authorization");
@@ -39,7 +40,14 @@ export async function PATCH(req: NextRequest) {
   }
 
   const tableName = table === "shein" ? "orders" : "store_orders";
+  const { data: before } = await supabaseAdmin.from(tableName).select("user_id,status,payment_status").eq("id", id).maybeSingle();
   const { error } = await supabaseAdmin.from(tableName).update(updates).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Tell the customer (bell + phone) — only on a real change.
+  if (before?.user_id) {
+    const kind = table === "shein" ? "shein" : "store";
+    if (status && status !== before.status) { const n = NOTICES.orderStatus(String(id), status, kind); if (n) await notifyUser(before.user_id, n); }
+    if (payment_status && payment_status !== before.payment_status) { const n = NOTICES.orderPayment(String(id), payment_status); if (n) await notifyUser(before.user_id, n); }
+  }
   return NextResponse.json({ success: true });
 }

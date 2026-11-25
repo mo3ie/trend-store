@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { creditWallet } from "@/lib/wallet";
+import { notifyUser, NOTICES } from "@/lib/notify";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -55,6 +56,7 @@ export async function POST(req: Request) {
 
     // Credit the wallet the products actually debit (see lib/wallet).
   const newBalance = await creditWallet(tx.user_id, tx.amount);
+  await notifyUser(tx.user_id, NOTICES.walletTopup(Number(tx.amount), newBalance));
 
     console.log(`✅ Wallet topped up: user=${tx.user_id} +${tx.amount} → ${newBalance}`);
     return NextResponse.json({ received: true });

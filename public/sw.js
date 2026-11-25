@@ -8,7 +8,7 @@
 //  • page navigations                                  → network-first (3.5 s) → cached copy → /offline
 //  • EVERYTHING ELSE under /api (wallet, orders, auth, payments, cards/utilities purchases, admin…)
 //    and every non-GET request                         → straight to the network, never cached.
-const V = "v6";
+const V = "v7";
 const STATIC = `trend-static-${V}`, PAGES = `trend-pages-${V}`, IMG = `trend-img-${V}`, API = `trend-api-${V}`;
 const PRECACHE = ["/", "/offline", "/icon-192.png", "/icon-512.png", "/apple-icon.png", "/brand/trend-logo.png", "/manifest.webmanifest"];
 
@@ -97,3 +97,36 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("message", (e) => { if (e.data === "skipWaiting") self.skipWaiting(); });
+
+// ── Phone notifications (Web Push) — arrive even with the site closed ─────────
+self.addEventListener("push", (event) => {
+  let d = {};
+  try { d = event.data ? event.data.json() : {}; } catch { d = { body: event.data ? event.data.text() : "" }; }
+  event.waitUntil(self.registration.showNotification(d.title || "محل ترند", {
+    body: d.body || "",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    dir: "rtl", lang: "ar",
+    tag: d.tag || "trend",
+    renotify: true,
+    vibrate: [90, 40, 90],
+    requireInteraction: !!d.important,
+    data: { url: d.url || "/" },
+  }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const w of wins) {
+      if (w.url.startsWith(self.location.origin)) {   // site already open → bring it to the front and go there
+        await w.focus();
+        if ("navigate" in w) await w.navigate(target).catch(() => {});
+        return;
+      }
+    }
+    await self.clients.openWindow(target);
+  })());
+});

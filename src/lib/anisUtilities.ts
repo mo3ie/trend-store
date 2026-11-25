@@ -2,6 +2,7 @@ import { Money, type MeterCharge, type DirectRecharge } from "@anis-ly/partners"
 import { createClient } from "@supabase/supabase-js";
 import { anis, anisEnabled, anisWallet, anisRefusalAr } from "@/lib/anis";
 import { creditWallet, debitWallet } from "@/lib/wallet";
+import { notifyUser } from "@/lib/notify";
 
 /**
  * Anis utilities sold from the customer's Trend wallet:
@@ -30,7 +31,7 @@ export const sellPrice = (cost: number, pct: number, fee: number) => Math.max(co
 
 const r3 = (x: number | string) => Number(x).toFixed(3);
 async function notify(userId: string, title: string, body: string, kind: "meter" | "recharge" = "meter") {
-  await db.from("notifications").insert({ user_id: userId, type: "utilities", title, body, link: `${kind === "meter" ? "/electricity" : "/recharge"}?tab=orders` });
+  await notifyUser(userId, { type: "utilities", title, body, link: `${kind === "meter" ? "/electricity" : "/recharge"}?tab=orders` });
 }
 
 // ───────────────────────── catalogue ─────────────────────────

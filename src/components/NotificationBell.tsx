@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, X, CheckCheck, ShoppingBag, Info, AlertCircle, Gift } from "lucide-react";
+import { Bell, X, CheckCheck, ShoppingBag, Info, AlertCircle, Gift, Smartphone } from "lucide-react";
 
 type Notification = {
   id: string;
@@ -160,6 +160,14 @@ export default function NotificationBell() {
               ))
             )}
           </div>
+
+          {/* Phone notifications on/off — opens the PushPrompt card */}
+          <button
+            onClick={() => { setOpen(false); window.dispatchEvent(new Event("trend:push")); }}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 border-t border-purple-500/15 text-xs font-bold text-purple-400 hover:bg-white/5 transition-colors"
+          >
+            <Smartphone size={14} /> إشعارات الهاتف
+          </button>
         </div>
       )}
     </div>

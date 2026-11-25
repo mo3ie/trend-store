@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomBytes } from "crypto";
 import { createClient } from "@supabase/supabase-js";
+import { notifyUser } from "@/lib/notify";
 
 /**
  * «هدية اليوم» — a daily gift drawn automatically, with no one choosing the
@@ -108,8 +109,8 @@ async function crown(day: string, giftTitle: string, winner: Entry, extra: Recor
     winner_phone_hash: winner.phone_hash, winner_device_hash: winner.device_hash, claimed_at: null,
   }).eq("day", day).select("day");
   if (!upd?.length) return null;
-  await db.from("notifications").insert({
-    user_id: winner.user_id, type: "gift", title: "🎁 مبروك! فزت بهدية اليوم",
+  await notifyUser(winner.user_id, {
+    type: "gift", important: true, title: "🎁 مبروك! فزت بهدية اليوم",
     body: `فزت بـ «${giftTitle}». كود الاستلام: ${code} — اعرضه في المحل مع بطاقة هويتك ورقم هاتفك المسجّل.`, link: "/gift",
   });
   return code;

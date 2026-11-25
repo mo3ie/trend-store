@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { completeSession } from "@/lib/yusor";
+import { notifyUser, NOTICES } from "@/lib/notify";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest) {
         dpay_session_id: null, // single-use — clear the token after confirmation
       })
       .eq("id", order_id);
+    { const n = NOTICES.orderPayment(String(order_id), "paid"); if (n) await notifyUser(user.id, n); }
 
     return NextResponse.json({ success: true });
   } catch (err) {

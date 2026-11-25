@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { notifyUser } from "@/lib/notify";
 
 // One "month" of a plan term, matching the purchase route's own arithmetic.
 export const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
@@ -15,7 +16,7 @@ export type RenewOutcome =
 // must never roll back a successful charge.
 export async function notify(userId: string, title: string, body: string, type = "info", link = "/subscriptions") {
   try {
-    await supabaseAdmin.from("notifications").insert({ user_id: userId, title, body, type, link });
+    await notifyUser(userId, { title, body, type, link });
   } catch { /* best-effort */ }
 }
 

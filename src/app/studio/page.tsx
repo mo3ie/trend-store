@@ -24,6 +24,8 @@ interface Product { id: string; category?: string; name: string; price_text?: st
 interface Brand {
   brand_name?: string; phones?: string[]; addresses?: string[]; links?: string[];
   hours?: string; tone?: string; logo_url?: string; extra?: string;
+  /** Free text, never a fixed list of dialects: the owner may want English. */
+  language?: string;
 }
 // Ready-made post-idea types the owner can pick from before generating.
 const POST_IDEAS: [string, string][] = [
@@ -168,6 +170,9 @@ export default function StudioPage() {
   const [planErr, setPlanErr] = useState("");
   const [selectedIdeas, setSelectedIdeas] = useState<Set<string>>(new Set());
   const [guidance, setGuidance] = useState("");
+  // Per-plan language override. Empty = fall back to the saved brand language,
+  // and empty there too = Libyan Arabic, which is what every existing plan used.
+  const [planLang, setPlanLang] = useState("");
   // Plan post multi-select
   const [postSelectMode, setPostSelectMode] = useState(false);
   const [selectedPlanPosts, setSelectedPlanPosts] = useState<Set<string>>(new Set());
@@ -443,7 +448,7 @@ export default function StudioPage() {
   async function generatePlan() {
     setPlanErr(""); setGenerating(true);
     try {
-      const r = await fetch("/api/studio/plan/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pageId: selectedPage, postsPerDay, durationDays, types: Array.from(selectedIdeas), guidance }) });
+      const r = await fetch("/api/studio/plan/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pageId: selectedPage, postsPerDay, durationDays, types: Array.from(selectedIdeas), guidance, language: planLang }) });
       const d = await r.json();
       if (!r.ok) { setPlanErr(d.error || t("تعذّر التوليد", "Generation failed")); }
       else { setPlan(d.plan); setPlanPosts(d.posts || []); }
@@ -921,6 +926,7 @@ export default function StudioPage() {
                 </div>
                 <Field muted={c.muted} label={t("اسم المتجر", "Store name")}><input style={input} value={brand.brand_name || ""} onChange={(e) => setBrand({ ...brand, brand_name: e.target.value })} placeholder={t("مثال: متجر لمسة أنوثة", "e.g. Lamsa Beauty")} /></Field>
                 <Field muted={c.muted} label={t("نبرة العلامة / وصف المتجر", "Brand voice / description")}><textarea rows={2} style={{ ...input, resize: "vertical" }} value={brand.tone || ""} onChange={(e) => setBrand({ ...brand, tone: e.target.value })} placeholder={t("مثال: متجر مستلزمات زينة نسائية راقٍ، لهجة ودودة وأنيقة", "e.g. Elegant women's beauty shop, warm & classy tone")} /></Field>
+                <Field muted={c.muted} label={t("لغة الكتابة (اكتبها كما تشاء)", "Writing language (write it however you like)")}><input style={input} value={brand.language || ""} onChange={(e) => setBrand({ ...brand, language: e.target.value })} placeholder={t("مثال: اللهجة الليبية · العربية الفصحى · English · عربي وإنجليزي معاً…", "e.g. Libyan dialect · Modern Standard Arabic · English · Arabic + English mix…")} /></Field>
                 <Field muted={c.muted} label={t("أرقام الهاتف (رقم في كل سطر)", "Phone numbers (one per line)")}><textarea rows={3} style={{ ...input, resize: "vertical" }} value={phonesText} onChange={(e) => setPhonesText(e.target.value)} placeholder={"091xxxxxxx\n092xxxxxxx"} /></Field>
                 <Field muted={c.muted} label={t("العناوين (عنوان في كل سطر)", "Addresses (one per line)")}><textarea rows={3} style={{ ...input, resize: "vertical" }} value={addressesText} onChange={(e) => setAddressesText(e.target.value)} placeholder={t("طرابلس - شارع...", "Tripoli - ...")} /></Field>
                 <Field muted={c.muted} label={t("روابط (صفحات/موقع، رابط في كل سطر)", "Links (pages/site, one per line)")}><textarea rows={3} style={{ ...input, resize: "vertical" }} value={linksText} onChange={(e) => setLinksText(e.target.value)} placeholder={"https://facebook.com/...\nhttps://instagram.com/..."} /></Field>
@@ -1124,6 +1130,14 @@ export default function StudioPage() {
                       );
                     })}
                   </div>
+
+                  {/* Language for THIS plan. Free text, deliberately not a list:
+                      a dropdown is a guess about who subscribes, and every guess
+                      leaves someone out — English most obviously. */}
+                  <Field muted={c.muted} label={t("لغة هذه الخطة (اختياري)", "Language for this plan (optional)")}>
+                    <input style={input} value={planLang} onChange={(e) => setPlanLang(e.target.value)}
+                      placeholder={brand.language || t("افتراضياً: اللهجة الليبية — اكتب أي لغة أو لهجة تريدها", "Default: Libyan Arabic — type any language or dialect")} />
+                  </Field>
 
                   {/* Free guidance */}
                   <Field muted={c.muted} label={t("تحدّث عن الأفكار التي تريدها (اختياري)", "Describe the ideas you want (optional)")}>

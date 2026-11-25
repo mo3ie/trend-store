@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { onlineConfTrans } from "@/lib/adfali";
+import { notifyUser, NOTICES } from "@/lib/notify";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest) {
       .from("store_orders")
       .update({ payment_status: "paid", status: "processing", dpay_session_id: null })
       .eq("id", order_id);
+    { const n = NOTICES.orderPayment(String(order_id), "paid"); if (n) await notifyUser(user.id, n); }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

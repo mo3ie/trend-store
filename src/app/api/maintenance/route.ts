@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, getUser } from "@/lib/apiAuth";
+import { notifyUser, NOTICES } from "@/lib/notify";
 
 const db = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
     }).select("id").single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (user?.id) { const n = NOTICES.maintenance(String(data.id), "new"); if (n) await notifyUser(user.id, n); }
     return NextResponse.json({ success: true, id: data.id });
   } catch {
     return NextResponse.json({ error: "خطأ في إنشاء الطلب" }, { status: 500 });
@@ -68,7 +70,16 @@ export async function PATCH(req: NextRequest) {
   if (technician !== undefined) updates.technician = technician || null;
   if (notes !== undefined) updates.notes = notes || null;
 
+  const { data: before } = await db.from("maintenance_requests").select("user_id,status,quote_price").eq("id", id).maybeSingle();
   const { error } = await db.from("maintenance_requests").update(updates).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (before?.user_id) {
+    const newQuote = updates.quote_price as number | null | undefined;
+    // a new price counts as «quoted» even if the admin didn't switch the status
+    const st = status && status !== before.status ? status
+      : newQuote != null && Number(newQuote) !== Number(before.quote_price) ? "quoted" : null;
+    const n = st ? NOTICES.maintenance(String(id), st, newQuote ?? before.quote_price) : null;
+    if (n) await notifyUser(before.user_id, n);
+  }
   return NextResponse.json({ success: true });
 }

@@ -1,6 +1,7 @@
 import { createHmac } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { notifyUser, NOTICES } from "@/lib/notify";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
 
     const { data: order } = await supabaseAdmin
       .from("store_orders")
-      .select("total, payment_status")
+      .select("total, payment_status, user_id")
       .eq("id", orderId)
       .single();
     if (!order) return NextResponse.json({ ok: true });
@@ -79,6 +80,7 @@ export async function POST(req: NextRequest) {
       .eq("id", orderId);
 
     if (error) console.error("MOAMALAT WEBHOOK DB ERROR:", error);
+    else { const n = NOTICES.orderPayment(String(orderId), isPaid ? "paid" : "failed"); if (n) await notifyUser(order.user_id, n); }
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {

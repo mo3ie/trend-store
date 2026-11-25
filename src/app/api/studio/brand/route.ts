@@ -32,6 +32,8 @@ export async function PUT(req: NextRequest) {
     links:      arr(b.links),
     hours:      b.hours ?? null,
     tone:       b.tone ?? null,
+    // Free text, never a list: see sql/38. NULL means Libyan Arabic.
+    language:   typeof b.language === "string" ? b.language.slice(0, 200).trim() || null : null,
     logo_url:   b.logo_url ?? null,
     colors:     b.colors ?? null,
     extra:      b.extra ?? null,

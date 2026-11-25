@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/apiAuth";
 import { db, act } from "@/lib/market";
+import { notifyUser } from "@/lib/notify";
 
 export async function GET() {
   const auth = await requireAdmin();
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
     if (b.action === "approve" || b.action === "reject") {
       const { data: l } = await db.from("market_listings").update(b.action === "approve" ? { status: "active", reject_reason: null } : { status: "rejected", reject_reason: String(b.reason || "مخالف للشروط").slice(0, 300) })
         .eq("id", b.id).eq("status", "pending").select("seller_id,title").maybeSingle();
-      if (l) await db.from("notifications").insert({ user_id: l.seller_id, type: "market", link: `/market/me`,
+      if (l) await notifyUser(l.seller_id, { type: "market", link: `/market/me`,
         title: b.action === "approve" ? "✅ إعلانك انتشر في سوق المستعمل" : "❌ إعلانك ما انقبلش",
         body: b.action === "approve" ? `«${l.title}» صار ظاهر للمشترين.` : `«${l.title}»: ${b.reason || "مخالف للشروط"} — عدّله وأرسله مرة ثانية.` });
       return NextResponse.json({ success: true });

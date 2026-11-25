@@ -3,6 +3,7 @@ import { Cairo, IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 import ThemeToggle from "@/components/ThemeToggle";
 import PWARegister from "@/components/PWARegister";
+import PushPrompt from "@/components/PushPrompt";
 import UiFx from "@/components/UiFx";
 import GlassNav from "@/components/GlassNav";
 import HoloBot from "@/components/holo/HoloBot";
@@ -81,6 +82,7 @@ export default function RootLayout({
         <GlassNav />
         <HoloBot />
         <PWARegister />
+        <PushPrompt />
       </body>
     </html>
   );

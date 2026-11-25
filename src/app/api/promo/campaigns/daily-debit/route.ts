@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { setCampaignStatus } from "@/services/meta";
+import { notifyUser, NOTICES } from "@/lib/notify";
 
 // Daily wallet debit for open-ended (continuous) campaigns. Run once a day from an
 // external scheduler with `Authorization: Bearer <CRON_SECRET>`.
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
   const nowIso = new Date().toISOString();
   const { data: due, error } = await supabaseAdmin
     .from("ad_campaigns")
-    .select("id, user_id, external_campaign_id, daily_price_lyd, next_charge_at, status")
+    .select("id, user_id, page_name, external_campaign_id, daily_price_lyd, next_charge_at, status")
     .eq("platform", "meta")
     .eq("continuous", true)
     .in("status", ["active", "in_review"])
@@ -54,6 +55,7 @@ export async function GET(req: NextRequest) {
       await supabaseAdmin.from("ad_campaigns")
         .update({ status: "paused", error_message: "توقفت مؤقتاً لنفاد رصيد المحفظة — اشحن محفظتك واستأنف الحملة.", updated_at: nowIso })
         .eq("id", c.id);
+      await notifyUser(c.user_id, NOTICES.adPaused(c.page_name, "فيسبوك"));
       paused++;
     }
   }

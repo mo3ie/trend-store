@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { creditWallet, debitWallet } from "@/lib/wallet";
+import { notifyUser } from "@/lib/notify";
 
 /**
  * «سوق المستعمل بضمان» — used-device marketplace with the store as escrow.
@@ -30,7 +31,7 @@ type Order = { id: string; listing_id: string; buyer_id: string; seller_id: stri
 const step = (o: Order, what: string, by: string) => [...(Array.isArray(o.timeline) ? o.timeline : []), { at: new Date().toISOString(), what, by }];
 
 async function notify(userId: string, title: string, body: string, link: string) {
-  await db.from("notifications").insert({ user_id: userId, type: "market", title, body, link });
+  await notifyUser(userId, { type: "market", title, body, link });
 }
 
 async function txLog(userId: string, amount: number, type: "credit" | "debit", note: string) {

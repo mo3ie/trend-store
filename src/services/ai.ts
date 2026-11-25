@@ -31,6 +31,22 @@ export interface AIParams {
   user: string;
   maxTokens?: number;
   temperature?: number;
+  /**
+   * How hard a reasoning model may think before answering.
+   *
+   * `gpt-oss` is a REASONING model: thinking is where its quality comes from. It
+   * was pinned to "low" everywhere after it once spent the entire token budget
+   * thinking and returned an empty answer — a real failure, and the right fix at
+   * the time, but it was applied globally and so it also capped the one caller
+   * whose whole job is ideas. The content planner was being told not to think.
+   *
+   * So the ceiling is now per-call. It stays "low" by default, because the bot
+   * answers comments in seconds and under a shared free daily budget, and raising
+   * it there would buy nothing. Callers that trade latency and tokens for better
+   * output ask for more, and MUST pass a token budget large enough that thinking
+   * cannot starve the answer — which is what caused the empty replies.
+   */
+  reasoningEffort?: "low" | "medium" | "high";
 }
 
 async function callProvider(p: { provider: Provider; key: string }, params: AIParams, maxTokens: number, temperature: number): Promise<string> {
@@ -44,8 +60,9 @@ async function callProvider(p: { provider: Provider; key: string }, params: AIPa
       body: JSON.stringify({
         model, max_tokens: maxTokens, temperature,
         // gpt-oss is a reasoning model: at default effort it can spend the whole
-        // token budget thinking and return an EMPTY answer.
-        ...(model.includes("gpt-oss") ? { reasoning_effort: "low" } : {}),
+        // token budget thinking and return an EMPTY answer. "low" is the safe
+        // default; see AIParams.reasoningEffort for why it is no longer global.
+        ...(model.includes("gpt-oss") ? { reasoning_effort: params.reasoningEffort ?? "low" } : {}),
         messages: [{ role: "system", content: params.system }, { role: "user", content: params.user }],
       }),
       cache: "no-store",

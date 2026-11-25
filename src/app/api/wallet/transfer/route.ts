@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthUser } from "@/lib/authUser";
 import { getBalance } from "@/lib/wallet";
+import { notifyUser, NOTICES } from "@/lib/notify";
 
 export const maxDuration = 30;
 
@@ -161,6 +162,10 @@ export async function POST(req: NextRequest) {
   }
 
   const result = data as { transfer_id: string; from_balance: number };
+  // Both sides hear about it (bell + phone). The recipient sees the sender's name as on their profile.
+  const { data: me } = await supabaseAdmin.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+  await notifyUser(recipient.id, NOTICES.walletReceived(amt, me?.full_name || "مستخدم في ترند"));
+  await notifyUser(user.id, NOTICES.walletSent(amt, recipient.name || "المستلم"));
   return NextResponse.json({
     ok: true,
     transferId: result.transfer_id,

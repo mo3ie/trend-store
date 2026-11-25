@@ -4,6 +4,7 @@ import { getUser } from "@/lib/apiAuth";
 import { creditWallet } from "@/lib/wallet";
 import * as yusor from "@/lib/yusor";
 import * as masarafi from "@/lib/masarafi";
+import { notifyUser, NOTICES } from "@/lib/notify";
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -36,5 +37,6 @@ export async function POST(req: Request) {
     .eq("id", tx.id).eq("status", "pending").select("id");
   if (!done?.length) return NextResponse.json({ error: "العملية مكتملة بالفعل" }, { status: 409 });
   const newBalance = await creditWallet(user.id, tx.amount);
+  await notifyUser(user.id, NOTICES.walletTopup(Number(tx.amount), newBalance));
   return NextResponse.json({ success: true, newBalance });
 }

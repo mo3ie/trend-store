@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { db, weekStart } from "@/lib/games";
 import { libyaDay } from "@/lib/dailyGift";
 import { maskName } from "@/lib/dailyGift";
+import { notifyUser } from "@/lib/notify";
 
 const CODE = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const code = () => Array.from(randomBytes(8), (x) => CODE[x % CODE.length]).join("");
@@ -28,6 +29,6 @@ export async function finalizePastWeek() {
   const winners = top.map((t) => ({ ...t, code: code(), claimed: false }));
   const { data: upd } = await db.from("game_weeks").update({ winners, finalized_at: new Date().toISOString() }).eq("week_start", ws).is("finalized_at", null).select("prize_title");
   if (!upd?.length) return;
-  for (const x of winners) await db.from("notifications").insert({ user_id: x.user_id, type: "games", link: "/games",
+  for (const x of winners) await notifyUser(x.user_id, { type: "games", important: true, link: "/games",
     title: `🏆 مبروك! المركز ${x.rank} في تحديات الأسبوع`, body: `${upd[0].prize_title} — كود الاستلام: ${x.code}. اعرضه في المحل مع هويتك.` });
 }

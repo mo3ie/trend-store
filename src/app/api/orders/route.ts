@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
+import { notifyUser, NOTICES } from "@/lib/notify";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -86,6 +87,7 @@ export async function POST(req: NextRequest) {
     }).select().single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await notifyUser(user.id, NOTICES.orderPlaced(String(data.id), total));
     return NextResponse.json(data);
   } catch {
     return NextResponse.json({ error: "خطأ في إنشاء الطلب" }, { status: 500 });
