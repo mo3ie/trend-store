@@ -34,7 +34,7 @@ async function cardBrands(): Promise<string> {
     const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
     const { data } = await db.from("card_products").select("brand,name").eq("active", true).or("provider_available.is.null,provider_available.eq.true").limit(300);
     const brands = [...new Set((data || []).map((c) => String(c.brand || c.name || "").trim()).filter(Boolean))].slice(0, 40);
-    return brands.length ? `الكروت المتوفرة الآن في صفحة الكروت الرقمية (/cards): ${brands.join("، ")}. لما يطلب كرت منها وجّهه لـ /cards (مش من قائمة المنتجات).` : "صفحة الكروت الرقمية (/cards) ما فيها كروت مفعّلة حالياً — قول إنها قريباً.";
+    return brands.length ? `الكروت المتوفرة الآن في صفحة الكروت الرقمية (/cards): ${brands.join("، ")}. لما يطلب كرت منها وجّهه لـ /cards (مش من قائمة المنتجات).` : "معلومة: صفحة الكروت الرقمية (/cards) ما فيها كروت مفعّلة حالياً، الكروت قريباً.";
   } catch { return ""; }
 }
 
