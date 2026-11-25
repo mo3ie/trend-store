@@ -23,6 +23,10 @@ const EDITABLE = [
   // Its delivery: see src/lib/privateLinks.ts.
   "private_delivery", "private_link_text", "whatsapp_number", "whatsapp_text",
   "private_link_ttl_hours", "private_link_max_opens",
+  // «من التعليق إلى الرسالة» — answering a code the customer sends by DM. The
+  // per-merchant half of the switch; the other half is the DM_CODE_AUTOREPLY env
+  // var, and BOTH must be on before anything is sent. See services/dmCodeReply.ts.
+  "dm_code_autoreply", "dm_code_miss_text",
 ] as const;
 
 /**
