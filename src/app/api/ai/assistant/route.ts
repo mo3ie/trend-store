@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { aiComplete, hasAI, parseJsonReply } from "@/services/ai";
 import { getCatalog, shortlist, rateLimited } from "@/lib/catalog";
+import { PAGES, SITE_GUIDE } from "@/lib/siteGuide";
+import { settings as utilSettings } from "@/lib/anisUtilities";
 
 /**
  * «ترندي» — the store's AI shopping assistant.
@@ -12,16 +14,26 @@ type Msg = { role: "user" | "assistant"; content: string };
 
 const SYSTEM = `أنت «ترندي»، المساعد الذكي لمحل ترند للإلكترونيات في ليبيا.
 تتكلم بالعربية بلهجة ليبية مهذبة وبسيطة، وجمل قصيرة.
-مهمتك: تساعد الزبون يختار منتج من القائمة المرفقة فقط، وتجاوب على أسئلة الأجهزة والإكسسوارات والصيانة.
+مهمتك: تساعد الزبون يختار منتج من القائمة المرفقة فقط، وتجاوب على أسئلة الأجهزة والإكسسوارات والصيانة، وتشرح أي ميزة في الموقع خطوة بخطوة من «دليل الموقع» المرفق.
 قواعد صارمة:
 - لا تخترع منتجات ولا أسعار. استعمل فقط المنتجات الموجودة في القائمة وأرقامها (id) كما هي.
 - الأسعار بالدينار الليبي كما في القائمة.
 - إذا المنتج غير متوفر قل ذلك واقترح بديل متوفر.
 - إذا الزبون يشتكي من عطل أو بطء أو بطارية، اقترح «فحص جهازك» (action: "diagnose") أو حجز صيانة (action: "repair").
-- لا تطلب بيانات شخصية ولا بيانات دفع.
+- لا تطلب بيانات شخصية ولا بيانات دفع ولا كلمة سر ولا أكواد.
+- لما الزبون يسأل على ميزة: اشرحها بخطوات قصيرة مرقّمة من الدليل فقط، وحط رابط صفحتها في "page". لا تخترع ميزات أو أسعار أو مدد مش مكتوبة في الدليل؛ لو ما تعرفش قول بصراحة ووجّهه للمحل.
+- لو الدليل يقول الخدمة «متوقفة مؤقتاً» قول إنها قريباً وما تحطش رابطها.
 أرجع JSON فقط بهذا الشكل:
-{"reply":"نص الرد","products":["id1","id2"],"action":null}
-حيث action واحدة من: null, "diagnose", "repair", "cart". أقصى 4 منتجات.`;
+{"reply":"نص الرد","products":["id1","id2"],"action":null,"page":null}
+حيث action واحدة من: null, "diagnose", "repair", "cart". و page مسار صفحة من الدليل (مثل "/electricity") أو null. أقصى 4 منتجات.`;
+
+async function liveStatus(): Promise<string> {
+  try {
+    const s = await utilSettings();
+    const st = (on: boolean) => (on ? "شغّالة" : "متوقفة مؤقتاً (قريباً)");
+    return `حالة الخدمات الآن: شحن الكهرباء ${st(s.meter_enabled)}، الشحن المباشر ${st(s.recharge_enabled)}.`;
+  } catch { return ""; }
+}
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anon";
@@ -41,7 +53,7 @@ export async function POST(req: NextRequest) {
   const last = [...messages].reverse().find((m) => m.role === "user");
   if (!last) return NextResponse.json({ error: "empty" }, { status: 400 });
 
-  const catalog = await getCatalog();
+  const [catalog, status] = await Promise.all([getCatalog(), liveStatus()]);
   const context = messages.map((m) => m.content).join(" ");
   const list = shortlist(catalog, context, 40);
   const listText = list
@@ -53,11 +65,14 @@ export async function POST(req: NextRequest) {
   try {
     const raw = await aiComplete({
       system: SYSTEM,
-      user: `قائمة المنتجات:\n${listText}\n\nالمحادثة:\n${convo}\n\nرد على آخر رسالة للزبون. JSON فقط.`,
-      maxTokens: 700,
+      user: `${SITE_GUIDE}
+${status}
+
+قائمة المنتجات:\n${listText}\n\nالمحادثة:\n${convo}\n\nرد على آخر رسالة للزبون. JSON فقط.`,
+      maxTokens: 900,
       temperature: 0.5,
     });
-    let out: { reply?: string; products?: string[]; action?: string | null };
+    let out: { reply?: string; products?: string[]; action?: string | null; page?: string | null };
     try { out = parseJsonReply(raw); } catch { out = { reply: raw.slice(0, 800), products: [] }; }
 
     const byId = new Map(catalog.map((p) => [p.id, p]));
@@ -68,7 +83,8 @@ export async function POST(req: NextRequest) {
       .map((p) => ({ id: p!.id, name: p!.name, price: p!.price, image_url: p!.image_url, inStock: p!.inStock }));
     const action = ["diagnose", "repair", "cart"].includes(String(out.action)) ? out.action : null;
 
-    return NextResponse.json({ reply: String(out.reply || "").slice(0, 1200), products, action });
+    const page = typeof out.page === "string" && PAGES[out.page] ? { href: out.page, label: PAGES[out.page] } : null;
+    return NextResponse.json({ reply: String(out.reply || "").slice(0, 1500), products, action, page });
   } catch {
     return NextResponse.json({ reply: "صار خلل بسيط، عاود بعد شوية.", products: [] }, { status: 502 });
   }

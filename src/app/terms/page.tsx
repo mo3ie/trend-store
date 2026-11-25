@@ -12,15 +12,71 @@ export default function TermsPage() {
     {
       title: ["قبول الشروط", "Acceptance of terms"],
       body: [
-        "باستخدامك موقع ترند ستور وخدماته (المتجر الإلكتروني، الإعلانات الرقمية، بوت الرد الآلي) فإنك توافق على هذه الشروط. إن لم توافق عليها، يرجى عدم استخدام الخدمة.",
-        "By using the Trend Store website and its services (online store, digital advertising, auto-reply bot) you agree to these terms. If you do not agree, please do not use the service.",
+        "باستخدامك موقع ترند ستور (trendstore-ly.com) وتطبيقه وخدماته — المتجر، المحفظة، الكروت الرقمية، شحن الكهرباء، الشحن المباشر، سوق المستعمل بضمان، الفحص والصيانة، هدية اليوم والألعاب، المساعد الذكي، الإعلانات الرقمية، بوت الرد الآلي، والموظف الذكي — فإنك توافق على هذه الشروط وعلى سياسة الخصوصية. إن لم توافق عليها، يرجى عدم استخدام الخدمة.",
+        "By using the Trend Store website (trendstore-ly.com), its app and its services — the store, wallet, digital cards, electricity top-up, direct recharge, the escrow used-device market, diagnosis and repair, the daily gift and games, the AI assistant, digital advertising, the auto-reply bot and the AI Employee — you agree to these terms and to the privacy policy. If you do not agree, please do not use the service.",
       ],
     },
     {
       title: ["الحساب والمسؤولية", "Account & responsibility"],
       body: [
-        "أنت مسؤول عن دقة بيانات حسابك وعن الحفاظ على سرية كلمة المرور. أنت مسؤول عن كل النشاط الذي يجري عبر حسابك.",
-        "You are responsible for the accuracy of your account details and for keeping your password confidential. You are responsible for all activity that occurs under your account.",
+        "أنت مسؤول عن دقة بيانات حسابك وعن الحفاظ على سرية كلمة المرور. أنت مسؤول عن كل النشاط الذي يجري عبر حسابك. حساب واحد لكل شخص؛ الحسابات المتعددة أو الوهمية تُوقف وتُلغى مشاركاتها وجوائزها.",
+        "You are responsible for the accuracy of your account details and for keeping your password confidential. You are responsible for all activity that occurs under your account. One account per person; multiple or fake accounts are suspended and their entries and prizes cancelled.",
+      ],
+    },
+    {
+      title: ["المتجر والطلبات", "Store & orders"],
+      body: [
+        "الأسعار بالدينار الليبي كما تظهر عند تأكيد الطلب. يظهر المنتج «متوفر» ما دام في المخزون، وقد نتواصل معك لتعديل الطلب أو إلغائه إذا نفد المنتج قبل التجهيز، ويُعاد لك أي مبلغ مدفوع عنه. الضمان والاستبدال حسب المكتوب في صفحة المنتج أو فاتورة الشراء. الصور والعرض ثلاثي الأبعاد توضيحية وقد يختلف اللون أو الشكل قليلاً.",
+        "Prices are in Libyan dinars as shown when the order is confirmed. A product shows «In stock» while it is available; if it runs out before preparation we may contact you to amend or cancel the order, and any amount paid for it is returned. Warranty and exchange are as stated on the product page or the purchase invoice. Photos and 3D views are illustrative and colour or shape may differ slightly.",
+      ],
+    },
+    {
+      title: ["المحفظة", "Wallet"],
+      body: [
+        "رصيد المحفظة يُشحن عبر بوابات الدفع المتاحة ويُستخدم داخل المنصة. أي عملية ما تمّت (كرت أو شحن أو سوق) يُعاد مبلغها للمحفظة. التحويل لمستخدم آخر نهائي بعد تأكيده، فتأكد من المستلم. في حال خطأ في الشحن أو الخصم تواصل معنا ونراجع العملية من سجلاتنا وسجلات البوابة.",
+        "Wallet balance is topped up through the available payment gateways and used inside the platform. Any operation that does not complete (card, top-up or market) is refunded to the wallet. A transfer to another user is final once confirmed, so check the recipient. If a top-up or debit goes wrong, contact us and we will review it against our records and the gateway's.",
+      ],
+    },
+    {
+      title: ["الكروت الرقمية", "Digital cards"],
+      body: [
+        "الكرت يُدفع من المحفظة ويُسلَّم كوده في «كروتي». بعد تسليم الكود لا يمكن استرجاعه أو استبداله لأنه قابل للاستخدام فوراً، فاحفظه ولا تشاركه. إذا لم يُنفَّذ الطلب لدى المزوّد يُعاد المبلغ للمحفظة تلقائياً، وإذا كان الطلب قيد المعالجة نكمله ولا نُعيد المبلغ حتى تتأكد النتيجة النهائية.",
+        "Cards are paid from the wallet and the code is delivered under «My cards». Once delivered, a code cannot be refunded or exchanged because it is usable immediately, so keep it safe and do not share it. If the supplier does not place the order, the amount is refunded to the wallet automatically; if it is still processing, we complete it and refund only once the final outcome is known.",
+      ],
+    },
+    {
+      title: ["شحن الكهرباء والشحن المباشر", "Electricity top-up & direct recharge"],
+      body: [
+        "أنت مسؤول عن صحة رقم العداد وبيانات المستلم التي تكتبها؛ الشحن لرقم خاطئ قد لا يمكن استرجاعه. السعر بالدينار يظهر قبل الدفع ويشمل رسوم الخدمة، وفي الشحن المباشر يُحسب حسب سعر الصرف لحظة الطلب. يُعاد المبلغ للمحفظة إذا رفضه المزوّد أو فشل الشحن وأُعيد المبلغ لنا، وجزئياً إذا نُفّذ جزء منه. إذا طلب المزوّد تصحيح بيانات المستلم تقدر تصحّحها من «شحناتي». قد يستغرق التنفيذ بعض الوقت حسب الجهة المستلمة.",
+        "You are responsible for the meter number and recipient details you enter; a top-up to a wrong number may not be recoverable. The dinar price is shown before payment and includes the service fee; for direct recharge it uses the exchange rate at the time of the order. The amount is refunded to the wallet if the supplier rejects it or the top-up fails and is refunded to us, and partially if only part is executed. If the supplier asks for the recipient details to be corrected you can do so under «My top-ups». Execution may take some time depending on the receiving party.",
+      ],
+    },
+    {
+      title: ["سوق المستعمل بضمان", "Escrow used-device market"],
+      body: [
+        "الإعلانات تُراجع قبل النشر، ويُمنع بيع أجهزة مسروقة أو مقفلة بحساب (iCloud/Google) أو مخالفة للقانون. عند الشراء يُحجز ثمن الجهاز لدى ترند، ويسلّم البائع الجهاز، وللمشتري أيام حماية لفحصه وتأكيد الاستلام أو فتح نزاع. يُحوَّل للبائع الثمن ناقص عمولة المنصة المعلنة بعد التأكيد أو انتهاء أيام الحماية دون نزاع. في النزاع يحكم المحل بعد مراجعة الطرفين، وقراره نهائي داخل المنصة. البائع مسؤول عن صدق وصف الجهاز.",
+        "Listings are reviewed before publishing; selling stolen devices, devices locked to an account (iCloud/Google) or anything unlawful is prohibited. On purchase the price is held by Trend, the seller hands over the device, and the buyer has protection days to inspect it and confirm receipt or open a dispute. The seller is paid the price minus the published platform commission after confirmation, or once the protection days pass without a dispute. In a dispute the shop decides after reviewing both sides, and its decision is final within the platform. The seller is responsible for an honest device description.",
+      ],
+    },
+    {
+      title: ["الفحص والصيانة", "Diagnosis & repair"],
+      body: [
+        "فحص المتصفح وتقارير الذكاء الاصطناعي تقديرية للمساعدة في القرار، وليست ضماناً لحالة الجهاز. الفحص العميق مدفوع، ولا يُستهلك كوده إلا إذا كانت البيانات المرفوعة كافية لإصدار شهادة. شروط الصيانة وضمانها حسب ما يُتفق عليه عند استلام الجهاز.",
+        "Browser checks and AI reports are estimates to help your decision, not a guarantee of the device's condition. The deep scan is paid, and its code is consumed only if the uploaded data is enough to issue a certificate. Repair terms and warranty are as agreed when the device is received.",
+      ],
+    },
+    {
+      title: ["هدية اليوم والألعاب", "Daily gift & games"],
+      body: [
+        "المشاركة مجانية. هدية اليوم تتطلب حساباً مؤكداً ورقم هاتف ليبي ومشاركة واحدة يومياً لكل شخص وجهاز، والسحب عشوائي قابل للتحقق علناً. الألعاب محاولة واحدة يومياً، والجوائز الأسبوعية لأصحاب أعلى النتائج. نستبعد أي مشاركة أو فوز يثبت فيه الغش أو تعدد الحسابات ونعيد السحب. تُستلم الجائزة بكود الاستلام خلال المدة المعلنة، ولا تُستبدل نقداً إلا إذا أُعلن ذلك.",
+        "Participation is free. The daily gift requires a confirmed account, a Libyan phone number and one entry per person and device per day, and the draw is random and publicly verifiable. Games allow one attempt per day, and weekly prizes go to the top scores. We exclude any entry or win involving cheating or multiple accounts and redraw. Prizes are collected with the claim code within the announced period and are not exchangeable for cash unless announced.",
+      ],
+    },
+    {
+      title: ["المساعد الذكي «ترندي»", "The «Trendy» assistant"],
+      body: [
+        "«ترندي» يعتمد على الذكاء الاصطناعي ويقترح فقط من منتجات المتجر، لكنه قد يخطئ. السعر والتوفر المعتمدان هما ما يظهر في صفحة المنتج وعند تأكيد الطلب.",
+        "«Trendy» is AI-based and suggests only products from the store, but it can make mistakes. The binding price and availability are those shown on the product page and at order confirmation.",
       ],
     },
     {
@@ -40,8 +96,8 @@ export default function TermsPage() {
     {
       title: ["الاشتراكات والدفع", "Subscriptions & payment"],
       body: [
-        "بوت الرد الآلي خدمة باشتراك شهري لكل صفحة/حساب، يُخصم من رصيد محفظتك. الاشتراك لا يتجدد تلقائياً — يتوقف البوت عند انتهاء المدة ما لم تجدّد. المبالغ المدفوعة غير قابلة للاسترداد بعد تفعيل الخدمة، إلا في حال عطل من جانبنا يمنع تشغيلها.",
-        "The auto-reply bot is a monthly subscription per page/account, debited from your wallet balance. Subscriptions do not auto-renew — the bot stops at the end of the period unless you renew. Payments are non-refundable once the service is active, except where a fault on our side prevents it from running.",
+        "بوت الرد الآلي والإعلانات والموظف الذكي خدمات باشتراك (شهري أو ربع سنوي أو سنوي) حسب الباقة وعدد الصفحات، يُخصم من رصيد محفظتك، وللحسابات الجديدة فترة تجربة مجانية. التجديد التلقائي اختياري ومُطفأ افتراضياً؛ إذا فعّلته يُخصم سعر الباقة من المحفظة عند انتهاء المدة، ويمكنك إيقافه في أي وقت. ونذكّرك قبل انتهاء الاشتراك. المبالغ المدفوعة غير قابلة للاسترداد بعد تفعيل الخدمة، إلا في حال عطل من جانبنا يمنع تشغيلها.",
+        "The auto-reply bot, ads and AI Employee are subscription services (monthly, quarterly or yearly) by plan and number of pages, debited from your wallet balance, and new accounts get a free trial period. Auto-renew is optional and off by default; if you turn it on, the plan price is debited from the wallet when the term ends, and you can turn it off at any time. We remind you before a subscription expires. Payments are non-refundable once the service is active, except where a fault on our side prevents it from running.",
       ],
     },
     {
@@ -75,8 +131,8 @@ export default function TermsPage() {
     {
       title: ["التواصل", "Contact"],
       body: [
-        "لأي استفسار بخصوص هذه الشروط، تواصل معنا عبر الموقع أو صفحة ترند ستور على فيسبوك.",
-        "For any questions about these terms, contact us via the website or the Trend Store Facebook page.",
+        "لأي استفسار بخصوص هذه الشروط: trend@trendstore-ly.com، أو عبر الموقع وصفحة ترند ستور على فيسبوك — ترند للإلكترونيات، بنغازي، ليبيا. تخضع هذه الشروط للقوانين المعمول بها في دولة ليبيا.",
+        "For any questions about these terms: trend@trendstore-ly.com, or via the website and the Trend Store Facebook page — Trend Electronics, Benghazi, Libya. These terms are governed by the laws in force in Libya.",
       ],
     },
   ];
@@ -88,7 +144,7 @@ export default function TermsPage() {
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
           <div>
             <h1 style={{ fontSize: 32, fontWeight: 900, color: "#fff", marginBottom: 8 }}>{t("الشروط والأحكام", "Terms of Service")}</h1>
-            <p style={{ color: "#64748b", fontSize: 14, marginBottom: 48 }}>{t("آخر تحديث: يوليو 2026", "Last updated: July 2026")}</p>
+            <p style={{ color: "#64748b", fontSize: 14, marginBottom: 48 }}>{t("آخر تحديث: نوفمبر 2026", "Last updated: November 2026")}</p>
           </div>
           <LangToggle />
         </div>

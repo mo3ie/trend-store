@@ -2,17 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Send, Stethoscope, Wrench, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { X, Send, Stethoscope, Wrench, Sparkles, Volume2, VolumeX, ArrowLeft } from "lucide-react";
 import { speak, stopVoice, voiceOn, setVoiceOn } from "./trendyVoice";
 
 type P = { id: string; name: string; price: number; image_url: string | null; inStock: boolean };
-type M = { role: "user" | "assistant"; content: string; products?: P[]; action?: string | null };
+type M = { role: "user" | "assistant"; content: string; products?: P[]; action?: string | null; page?: { href: string; label: string } | null };
 
 const CHIPS = [
   "أبي جوال كويس تحت 1500 دينار",
   "سماعات مناسبة للألعاب",
   "جوالي صاير بطيء والبطارية تخلص بسرعة",
-  "شنو أحسن هدية إلكترونية؟",
+  "كيف نشحن عداد الكهرباء من الموقع؟",
+  "كيف نبيع جوالي المستعمل بضمان؟",
 ];
 
 const KEY = "trendy_chat_v1";
@@ -54,7 +55,7 @@ export default function TrendyChat({ open, onClose, onState }: { open: boolean; 
         body: JSON.stringify({ messages: next.map(({ role, content }) => ({ role, content })) }),
       });
       const d = await r.json();
-      setMsgs([...next, { role: "assistant", content: d.reply || "…", products: d.products || [], action: d.action }]);
+      setMsgs([...next, { role: "assistant", content: d.reply || "…", products: d.products || [], action: d.action, page: d.page || null }]);
       reply = d.reply || "";
     } catch {
       setMsgs([...next, { role: "assistant", content: "ما قدرتش نوصل للسيرفر، جرّب مرة ثانية." }]);
@@ -80,7 +81,7 @@ export default function TrendyChat({ open, onClose, onState }: { open: boolean; 
         <div className="tc-body">
           {msgs.length === 0 && (
             <div className="tc-hello">
-              <p>أهلاً 👋 أنا <b>ترندي</b>. قولّي شنو تدوّر عليه، أو اوصفلي مشكلة جوالك، ونساعدك.</p>
+              <p>أهلاً 👋 أنا <b>ترندي</b>. قولّي شنو تدوّر عليه، اوصفلي مشكلة جوالك، أو اسألني على أي ميزة في الموقع ونشرحهالك.</p>
               <div className="tc-chips">
                 {CHIPS.map((c) => <button key={c} onClick={() => send(c)}>{c}</button>)}
               </div>
@@ -88,7 +89,7 @@ export default function TrendyChat({ open, onClose, onState }: { open: boolean; 
           )}
           {msgs.map((m, i) => (
             <div key={i} className={`tc-msg ${m.role}`}>
-              <div className="tc-bubble">{m.content}</div>
+              <div className="tc-bubble" style={{ whiteSpace: "pre-line" }}>{m.content}</div>
               {!!m.products?.length && (
                 <div className="tc-prods">
                   {m.products.map((p) => (
@@ -103,6 +104,7 @@ export default function TrendyChat({ open, onClose, onState }: { open: boolean; 
               )}
               {m.action === "diagnose" && <a className="tc-act" href="/diagnose"><Stethoscope size={15} /> افحص جهازك الآن</a>}
               {m.action === "repair" && <a className="tc-act" href="/?repair=1"><Wrench size={15} /> احجز صيانة</a>}
+              {m.page && m.page.href !== "/diagnose" && m.page.href !== "/?repair=1" && <a className="tc-act" href={m.page.href}><ArrowLeft size={15} /> افتح «{m.page.label}»</a>}
             </div>
           ))}
           {busy && <div className="tc-msg assistant"><div className="tc-bubble tc-typing"><i /><i /><i /></div></div>}
