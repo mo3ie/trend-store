@@ -27,11 +27,23 @@ const SYSTEM = `أنت «ترندي»، المساعد الذكي لمحل تر�
 {"reply":"نص الرد","products":["id1","id2"],"action":null,"page":null}
 حيث action واحدة من: null, "diagnose", "repair", "cart". و page مسار صفحة من الدليل (مثل "/electricity") أو null. أقصى 4 منتجات.`;
 
+// Digital cards are a separate catalogue (card_products) — list the active brands so Trendy can point to /cards.
+async function cardBrands(): Promise<string> {
+  try {
+    const { createClient } = await import("@supabase/supabase-js");
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    const { data } = await db.from("card_products").select("brand,name").eq("active", true).or("provider_available.is.null,provider_available.eq.true").limit(300);
+    const brands = [...new Set((data || []).map((c) => String(c.brand || c.name || "").trim()).filter(Boolean))].slice(0, 40);
+    return brands.length ? `الكروت المتوفرة الآن في صفحة الكروت الرقمية (/cards): ${brands.join("، ")}. لما يطلب كرت منها وجّهه لـ /cards (مش من قائمة المنتجات).` : "صفحة الكروت الرقمية (/cards) ما فيها كروت مفعّلة حالياً — قول إنها قريباً.";
+  } catch { return ""; }
+}
+
 async function liveStatus(): Promise<string> {
   try {
     const s = await utilSettings();
     const st = (on: boolean) => (on ? "شغّالة" : "متوقفة مؤقتاً (قريباً)");
-    return `حالة الخدمات الآن: شحن الكهرباء ${st(s.meter_enabled)}، الشحن المباشر ${st(s.recharge_enabled)}.`;
+    return `حالة الخدمات الآن: شحن الكهرباء ${st(s.meter_enabled)}، الشحن المباشر ${st(s.recharge_enabled)}.
+${await cardBrands()}`;
   } catch { return ""; }
 }
 
