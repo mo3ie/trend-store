@@ -9,7 +9,7 @@ import HoloBot from "@/components/holo/HoloBot";
 import { preloadScript } from "@/lib/uiGlass";
 
 export const viewport: Viewport = {
-  themeColor: "#0b0f1a",
+  themeColor: "#5d6770",
   // Explicit so mobile never falls back to a ~980px desktop viewport (which made
   // some pages render zoomed-out "desktop-style").
   width: "device-width",
