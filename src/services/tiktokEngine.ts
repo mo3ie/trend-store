@@ -20,7 +20,7 @@ import {
   DEFAULT_PER_MIN, DEFAULT_MIN_DELAY_SEC, DEFAULT_MAX_DELAY_SEC,
 } from "@/services/botThrottle";
 import { matchRule, overrideHasContent, type BotRule } from "@/services/botEngine";
-import { generateAiReply, aiAvailable } from "@/services/botAi";
+import { generateAiReply, aiAvailable, classifyPriceIntent } from "@/services/botAi";
 import { getValidAccessToken } from "@/lib/tiktokTokens";
 import { hasProduct } from "@/lib/entitlements";
 import { canMessage, findConversationFor, sendMessage } from "@/services/tiktokMessaging";
@@ -34,7 +34,7 @@ import { decide, type ReplyGroup, type ReplyPolicy } from "@/services/replyDecis
 import { loadCatalog, matchProduct, productReply } from "@/services/catalogMatcher";
 import { featuresFor } from "@/lib/entitlements";
 import { createPrivateLink, composePublicReply } from "@/lib/privateLinks";
-import { shouldGate } from "@/services/priceIntent";
+import { shouldGateAsync, type PriceMode } from "@/services/priceIntent";
 import { loadShopFacts, factsBlock } from "@/services/shopFacts";
 import { renderCodeCard, commentImagesArmed } from "@/services/codeCard";
 import { siteHost } from "@/lib/siteUrl";
@@ -90,6 +90,8 @@ export interface TikTokTarget {
   priceKeywords: string[];
   /** Post the code as a rendered card instead of plain text. */
   replyImage: boolean;
+  /** How price questions are recognised: words | ai | manual. See sql/41. */
+  priceMode: PriceMode;
 }
 
 /** Loads the account + its bot config, verifying the subscription gate. */
@@ -104,7 +106,7 @@ export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
 
   const { data: config } = await supabaseAdmin
     .from("bot_configs")
-    .select("id, user_id, page_id, page_name, enabled, ai_enabled, ai_persona, reply_public, throttle_per_min, min_delay_sec, max_delay_sec, post_filter, post_filter_enabled, reply_groups, banned_words, banned_action, mention_author, once_per_user, like_comments, public_replies, default_public_reply, default_private_reply, post_overrides, catalog_match, catalog_ambiguous_reply, private_delivery, private_link_text, whatsapp_number, whatsapp_text, private_link_ttl_hours, private_link_max_opens, price_keywords, reply_image")
+    .select("id, user_id, page_id, page_name, enabled, ai_enabled, ai_persona, reply_public, throttle_per_min, min_delay_sec, max_delay_sec, post_filter, post_filter_enabled, reply_groups, banned_words, banned_action, mention_author, once_per_user, like_comments, public_replies, default_public_reply, default_private_reply, post_overrides, catalog_match, catalog_ambiguous_reply, private_delivery, private_link_text, whatsapp_number, whatsapp_text, private_link_ttl_hours, private_link_max_opens, price_keywords, reply_image, price_mode")
     .eq("platform", "tiktok")
     .eq("page_id", openId)
     .eq("enabled", true)
@@ -156,6 +158,7 @@ export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
     privateDelivery: (config.private_delivery as string | null) || "off",
     priceKeywords: (config.price_keywords as string[] | null) || [],
     replyImage: config.reply_image === true,
+    priceMode: ((config.price_mode as string | null) || "words") as PriceMode,
     privateLinkText: config.private_link_text,
     whatsappNumber: config.whatsapp_number,
     whatsappText: config.whatsapp_text,
@@ -496,7 +499,12 @@ export async function processClaimedComment(
    * scrolling past reads "نوصّل لمصراتة 🚚" under someone else's comment and
    * learns something about the shop — which a code behind a bio link can never do.
    */
-  const gated = shouldGate(decision.source, comment.text, target.priceKeywords);
+  const gated = await shouldGateAsync(
+    decision.source, comment.text, target.priceMode, target.priceKeywords,
+    // Injected, so priceIntent.ts stays free of the AI stack and every one of
+    // its tests runs offline.
+    target.priceMode === "ai" ? classifyPriceIntent : undefined,
+  );
   if (!gated) patch.private_status = "public";
 
   /*

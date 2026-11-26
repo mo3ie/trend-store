@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import { Loader2, Lock, MessageSquare, Eye, Link2, CheckCircle2 } from "lucide-react";
 import { ttCard, ttInput, type TikTokPalette } from "@/lib/tiktokTheme";
+/*
+ * Safe to import into the browser: priceIntent pulls only `normalize` from
+ * replyDecision, which is pure matching logic whose own single import is a TYPE
+ * and is erased at build. Shown rather than re-typed here so the list on screen
+ * cannot drift from the list the engine actually matches against.
+ */
+import { BUILTIN_PRICE_WORDS } from "@/services/priceIntent";
 
 /**
  * «الردّ الخاص» — the merchant's whole setup for it, on one screen.
@@ -35,6 +42,8 @@ export interface PrivateReplyConfig {
   private_link_max_opens: number | null;
   /** Extra "how much?" words for this shop. See sql/40. */
   price_keywords: string[] | null;
+  /** How price questions are recognised: words | ai | manual. See sql/41. */
+  price_mode: string | null;
   /** Post the code as a rendered card (big code + QR) instead of plain text. */
   reply_image: boolean | null;
 }
@@ -396,6 +405,66 @@ export function PrivateReplyPanel({
             hint={t("الكود يذهب لمن يسأل عن السعر فقط. أمّا التوصيل والعنوان والضمان والألوان — فيُجاب عنها مباشرةً تحت الفيديو، لأنّ أحداً لن يمشي إلى البايو ليُقال له «نعم نوصّل». والبوت يعرف كلمات السعر بالليبية والعربية والإنجليزية. أضف هنا كلمات زبائنك وحدهم إن وُجدت.",
                     "Only price questions get a code. Delivery, address, warranty and colours are answered straight under the video — nobody walks to the bio to be told \"yes, we deliver\". The bot already knows price words in Libyan, Arabic and English. Add your own customers' words here, if they have any.")}
           >
+            {/*
+              Three ways to recognise a price question, and the merchant picks.
+              Each states its real cost — the list is free and predictable, the
+              model catches what no list can and charges for every comment.
+            */}
+            <div style={{ display: "grid", gap: 7 }}>
+              {([
+                ["words", t("الكلمات الجاهزة + كلماتك", "Ready words + yours"),
+                  t("مجاني وفوري. يعرف «قداش» و«بكم» و«السعر» و«ثمن» و«price» وأخواتها. هذا الأنسب لأغلب المتاجر.",
+                    "Free and instant. Knows قداش, بكم, السعر, ثمن, price and their family. Right for most shops.")],
+                ["ai", t("الذكاء يفهمها تلقائياً", "Let the AI understand"),
+                  t("يلتقط ما لا تلتقطه قائمة: «هل هو غالي؟»، «ميزانيتي ٣٠٠٠»، «في تقسيط؟». لكنه يسأل الذكاء عن كل تعليق — وهذا يستهلك رصيدك اليومي أسرع. وإن تعذّر، يرجع للكلمات تلقائياً.",
+                    "Catches what no list can: \"is it expensive?\", \"my budget is 3000\", \"instalments?\". But it asks the model about every comment, which burns your daily allowance faster. If it fails it falls back to the words.")],
+                ["manual", t("كلماتي أنا فقط", "Only my own words"),
+                  t("لا يستعمل إلا ما تكتبه بالأسفل. وإن تركته فارغاً، تبقى الكلمات الجاهزة تعمل — حتى لا تُنشر الأسعار كلها بالخطأ.",
+                    "Uses only what you write below. If you leave it empty the ready words stay on — so every price is not published by accident.")],
+              ] as const).map(([key, label, why]) => {
+                const active = (config.price_mode || "words") === key;
+                return (
+                  <button key={key} onClick={() => !active && save({ price_mode: key })} disabled={busy}
+                    style={{
+                      textAlign: "start", background: active ? "rgba(34,197,94,.10)" : c.stage,
+                      border: `1px solid ${active ? c.ok : (c.border ?? "#242c42")}`,
+                      borderRadius: 11, padding: "11px 13px", cursor: busy ? "default" : "pointer",
+                      fontFamily: "inherit", color: c.text,
+                    }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 800, color: active ? c.ok : c.text }}>
+                      {active ? "● " : "○ "}{label}
+                    </div>
+                    <div style={{ fontSize: 11, color: c.muted, lineHeight: 1.7, marginTop: 4 }}>{why}</div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/*
+              The built-in list, shown. It was invisible, and an invisible rule is
+              one the merchant cannot predict or trust — he could only find out
+              what the bot does by watching it do it to a real customer.
+            */}
+            {(config.price_mode || "words") !== "manual" && (
+              <div style={{ marginTop: 11, background: c.stage, borderRadius: 11, padding: "11px 12px" }}>
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: "#8b8f9e", marginBottom: 6, letterSpacing: ".3px" }}>
+                  {t("الكلمات التي يعرفها أصلاً", "Words it already knows")}
+                </div>
+                <div style={{ fontSize: 12, color: c.muted, lineHeight: 2, direction: "rtl" }}>
+                  {BUILTIN_PRICE_WORDS.join(" · ")}
+                </div>
+                <div style={{ fontSize: 10.5, color: "#8b8f9e", lineHeight: 1.7, marginTop: 6 }}>
+                  {t("ومعها تصريفاتها: سعرها، سعركم، أسعاركم، بالسعر…",
+                     "…and their inflections: سعرها, سعركم, أسعاركم, بالسعر…")}
+                </div>
+              </div>
+            )}
+
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: c.muted, marginTop: 13, marginBottom: 6 }}>
+              {(config.price_mode || "words") === "manual"
+                ? t("كلماتك — وهي كل ما سيُستعمل", "Your words — and they are all that will be used")
+                : t("أضف كلمات زبائنك، إن كان لهم كلمات خاصة", "Add your customers' own words, if they have any")}
+            </div>
             <input
               value={kw} onChange={(e) => setKw(e.target.value)}
               onBlur={() => {
@@ -407,8 +476,8 @@ export function PrivateReplyPanel({
               style={ttInput(c)}
             />
             <div style={{ fontSize: 11, color: c.muted, lineHeight: 1.8, marginTop: 8 }}>
-              {t("افصل بينها بفاصلة. اتركه فارغاً إن لم تحتج شيئاً.",
-                 "Separate them with commas. Leave it empty if you don't need any.")}
+              {t("افصل بينها بفاصلة. تُطابَق كاملة لا كبداية كلمة.",
+                 "Separate them with commas. They are matched whole, not as a prefix.")}
             </div>
           </Field>
 

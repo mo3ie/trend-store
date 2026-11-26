@@ -64,3 +64,43 @@ ${facts.trim()}`
     return null;
   }
 }
+
+/**
+ * "Is this comment asking what something costs?" — yes or no, nothing else.
+ *
+ * The opt-in half of the price gate. The word list in services/priceIntent.ts
+ * handles the ordinary phrasings for free and offline; this exists for the ones
+ * no list holds — "هل هو غالي؟", "ميزانيتي ٣٠٠٠، يكفي؟", "worth it?" — where the
+ * question is about price without containing a price word.
+ *
+ * Deliberately tiny. It runs on EVERY comment when enabled, against a shared free
+ * daily token budget, so: no catalog, no persona, no shop facts, ten output
+ * tokens, and the default low reasoning effort. Everything that makes a reply
+ * good makes a classifier expensive.
+ *
+ * Returns null — not false — when there is no provider or the answer is
+ * unreadable, so the caller can fall back to the word list instead of treating
+ * "could not tell" as "not a price question" and publishing a price.
+ */
+export async function classifyPriceIntent(comment: string): Promise<boolean | null> {
+  if (!hasAI() || !comment.trim()) return null;
+  try {
+    const text = await aiComplete({
+      system:
+        "You decide ONE thing: is this social-media comment asking about the PRICE, cost or affordability of a product? " +
+        "Comments arrive in Arabic (Libyan, Gulf, Egyptian, Levantine dialects) and English. " +
+        "Count as YES: asking a price, asking if something is expensive or cheap, naming a budget, asking about discounts or instalments. " +
+        "Count as NO: delivery, location, opening hours, colours, sizes, availability, warranty, compliments, anything else. " +
+        "Answer with exactly one word: YES or NO.",
+      user: comment.slice(0, 400),
+      maxTokens: 10,
+      temperature: 0,
+    });
+    const v = (text || "").trim().toUpperCase();
+    if (v.startsWith("YES")) return true;
+    if (v.startsWith("NO")) return false;
+    return null;
+  } catch {
+    return null;
+  }
+}

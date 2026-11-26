@@ -29,7 +29,7 @@ const EDITABLE = [
   "dm_code_autoreply", "dm_code_miss_text",
   // The price gate (sql/40). `price_keywords` are the merchant's own "how much?"
   // words; `reply_image` posts the code as a rendered card instead of plain text.
-  "price_keywords", "reply_image",
+  "price_keywords", "reply_image", "price_mode",
 ] as const;
 
 /**
@@ -149,6 +149,10 @@ export async function PATCH(req: NextRequest) {
     const raw = patch.price_keywords;
     patch.price_keywords = (Array.isArray(raw) ? raw : String(raw ?? "").split(/[\n,،]/))
       .map((w) => String(w).trim()).filter(Boolean).slice(0, 40);
+  }
+  // Anything else would fail the CHECK constraint and 500 the whole save.
+  if ("price_mode" in patch && !["words", "ai", "manual"].includes(String(patch.price_mode))) {
+    patch.price_mode = "words";
   }
   if ("private_delivery" in patch && !["off", "link", "assist"].includes(String(patch.private_delivery))) {
     patch.private_delivery = "off";

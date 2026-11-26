@@ -149,9 +149,78 @@ export function asksPrice(text: string, extra?: string[] | null): boolean {
   return false;
 }
 
+/**
+ * How a shop wants price questions recognised.
+ *
+ *   "words"   the built-in list, plus anything the merchant added. The default.
+ *   "ai"      ask the model on every comment. Catches phrasings no list holds —
+ *             "هل هو غالي؟", "ميزانيتي ٣٠٠٠" — and costs a call per comment out
+ *             of a shared free daily budget, so it is opt-in and says so.
+ *   "manual"  ONLY the merchant's own words. For a shop that wants the gate to
+ *             fire on exactly what it listed and nothing else.
+ */
+export type PriceMode = "words" | "ai" | "manual";
+
+/** The built-in list, for the screen to show. Invisible rules cannot be trusted. */
+export const BUILTIN_PRICE_WORDS: string[] = [
+  "قداش", "بقداش", "شحال", "بشحال", "قداه",
+  "بكم", "بكام", "كام", "بيكم",
+  "سعر", "السعر", "سعرها", "أسعار", "ثمن", "تمن", "قيمة", "كلفة", "تكلفة",
+  "price", "cost", "how much",
+];
+
+/**
+ * The gate, with the mode applied.
+ *
+ * Async only because "ai" needs a round trip; the other two resolve immediately.
+ * `classify` is injected rather than imported so this file stays free of the AI
+ * stack — it is pure matching logic and every one of its tests runs offline.
+ *
+ * In "ai" mode a failed or unavailable model falls back to the word list rather
+ * than to a guess. The wrong direction to fail is silently open: a price said out
+ * loud cannot be taken back, while an over-gated delivery answer costs one
+ * customer a walk.
+ */
+export async function asksPriceSmart(
+  message: string,
+  mode: PriceMode,
+  extra?: string[] | null,
+  classify?: (text: string) => Promise<boolean | null>,
+): Promise<boolean> {
+  if (mode === "manual") {
+    const words = (extra || []).map((w) => w.trim()).filter(Boolean);
+    // No words listed means nothing can match — which would gate nothing at all
+    // and quietly publish every price. The built-ins hold the floor.
+    return words.length ? asksPrice(message, words) : asksPrice(message);
+  }
+  if (mode === "ai" && classify) {
+    const verdict = await classify(message).catch(() => null);
+    if (verdict !== null && verdict !== undefined) return verdict;
+  }
+  return asksPrice(message, extra);
+}
+
+/**
+ * Should this answer be hidden, or said out loud?
+ *
+ * Synchronous form, kept for callers that already know the verdict. See
+ * `shouldGateAsync` for the one the engine uses.
+ */
 export function shouldGate(
   source: string, message: string, extra?: string[] | null,
 ): boolean {
   if (source === "ai") return asksPrice(message, extra);
   return true;
+}
+
+/** The same decision, honouring the merchant's chosen mode. */
+export async function shouldGateAsync(
+  source: string,
+  message: string,
+  mode: PriceMode,
+  extra?: string[] | null,
+  classify?: (text: string) => Promise<boolean | null>,
+): Promise<boolean> {
+  if (source !== "ai") return true;
+  return asksPriceSmart(message, mode, extra, classify);
 }

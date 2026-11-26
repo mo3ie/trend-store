@@ -94,6 +94,7 @@ interface Config {
   // The price gate + the code card (sql/40).
   price_keywords: string[] | null;
   reply_image: boolean | null;
+  price_mode: string | null;
   throttle_per_min: number | null;
   min_delay_sec: number | null;
   max_delay_sec: number | null;
