@@ -157,15 +157,23 @@ export async function renderCodeCard(input: CodeCardInput): Promise<Uint8Array |
 }
 
 /**
- * The global arm for comment images.
+ * The global kill switch for comment images. ON unless explicitly turned off.
  *
- * The per-merchant `bot_configs.reply_image` is the other half, and both must be
- * on. Two switches, for the same reason the DM feature has two: the scope this
- * upload needs is undocumented, so the first real traffic is an experiment, and
- * an experiment must be stoppable from the environment without a deploy and
- * without touching anyone's settings.
+ * It shipped the other way round — off until `TIKTOK_COMMENT_IMAGE=on` was set —
+ * mirroring the DM feature's two switches. That was the wrong copy. The DM switch
+ * guards something that cannot be taken back: a message sent to a stranger. This
+ * guards an image upload whose only failure mode is that TikTok refuses it and
+ * the reply goes out as the text it would have been anyway.
+ *
+ * So the second gate bought nothing and cost a trip to the environment variables
+ * before the merchant could even see the feature. And it did not really buy
+ * "stoppable without a deploy" either: `bot_configs.reply_image` is a toggle on
+ * the merchant's own screen and takes effect on the next comment.
+ *
+ * Set TIKTOK_COMMENT_IMAGE=off to stop it for every account at once — which is
+ * what a global switch is actually for.
  */
 export function commentImagesArmed(): boolean {
   const v = (process.env.TIKTOK_COMMENT_IMAGE || "").trim().toLowerCase();
-  return v === "on" || v === "1" || v === "true";
+  return !(v === "off" || v === "0" || v === "false");
 }

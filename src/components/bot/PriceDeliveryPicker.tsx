@@ -134,15 +134,25 @@ export function PriceDeliveryPreview({
   c: BotPalette;
   t: TF;
 }) {
-  const comment = (commentText || "").trim()
-    .split("{code}").join(codeExample)
-    .split("{link}").join(`${host}/r/${codeExample}`);
+  /*
+   * Mirrors composePublicReply in src/lib/privateLinks.ts, including the case
+   * that matters most: a template naming neither placeholder gets the code and
+   * the link appended on their own lines. The preview is only worth having if it
+   * is the same composition the engine performs — a preview that agrees with the
+   * code in the easy cases and not the real one is worse than none.
+   */
+  const link = `${host}/r/${codeExample}`;
+  const base = (commentText || "").trim();
+  const comment = base.includes("{code}") || base.includes("{link}")
+    ? base.split("{code}").join(codeExample).split("{link}").join(link)
+    : `${base}\n${codeExample}\n${link}`;
 
   const row = (k: string, v: string, mono?: boolean) => (
     <div style={{ display: "flex", gap: 9, alignItems: "baseline", marginTop: 7 }}>
       <div style={{ fontSize: 10.5, color: c.muted, fontWeight: 800, minWidth: 74, flexShrink: 0 }}>{k}</div>
       <div style={{
         fontSize: 12, color: c.text, lineHeight: 1.75, wordBreak: "break-word",
+        whiteSpace: "pre-wrap",
         fontFamily: mono ? "ui-monospace, Menlo, Consolas, monospace" : "inherit",
       }}>{v}</div>
     </div>

@@ -170,8 +170,25 @@ export function composePublicReply(
   const hasLink = base.includes("{link}");
 
   let out = base.split("{code}").join(code).split("{link}").join(url);
-  if (!hasCode && !hasLink) out = `${out}
-${url}`;
+
+  /*
+   * A template naming neither placeholder gets BOTH, each on its own line.
+   *
+   * It used to get the URL alone, and that failed in a way only a live test
+   * showed: the code is the URL's last segment, so a merchant whose text was
+   * "تم الرد عليك داخل الرابط الخاص 📩" saw one line ending in /r/AB3K9 and no
+   * code anywhere. Reported exactly: "الكود ظهر مع الرابط، خلي الكود بروحه".
+   *
+   * He is right, and it is not a cosmetic point. The two serve different people.
+   * The code alone is what someone on a phone reads and retypes at the bio link,
+   * and digging it out of the tail of a URL is work. The full URL is what someone
+   * on a desktop copies. Printing them on separate lines costs one newline and
+   * serves both; printing only the URL served neither well.
+   *
+   * The code goes FIRST and bare — no label — because that is the line that has
+   * to survive being read off a crowded comment list at a glance.
+   */
+  if (!hasCode && !hasLink) out = `${out}\n${code}\n${url}`;
   return out;
 }
 
