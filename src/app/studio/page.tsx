@@ -232,7 +232,12 @@ export default function StudioPage() {
       if (!d) return;
       const p = d.pages || [];
       setPages(p);
-      if (p.length > 0) setSelectedPage(p[0].page_id);
+      // ?page=<id> from «صفحاتي» preselects that Page (only if it is one of the user's)
+      let want: string | null = null;
+      try { want = new URLSearchParams(window.location.search).get("page"); } catch {}
+      const hit = want && p.find((x: { page_id: string }) => x.page_id === want);
+      if (hit) setSelectedPage(hit.page_id);
+      else if (p.length > 0) setSelectedPage(p[0].page_id);
       setLoadingPages(false);
     }).catch(() => setLoadingPages(false));
   }, []);

@@ -31,7 +31,7 @@ async function appendPoolTokens(userId: string, pages: MetaPage[]): Promise<void
 }
 
 // GET — Meta OAuth callback
-const ALLOWED_RETURNS = ["/ads/connect", "/studio", "/bot", "/tiktok-bot"];
+const ALLOWED_RETURNS = ["/facebook/pages", "/ads/connect", "/studio", "/bot", "/tiktok-bot"];
 
 // Saves connected pages to DB then returns the user to wherever they started
 export async function GET(req: NextRequest) {
@@ -43,11 +43,11 @@ export async function GET(req: NextRequest) {
   const base = process.env.NEXT_PUBLIC_BASE_URL || "https://trendstore-ly.com";
 
   if (error || !code || !state) {
-    return NextResponse.redirect(`${base}/ads/connect?error=cancelled`);
+    return NextResponse.redirect(`${base}/facebook/pages?error=cancelled`);
   }
 
   let userId: string;
-  let back = "/ads/connect";
+  let back = "/facebook/pages";
   try {
     const decoded = Buffer.from(state, "base64").toString("utf-8");
     const [id, next] = decoded.split("|");
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
     // arbitrary `next` would turn this callback into an open redirect.
     if (next && ALLOWED_RETURNS.includes(next)) back = next;
   } catch {
-    return NextResponse.redirect(`${base}/ads/connect?error=invalid_state`);
+    return NextResponse.redirect(`${base}/facebook/pages?error=invalid_state`);
   }
 
   // A Meta code is single-use, but this URL can be hit twice (slow first run with many

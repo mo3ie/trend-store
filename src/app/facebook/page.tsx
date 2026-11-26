@@ -157,7 +157,7 @@ export default function FacebookToolsPage() {
             <p>{t("إعلانات ممولة حقيقية، وردّ آلي على كل تعليق، وموظف تسويق ذكي يُعدّ منشوراتك. ادفع بالدينار الليبي، ودع ترندي يساعدك في الاختيار.", "Real paid ads, an auto-reply on every comment, and an AI marketing employee that prepares your posts. Pay in LYD — Trendy helps you choose.")}</p>
             <div className="fbx-row">
               <a href="#tools" className="fbx-btn">{t("اختر أداتك", "Choose your tool")} <ChevronDown size={16} /></a>
-              <a href={signed && pages.length ? "/ads/connect" : "/ads/connect"} className="fbx-btn2">{signed && pages.length ? t("إدارة صفحاتي", "Manage my pages") : t("ربط صفحة فيسبوك", "Connect a Facebook Page")}</a>
+              <a href="/facebook/pages" className="fbx-btn2">{signed && pages.length ? t("إدارة صفحاتي", "Manage my pages") : t("ربط صفحة فيسبوك", "Connect a Facebook Page")}</a>
             </div>
             <div className="fbx-checks">
               <span><Check size={15} /> {t("تجربة مجانية 3 أيام", "3-day free trial")}</span>
@@ -203,7 +203,7 @@ export default function FacebookToolsPage() {
           <section className="fbx-connect">
             <span className="fbx-connect-ic" style={{ background: C.chipBlue }}><Link2 size={24} color="#438DF5" /></span>
             <div className="fbx-grow"><b>{t("اربط صفحة فيسبوك وابدأ باستخدام أدواتك الذكية.", "Connect a Facebook Page to start using your smart tools.")}</b><p>{t("تسجيل دخول فيسبوك الرسمي. نطلب صلاحيات صفحاتك فقط، ويمكنك إلغاؤها في أي وقت.", "Official Facebook login. We only ask for your own Pages' permissions — revoke anytime.")}</p></div>
-            <a href="/ads/connect" className="fbx-btn">{t("ربط صفحة فيسبوك", "Connect a Facebook Page")}</a>
+            <a href="/facebook/pages" className="fbx-btn">{t("ربط صفحة فيسبوك", "Connect a Facebook Page")}</a>
           </section>
         )}
         {ov && signed && pages.length > 0 && (
@@ -222,7 +222,7 @@ export default function FacebookToolsPage() {
                 <span key={p}><Check size={12} color="#20BE83" strokeWidth={3} />{p}</span>
               ))}
             </div>
-            <a href="/ads/connect" className="fbx-btn2 fbx-sm">{t("إدارة الربط", "Manage connection")}</a>
+            <a href="/facebook/pages" className="fbx-btn2 fbx-sm">{t("إدارة صفحاتي", "Manage my Pages")}</a>
           </section>
         )}
 

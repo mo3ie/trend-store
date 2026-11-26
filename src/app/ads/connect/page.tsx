@@ -115,7 +115,7 @@ function ConnectPageInner() {
   async function connectMeta() {
     setConnecting(true);
     setError("");
-    const res  = await fetch("/api/promo/pages/connect");
+    const res  = await fetch("/api/promo/pages/connect?next=%2Fads%2Fconnect");
     if (res.status === 401) { setNotAuthed(true); setConnecting(false); return; }
     const data = await res.json();
     if (data.url) { window.location.href = data.url; }

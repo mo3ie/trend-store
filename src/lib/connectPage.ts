@@ -8,7 +8,7 @@
  *
  * `next` must be one of the destinations the OAuth callback allowlists.
  */
-export async function startPageConnect(next: "/studio" | "/bot" | "/tiktok-bot" | "/ads/connect"): Promise<string | null> {
+export async function startPageConnect(next: "/facebook/pages" | "/studio" | "/bot" | "/tiktok-bot" | "/ads/connect"): Promise<string | null> {
   try {
     const r = await fetch(`/api/promo/pages/connect?next=${encodeURIComponent(next)}`);
     const d = await r.json();

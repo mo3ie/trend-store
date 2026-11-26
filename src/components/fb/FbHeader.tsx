@@ -10,7 +10,7 @@ import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import { fbPalette, FB_FONT } from "@/lib/fbTheme";
 
-export type FbSection = "home" | "ads" | "bot" | "studio" | "billing";
+export type FbSection = "home" | "pages" | "ads" | "bot" | "studio" | "billing";
 
 /**
  * The one top bar of every «أدوات فيسبوك» screen. On phones the section links hide
@@ -41,6 +41,7 @@ export default function FbHeader({ active, mobileNav = false }: { active: FbSect
 
   const links: [FbSection, string, string][] = [
     ["home", t("الرئيسية", "Home"), "/facebook"],
+    ["pages", t("صفحاتي", "My Pages"), "/facebook/pages"],
     ["ads", t("الإعلانات", "Ads"), "/ads"],
     ["bot", t("الرد الآلي", "Auto-Reply"), "/bot"],
     ["studio", t("الموظف الذكي", "AI Employee"), "/studio"],
