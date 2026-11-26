@@ -75,13 +75,22 @@ export default function TikTokStudioPage() {
 
   const [st, setSt] = useState<Status | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"plan" | "brand" | "products">("plan");
+  const [tab, setTab] = useState<"plan" | "videos" | "brand" | "products">("plan");
   const [error, setError] = useState("");
 
   const [plan, setPlan] = useState<Plan | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [bulk, setBulk] = useState("");
+  /*
+   * Videos the merchant already has. `note` is his one line about each clip —
+   * optional, because a shop uploading twelve files will not describe twelve,
+   * and a caption written from the brand and catalogue alone still beats an
+   * empty box he has to fill before anything happens.
+   */
+  const [clips, setClips] = useState<{ url: string; name: string; note: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [arranging, setArranging] = useState(false);
   const [savingProducts, setSavingProducts] = useState(false);
 
   /**
@@ -92,6 +101,54 @@ export default function TikTokStudioPage() {
    * going to match a separator we picked. A line with no separator is still a
    * product; it just has no price yet, which is better than refusing the line.
    */
+  /** Uploads the chosen clips one at a time, keeping whichever succeed. */
+  async function uploadClips(files: FileList | null) {
+    if (!files || !files.length) return;
+    setUploading(true); setError("");
+    for (const file of Array.from(files).slice(0, 20)) {
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const r = await fetch("/api/studio/upload", { method: "POST", body: fd });
+        const d = await r.json();
+        if (d.url) setClips((prev) => [...prev, { url: d.url, name: file.name, note: "" }]);
+        // One bad file must not discard the ones that worked — a shop uploading
+        // a dozen clips over a Libyan connection will have one fail.
+        else setError(d.error || t("تعذّر رفع أحد الملفات", "One file could not be uploaded"));
+      } catch {
+        setError(t("تعذّر رفع أحد الملفات", "One file could not be uploaded"));
+      }
+    }
+    setUploading(false);
+  }
+
+  /** Hands the clips to the AI employee and reloads the plan it writes. */
+  async function arrangeWeek() {
+    if (!clips.length || !pageId) return;
+    setArranging(true); setError("");
+    try {
+      const r = await fetch("/api/studio/plan/from-videos", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pageId, postsPerDay: perDay,
+          guidance: guidance || undefined,
+          videos: clips.map((v) => ({ url: v.url, note: v.note })),
+        }),
+      });
+      const d = await r.json();
+      if (d.plan) {
+        setClips([]);
+        setTab("plan");
+        await loadPlan(pageId);
+      } else {
+        setError(d.message || d.error || t("تعذّر تنظيم الخطة", "Could not arrange the plan"));
+      }
+    } catch {
+      setError(t("تعذّر الاتصال", "Connection failed"));
+    }
+    setArranging(false);
+  }
+
   async function addProducts() {
     const items = bulk.split(/\r?\n/).map((raw) => {
       const line = raw.trim();
@@ -286,6 +343,7 @@ export default function TikTokStudioPage() {
           c={c} value={tab} onChange={setTab}
           tabs={[
             { key: "plan" as const,     label: t("الخطة", "Plan") },
+            { key: "videos" as const,   label: t("فيديوهاتي", "My videos") },
             { key: "products" as const, label: t("المنتجات", "Products") },
             { key: "brand" as const,    label: t("بيانات النشاط", "Business info") },
           ]}
@@ -377,6 +435,82 @@ export default function TikTokStudioPage() {
               </div>
             )}
           </>
+        )}
+
+        {/* ── MY VIDEOS ────────────────────────────────────────────────────── */}
+        {tab === "videos" && (
+          <div style={{ ...ttCard(c), padding: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+              <Film size={17} color={c.pinkInk} /> {t("فيديوهاتي الجاهزة", "Videos I already have")}
+            </div>
+            <p style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.75, margin: "9px 0 14px" }}>
+              {t("تبويب «الخطة» يكتب لك سكربتات فيديوهات لم تصوّرها بعد. هنا العكس: ترفع فيديوهاتك الجاهزة، والموظف الذكي يكتب لكل واحد وصفه ووسومه ويوزّعها على أيام الأسبوع.",
+                 "The Plan tab writes scripts for videos you have not filmed. This is the other way round: upload the clips you already have, and the AI Employee writes each one's caption and hashtags and spreads them across the week.")}
+            </p>
+
+            <label style={{ ...ttSecondary(c), width: "100%", cursor: uploading ? "default" : "pointer", justifyContent: "center" }}>
+              {uploading ? <Loader2 size={16} className="spin" /> : <Film size={16} />}
+              {uploading ? t("جارٍ الرفع…", "Uploading…") : t("اختر فيديوهاتك", "Choose your videos")}
+              <input type="file" accept="video/mp4,video/quicktime,video/webm" multiple hidden
+                disabled={uploading}
+                onChange={(e) => { uploadClips(e.target.files); e.target.value = ""; }} />
+            </label>
+            <div style={{ fontSize: 11, color: c.muted, lineHeight: 1.75, marginTop: 7 }}>
+              {t("MP4 أو MOV، حتى ٩٠ ميغابايت للفيديو.", "MP4 or MOV, up to 90 MB each.")}
+            </div>
+
+            {clips.length > 0 && (
+              <>
+                <div style={{ display: "grid", gap: 9, marginTop: 14 }}>
+                  {clips.map((v, i) => (
+                    <div key={v.url} style={{ background: c.surface2, borderRadius: 11, padding: "11px 12px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 700, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {i + 1}. {v.name}
+                        </span>
+                        <button onClick={() => setClips((prev) => prev.filter((x) => x.url !== v.url))}
+                          aria-label={t("حذف", "Remove")}
+                          style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", fontSize: 17, lineHeight: 1, padding: 0, fontFamily: "inherit", flexShrink: 0 }}>×</button>
+                      </div>
+                      {/*
+                        One line about the clip. Optional on purpose: the model can
+                        write from the brand and the catalogue, and demanding a
+                        description for every file is how twelve uploads become none.
+                      */}
+                      <input
+                        value={v.note}
+                        onChange={(e) => setClips((prev) => prev.map((x) => x.url === v.url ? { ...x, note: e.target.value } : x))}
+                        placeholder={t("شنو في الفيديو؟ (اختياري) — مثلاً: ايفون 15 برو، لقطة قريبة للكاميرا",
+                                       "What is in it? (optional) — e.g. iPhone 15 Pro, close-up of the camera")}
+                        style={{ ...ttInput(c), marginTop: 8, fontSize: 12.5 }}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <label style={{ display: "block", fontSize: 11.5, color: c.muted, marginTop: 14 }}>
+                  {t("كم فيديو في اليوم؟", "Videos per day")}
+                  <input type="number" min={1} max={5} value={perDay}
+                    onChange={(e) => setPerDay(Math.min(5, Math.max(1, Number(e.target.value) || 1)))}
+                    style={{ ...ttInput(c), marginTop: 5 }} />
+                </label>
+                <div style={{ fontSize: 11, color: c.muted, lineHeight: 1.75, marginTop: 7 }}>
+                  {t(`${clips.length} فيديو على ${Math.ceil(clips.length / perDay)} يوم، تبدأ غداً.`,
+                     `${clips.length} videos over ${Math.ceil(clips.length / perDay)} days, starting tomorrow.`)}
+                </div>
+
+                <button onClick={arrangeWeek} disabled={arranging}
+                  style={{ ...ttPrimary(rtl, arranging), width: "100%", marginTop: 12 }}>
+                  {arranging ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+                  {t("نظّم لي الأسبوع", "Arrange my week")}
+                </button>
+                <div style={{ fontSize: 11, color: c.muted, lineHeight: 1.75, marginTop: 8 }}>
+                  {t("تُحفظ كمسودّات في «الخطة» — تقرأها وتعدّلها، ولا يُنشر شيء حتى تضغط أنت.",
+                     "They are saved as drafts under Plan — you read and edit them, and nothing is posted until you press publish.")}
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         {/* ── PRODUCTS ─────────────────────────────────────────────────────── */}
