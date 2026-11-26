@@ -500,7 +500,7 @@ function CreateCampaignInner() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={pagePic(selectedPageObj.page_id)} alt="" style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
                 )}
-                {selectedPageObj ? selectedPageObj.page_name : t("اختر صفحة", "Choose a Page")}
+                <span style={{ minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{selectedPageObj ? selectedPageObj.page_name : t("اختر صفحة", "Choose a Page")}</span>
               </span>
               <ChevronDown size={16} color={c.dim} style={{ flexShrink: 0, transform: pageMenuOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
             </button>
