@@ -777,7 +777,7 @@ export default function StudioPage() {
   }
 
   if (loadingPages) {
-    return <div style={{ minHeight: "100vh", background: c.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><Loader2 size={30} color={PINK} className="spin" /><style>{`@keyframes spin-anim{to{transform:rotate(360deg)}}.spin{animation:spin-anim 1s linear infinite}`}</style></div>;
+    return <><FbHeader active="studio" /><div style={{ minHeight: "calc(100vh - 66px)", background: c.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><Loader2 size={30} color={PINK} className="spin" /><style>{`@keyframes spin-anim{to{transform:rotate(360deg)}}.spin{animation:spin-anim 1s linear infinite}`}</style></div></>;
   }
 
   if (notAuthed) {

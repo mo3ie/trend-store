@@ -423,10 +423,13 @@ function CreateCampaignInner() {
 
   if (loadingPages) {
     return (
-      <div style={{ minHeight: "100vh", background: c.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <>
+      <FbHeader active="ads" />
+      <div style={{ minHeight: "calc(100vh - 66px)", background: c.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Loader2 size={32} color={PINK} className="spin" />
         <style>{`@keyframes spin-anim{to{transform:rotate(360deg)}} .spin{animation:spin-anim 1s linear infinite}`}</style>
       </div>
+      </>
     );
   }
 

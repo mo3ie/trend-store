@@ -206,7 +206,7 @@ export default function SubscriptionsPage() {
 
   const { light } = useTheme();
   const fbVars = Object.fromEntries(Object.entries(fbPalette(light)).map(([k, v]) => [`--fb-${k}`, v])) as React.CSSProperties;
-  if (loading) return <div className="min-h-screen bg-[var(--fb-bg)] flex justify-center items-center" style={fbVars}><Loader2 className="animate-spin text-[#9367ED]" size={34} /></div>;
+  if (loading) return <div className="min-h-screen bg-[var(--fb-bg)]" style={fbVars}><FbHeader active="billing" /><div className="flex justify-center items-center" style={{ minHeight: "60vh" }}><Loader2 className="animate-spin text-[#9367ED]" size={34} /></div></div>;
 
 
   return (
