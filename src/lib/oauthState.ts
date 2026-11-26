@@ -169,3 +169,33 @@ export async function consumeOAuthState(input: ConsumeInput): Promise<ConsumeRes
 
   return { ok: true, userId: row.user_id, redirectPath: row.redirect_path ?? null, flow: row.flow };
 }
+
+/**
+ * Records why an attempt failed, on the state row it failed for.
+ *
+ * Five advertiser-link attempts produced five consumed states, zero grants and
+ * no readable reason: the cause lived for one serverless invocation and then
+ * existed only as a category in a URL. Every diagnosis since has been inference
+ * from timestamps — see sql/45.
+ *
+ * Never throws and never blocks: this runs on the failure path, and a logging
+ * problem must not replace the error the user needs to see. Stores a stage, a
+ * code and a time — never a token, an auth code or upstream text.
+ */
+export async function recordOAuthFailure(
+  state: string | null | undefined,
+  stage: "state" | "exchange" | "store",
+  code?: string | number | null,
+): Promise<void> {
+  if (!state) return;
+  try {
+    await supabaseAdmin
+      .from("tiktok_oauth_states")
+      .update({
+        fail_stage: stage,
+        fail_code: code === null || code === undefined ? null : String(code).slice(0, 40),
+        failed_at: new Date().toISOString(),
+      })
+      .eq("state_hash", sha256(state));
+  } catch { /* diagnosis is never worth an outage */ }
+}

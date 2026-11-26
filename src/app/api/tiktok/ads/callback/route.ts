@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/authUser";
 import { exchangeAdvertiserAuthCode, adsConfigured, TikTokAdsError } from "@/services/tiktokAds";
 import { storeAdvertiserGrant } from "@/lib/tiktokAdsTokens";
-import { consumeOAuthState, stateCookieOptions, ADS_OAUTH_STATE_COOKIE, type ConsumeFailure } from "@/lib/oauthState";
+import { consumeOAuthState, stateCookieOptions, ADS_OAUTH_STATE_COOKIE, recordOAuthFailure, type ConsumeFailure } from "@/lib/oauthState";
 import { checkRateLimit, rateLimitedJson, identifierFor, RATE_RULES } from "@/lib/rateLimit";
 import { siteUrl } from "@/lib/siteUrl";
 
@@ -99,7 +99,10 @@ export async function GET(req: NextRequest) {
     sessionUserId: user?.id ?? null,
     expectedFlows: ["advertiser_connect", "advertiser_reconnect"],
   });
-  if (!consumed.ok) return fail(codeFor(consumed.reason));
+  if (!consumed.ok) {
+    await recordOAuthFailure(state, "state", consumed.reason);
+    return fail(codeFor(consumed.reason));
+  }
 
   const userId = consumed.userId;
   const returnPath = consumed.redirectPath ?? "/tiktok-ads";
@@ -124,9 +127,13 @@ export async function GET(req: NextRequest) {
     // Safe server-side log only: endpoint, HTTP status, TikTok code, request id.
     if (err instanceof TikTokAdsError) {
       console.error(err.toLogLine(userId));
+      await recordOAuthFailure(state, "exchange", err.ttCode ?? err.kind);
       return fail("exchange_failed", err.ttCode ?? null);
     }
     console.error("tiktok_ads_callback_failed kind=internal");
+    // The store step raises plain errors; naming it separately is the difference
+    // between "TikTok refused us" and "we could not save what TikTok gave us".
+    await recordOAuthFailure(state, "store", err instanceof Error ? err.message.slice(0, 40) : "internal");
     return fail("exchange_failed");
   }
 }
