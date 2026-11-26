@@ -60,3 +60,16 @@ export const TIKTOK_WEBHOOK_PATH = "/api/tiktok/webhook/";
 export function tiktokWebhookUrl(): string {
   return siteUrl(TIKTOK_WEBHOOK_PATH);
 }
+
+/**
+ * The origin as a human reads it aloud: no scheme, no www.
+ *
+ * For printing on things people retype or scan — the code card, where every
+ * character is one the customer has to get right on a phone keyboard. "https://"
+ * and "www." are eleven characters that carry no information and that every
+ * browser supplies for free.
+ */
+export function siteHost(suffix = ""): string {
+  const host = siteOrigin().replace(/^https?:\/\//, "").replace(/^www\./, "");
+  return `${host}${suffix}`;
+}

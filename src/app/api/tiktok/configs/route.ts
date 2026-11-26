@@ -27,6 +27,9 @@ const EDITABLE = [
   // per-merchant half of the switch; the other half is the DM_CODE_AUTOREPLY env
   // var, and BOTH must be on before anything is sent. See services/dmCodeReply.ts.
   "dm_code_autoreply", "dm_code_miss_text",
+  // The price gate (sql/40). `price_keywords` are the merchant's own "how much?"
+  // words; `reply_image` posts the code as a rendered card instead of plain text.
+  "price_keywords", "reply_image",
 ] as const;
 
 /**
@@ -135,6 +138,17 @@ export async function PATCH(req: NextRequest) {
    */
   if ("whatsapp_number" in patch) {
     patch.whatsapp_number = normalizeWhatsApp(patch.whatsapp_number as string | null);
+  }
+  /*
+   * Merchant keywords arrive as whatever the screen sent. Normalising here rather
+   * than trusting the UI means one stray value cannot make `asksPrice` throw on
+   * every comment for the next two days — the same reasoning as the phone number
+   * above, and the same place to do it.
+   */
+  if ("price_keywords" in patch) {
+    const raw = patch.price_keywords;
+    patch.price_keywords = (Array.isArray(raw) ? raw : String(raw ?? "").split(/[\n,،]/))
+      .map((w) => String(w).trim()).filter(Boolean).slice(0, 40);
   }
   if ("private_delivery" in patch && !["off", "link", "assist"].includes(String(patch.private_delivery))) {
     patch.private_delivery = "off";

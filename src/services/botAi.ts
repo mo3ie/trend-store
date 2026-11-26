@@ -18,13 +18,26 @@ export async function generateAiReply(
   persona: string | null,
   pageName?: string | null,
   catalog?: string | null,
+  /**
+   * Where this answer will actually appear.
+   *
+   * It was hard-coded as "replying privately ... on a Facebook post", and TikTok
+   * reuses this function for a reply that is neither private nor on Facebook —
+   * it is posted publicly, under the video, where every future viewer reads it.
+   * That is a different piece of writing: shorter, addressed to a room rather
+   * than a person, and with nothing in it that assumes privacy. The model was
+   * being briefed for the wrong job and doing it well.
+   */
+  surface?: { platform?: "facebook" | "tiktok"; visibility?: "private" | "public" },
 ): Promise<string | null> {
   if (!hasAI() || !comment.trim()) return null;
 
   const system = [
     persona?.trim() ||
       `You are a helpful sales assistant for the Facebook page "${pageName || "our store"}".`,
-    "You are replying privately to someone who commented on a Facebook post.",
+    (surface?.visibility ?? "private") === "public"
+      ? `You are writing a PUBLIC reply under a ${surface?.platform === "tiktok" ? "TikTok video" : "post"}. Everyone scrolling the comments will read it, not only the person who asked — so answer them directly, but write it so a stranger reading it also learns something about the shop. Never mention prices, codes or links.`
+      : "You are replying privately to someone who commented on a Facebook post.",
     "Rules: reply in the SAME language as the comment (Arabic → Arabic, Libyan dialect is fine).",
     "Keep it under 45 words, warm and concrete.",
     catalog

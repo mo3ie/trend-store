@@ -33,6 +33,10 @@ export interface PrivateReplyConfig {
   whatsapp_text: string | null;
   private_link_ttl_hours: number | null;
   private_link_max_opens: number | null;
+  /** Extra "how much?" words for this shop. See sql/40. */
+  price_keywords: string[] | null;
+  /** Post the code as a rendered card (big code + QR) instead of plain text. */
+  reply_image: boolean | null;
 }
 
 interface LinkRow {
@@ -58,6 +62,7 @@ export function PrivateReplyPanel({
   const [body, setBody] = useState(config.default_private_reply || "");
   const [linkText, setLinkText] = useState(config.private_link_text || "");
   const [wa, setWa] = useState(config.whatsapp_number || "");
+  const [kw, setKw] = useState((config.price_keywords || []).join("، "));
   const [waText, setWaText] = useState(config.whatsapp_text || "");
 
   const [stats, setStats] = useState<{ sent: number; opened: number; whatsapp: number } | null>(null);
@@ -272,6 +277,54 @@ export function PrivateReplyPanel({
                   onBlur={(e) => save({ private_link_max_opens: Number(e.target.value) })}
                   style={{ ...ttInput(c), marginTop: 5 }} />
               </label>
+            </div>
+          </Field>
+
+          {/* ── 5. Which comments get a code ───────────────────────────────── */}
+          <Field
+            c={c} n={5}
+            title={t("أيّ التعليقات تأخذ كوداً", "Which comments get a code")}
+            hint={t("الكود يذهب لمن يسأل عن السعر فقط. أمّا التوصيل والعنوان والضمان والألوان — فيُجاب عنها مباشرةً تحت الفيديو، لأنّ أحداً لن يمشي إلى البايو ليُقال له «نعم نوصّل». والبوت يعرف كلمات السعر بالليبية والعربية والإنجليزية. أضف هنا كلمات زبائنك وحدهم إن وُجدت.",
+                    "Only price questions get a code. Delivery, address, warranty and colours are answered straight under the video — nobody walks to the bio to be told \"yes, we deliver\". The bot already knows price words in Libyan, Arabic and English. Add your own customers' words here, if they have any.")}
+          >
+            <input
+              value={kw} onChange={(e) => setKw(e.target.value)}
+              onBlur={() => {
+                const next = kw.split(/[\n,،]/).map((w) => w.trim()).filter(Boolean);
+                const prev = config.price_keywords || [];
+                if (next.join("|") !== prev.join("|")) save({ price_keywords: next });
+              }}
+              placeholder={t("بقديش، كم تجي، شنو تمنها", "e.g. how much does it run, what's it go for")}
+              style={ttInput(c)}
+            />
+            <div style={{ fontSize: 11, color: c.muted, lineHeight: 1.8, marginTop: 8 }}>
+              {t("افصل بينها بفاصلة. اتركه فارغاً إن لم تحتج شيئاً.",
+                 "Separate them with commas. Leave it empty if you don't need any.")}
+            </div>
+          </Field>
+
+          {/* ── 6. The card ────────────────────────────────────────────────── */}
+          <Field
+            c={c} n={6}
+            title={t("أرسل الكود كصورة", "Send the code as a picture")}
+            hint={t("بدل سطر رماديّ ضائع بين التعليقات: بطاقة بلون متجرك، الكود فيها ضخم، وفي ركنها QR يفتح السعر مباشرةً لمن يشاهد على شاشة أخرى. ولا سعر على البطاقة إطلاقاً — فهي علنيّة مثل التعليق.",
+                    "Instead of a grey line lost among the comments: a card in your shop's colour, the code on it huge, and a QR in the corner that opens the price for anyone watching on another screen. The price is never on the card — it is as public as the comment.")}
+          >
+            <button
+              onClick={() => save({ reply_image: !config.reply_image })}
+              disabled={busy}
+              style={{
+                ...ttInput(c), cursor: busy ? "default" : "pointer", textAlign: "start",
+                fontWeight: 800,
+                color: config.reply_image ? c.ok : c.muted,
+                borderColor: config.reply_image ? c.ok : undefined,
+              }}
+            >
+              {config.reply_image ? t("مُفعَّل ✓", "On ✓") : t("مُعطَّل", "Off")}
+            </button>
+            <div style={{ fontSize: 11, color: c.muted, lineHeight: 1.8, marginTop: 8 }}>
+              {t("تيك توك لم توثّق الصلاحية اللازمة لرفع الصور، فقد ترفضها. إن رفضت، يُرسَل الكود نصّاً كالمعتاد ولا يضيع شيء.",
+                 "TikTok has not documented the permission image uploads need, so it may refuse. If it does, the code goes out as text as usual and nothing is lost.")}
             </div>
           </Field>
 

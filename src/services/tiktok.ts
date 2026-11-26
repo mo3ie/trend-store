@@ -442,13 +442,85 @@ export async function listCommentReplies(
  */
 export async function replyToComment(
   token: string, businessId: string, videoId: string, commentId: string, text: string,
+  image?: CommentImage | null,
 ): Promise<{ commentId: string | null }> {
   const data = await call<{ comment_id?: string | number }>(
     "business/comment/reply/create/", "POST", {
       token,
-      body: { business_id: businessId, video_id: videoId, comment_id: commentId, text },
+      body: {
+        business_id: businessId, video_id: videoId, comment_id: commentId, text,
+        // All three travel together or none do: TikTok rejects an image_uri whose
+        // dimensions are missing, and the dimensions alone mean nothing.
+        ...(image ? {
+          image_uri: image.uri, image_width: image.width, image_height: image.height,
+        } : {}),
+      },
     });
   return { commentId: normalizeId(data.comment_id) };
+}
+
+/** What `uploadCommentImage` returns, and what a reply needs to carry it. */
+export interface CommentImage { uri: string; width: number; height: number; }
+
+/**
+ * POST /business/comment/image/upload/ — puts a picture where a reply can use it.
+ *
+ * Unlike every other call in this file this one is **multipart**, not JSON, so it
+ * cannot go through `call()`: that helper sets `Content-Type: application/json`
+ * and stringifies the body. It still raises the same `TikTokError`, so callers
+ * handle failure the way they handle it everywhere else.
+ *
+ * TikTok's documented limits, enforced here before we spend an upload:
+ *   * 5 MB
+ *   * 360x360 minimum, 1080x1920 or 1920x1080 maximum
+ *   * JPG, JPEG, WebP or PNG
+ *
+ * ⚠️ The required SCOPE is undocumented. TikTok's reference lists no permission
+ * for this endpoint, and no third-party source names one. It may be covered by
+ * `comment.list.manage`, which we hold, or it may need something we do not. The
+ * only way to find out is to call it — so every caller treats failure as normal
+ * and falls back to a text-only reply. Nothing in this product may DEPEND on an
+ * image until a real upload has returned a uri.
+ */
+export async function uploadCommentImage(
+  token: string, businessId: string, png: Uint8Array, filename = "reply.png",
+): Promise<CommentImage | null> {
+  if (png.byteLength > 5 * 1024 * 1024) return null;
+
+  const form = new FormData();
+  form.append("business_id", businessId);
+  form.append("image_file", new Blob([new Uint8Array(png)], { type: "image/png" }), filename);
+
+  let res: Response;
+  try {
+    // No Content-Type header: fetch must set the multipart boundary itself.
+    res = await fetch(`${BASE}/business/comment/image/upload/`, {
+      method: "POST", headers: { "Access-Token": token }, body: form, cache: "no-store",
+    });
+  } catch {
+    throw new TikTokError("network_error", "TikTok image upload failed", "business/comment/image/upload/");
+  }
+
+  let json: { code?: number; message?: string; request_id?: string;
+              data?: { image_uri?: string; width?: number; height?: number } };
+  try {
+    json = await res.json();
+  } catch {
+    throw new TikTokError("bad_response", "TikTok returned a non-JSON response",
+      "business/comment/image/upload/", res.status);
+  }
+
+  if (json.code !== 0) {
+    throw new TikTokError("api_error", json.message || `TikTok API error (code ${json.code})`,
+      "business/comment/image/upload/", res.status, json.code, json.request_id);
+  }
+
+  const uri = json.data?.image_uri;
+  const width = Number(json.data?.width) || 0;
+  const height = Number(json.data?.height) || 0;
+  // A uri without dimensions cannot be attached, so it is not a success.
+  if (!uri || !width || !height) return null;
+  return { uri, width, height };
 }
 
 /** POST /business/comment/create/ — a new top-level comment on an owned video. */

@@ -81,6 +81,9 @@ interface Config {
   whatsapp_text: string | null;
   private_link_ttl_hours: number | null;
   private_link_max_opens: number | null;
+  // The price gate + the code card (sql/40).
+  price_keywords: string[] | null;
+  reply_image: boolean | null;
   throttle_per_min: number | null;
   min_delay_sec: number | null;
   max_delay_sec: number | null;

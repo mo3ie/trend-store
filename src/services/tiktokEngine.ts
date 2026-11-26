@@ -27,12 +27,16 @@ import { canMessage, findConversationFor, sendMessage } from "@/services/tiktokM
 import { checkAppRateLimit, checkAccountRateLimit } from "@/lib/rateLimit";
 import {
   listComments, listVideos, replyToComment, likeComment, hideComment, deleteComment,
+  uploadCommentImage, type CommentImage,
   businessIdFromOpenId, TikTokError,
 } from "@/services/tiktok";
 import { decide, type ReplyGroup, type ReplyPolicy } from "@/services/replyDecision";
 import { loadCatalog, matchProduct, productReply } from "@/services/catalogMatcher";
 import { featuresFor } from "@/lib/entitlements";
 import { createPrivateLink, composePublicReply } from "@/lib/privateLinks";
+import { shouldGate } from "@/services/priceIntent";
+import { renderCodeCard, commentImagesArmed } from "@/services/codeCard";
+import { siteHost } from "@/lib/siteUrl";
 import type { PostOverride } from "@/services/botEngine";
 
 /** The bot's view of a connected TikTok account: credentials + rule configuration. */
@@ -81,6 +85,10 @@ export interface TikTokTarget {
   whatsappText: string | null;
   privateLinkTtlHours: number | null;
   privateLinkMaxOpens: number | null;
+  /** The merchant's own "how much?" words, on top of the built-in list. */
+  priceKeywords: string[];
+  /** Post the code as a rendered card instead of plain text. */
+  replyImage: boolean;
 }
 
 /** Loads the account + its bot config, verifying the subscription gate. */
@@ -95,7 +103,7 @@ export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
 
   const { data: config } = await supabaseAdmin
     .from("bot_configs")
-    .select("id, user_id, page_id, page_name, enabled, ai_enabled, ai_persona, reply_public, throttle_per_min, min_delay_sec, max_delay_sec, post_filter, post_filter_enabled, reply_groups, banned_words, banned_action, mention_author, once_per_user, like_comments, public_replies, default_public_reply, default_private_reply, post_overrides, catalog_match, catalog_ambiguous_reply, private_delivery, private_link_text, whatsapp_number, whatsapp_text, private_link_ttl_hours, private_link_max_opens")
+    .select("id, user_id, page_id, page_name, enabled, ai_enabled, ai_persona, reply_public, throttle_per_min, min_delay_sec, max_delay_sec, post_filter, post_filter_enabled, reply_groups, banned_words, banned_action, mention_author, once_per_user, like_comments, public_replies, default_public_reply, default_private_reply, post_overrides, catalog_match, catalog_ambiguous_reply, private_delivery, private_link_text, whatsapp_number, whatsapp_text, private_link_ttl_hours, private_link_max_opens, price_keywords, reply_image")
     .eq("platform", "tiktok")
     .eq("page_id", openId)
     .eq("enabled", true)
@@ -145,6 +153,8 @@ export async function loadTarget(openId: string): Promise<TikTokTarget | null> {
     catalogMatch: config.catalog_match || "off",
     catalogAmbiguousReply: config.catalog_ambiguous_reply,
     privateDelivery: (config.private_delivery as string | null) || "off",
+    priceKeywords: (config.price_keywords as string[] | null) || [],
+    replyImage: config.reply_image === true,
     privateLinkText: config.private_link_text,
     whatsappNumber: config.whatsapp_number,
     whatsappText: config.whatsapp_text,
@@ -253,7 +263,16 @@ async function decideReply(
   const aiWanted = (override?.ai ?? target.aiEnabled) === true;
   if (!rule && !catalogText && aiWanted && aiAvailable()
       && (await featuresFor(target.userId, "tiktok_bot", target.pageId).catch(() => new Set<string>())).has("ai_reply")) {
-    aiText = await generateAiReply(comment.text, target.aiPersona, target.pageName);
+    /*
+     * No catalog is passed, deliberately: a TikTok AI answer can end up posted
+     * publicly (see the price gate below), and a model holding the price list is
+     * a model that can quote a price into the open. The catalog path has its own
+     * branch above, and that one IS gated.
+     */
+    aiText = await generateAiReply(
+      comment.text, target.aiPersona, target.pageName, null,
+      { platform: "tiktok", visibility: "public" },
+    );
   }
 
   const decision = decide({
@@ -298,6 +317,7 @@ async function like(target: TikTokTarget, commentId: string): Promise<void> {
  */
 async function sendReply(
   target: TikTokTarget, videoId: string, commentId: string, text: string,
+  image?: CommentImage | null,
 ): Promise<{ ok: boolean; error?: string; replyCommentId?: string | null }> {
   const appLimit = await checkAppRateLimit("comment_reply_create");
   if (!appLimit.allowed) return { ok: false, error: "app_rate_limited" };
@@ -313,7 +333,7 @@ async function sendReply(
     // any other comment, and this is what lets the next delivery recognise it as ours
     // instead of answering it.
     const created = await replyToComment(
-      token, businessIdFromOpenId(target.openId), videoId, commentId, text,
+      token, businessIdFromOpenId(target.openId), videoId, commentId, text, image,
     );
     return { ok: true, replyCommentId: created.commentId };
   } catch (err) {
@@ -460,8 +480,29 @@ export async function processClaimedComment(
    * The order matters: a merchant who has a real DM should get it, and the link is
    * the fallback, not a replacement.
    */
+  /*
+   * Is this answer worth hiding?
+   *
+   * Only an AI answer to a comment that did NOT ask a price is said out loud —
+   * delivery, locations, colours, warranty, "is it available". Those cost
+   * nothing to answer in public and everything to gate: see sql/40 for the
+   * exchange this used to produce, and services/priceIntent.ts for how the
+   * question is read.
+   *
+   * Answering them under the video is not a consolation prize either. A stranger
+   * scrolling past reads "نوصّل لمصراتة 🚚" under someone else's comment and
+   * learns something about the shop — which a code behind a bio link can never do.
+   */
+  const gated = shouldGate(decision.source, comment.text, target.priceKeywords);
+  if (!gated) patch.private_status = "public";
+
+  // Set only on the link path: the card exists to carry a code, and the other
+  // paths do not mint one.
+  let cardToken: string | null = null;
+  let cardUrl: string | null = null;
+
   let privateSent = false;
-  if (target.canMessage && decision.privateText && comment.username) {
+  if (gated && target.canMessage && decision.privateText && comment.username) {
     privateSent = await sendPrivate(target, comment.username, decision.privateText);
   }
   if (privateSent) patch.private_status = "sent";
@@ -469,7 +510,7 @@ export async function processClaimedComment(
   let reply: string | null;
   if (privateSent) {
     reply = decision.publicText || decision.privateText;
-  } else if (decision.privateText && target.privateDelivery === "assist" && comment.username) {
+  } else if (gated && decision.privateText && target.privateDelivery === "assist" && comment.username) {
     /*
      * Assisted mode: the price goes to a queue a human sends from the real
      * TikTok app, and the comment says only that an answer is coming.
@@ -500,7 +541,7 @@ export async function processClaimedComment(
       // a promise of a message nobody was told to send.
       reply = decision.privateText || decision.publicText;
     }
-  } else if (decision.privateText && target.privateDelivery === "link") {
+  } else if (gated && decision.privateText && target.privateDelivery === "link") {
     const url = await createPrivateLink({
       configId: target.configId,
       userId: target.userId,
@@ -517,7 +558,9 @@ export async function processClaimedComment(
       maxOpens: target.privateLinkMaxOpens,
     });
     if (url) {
-      reply = composePublicReply(target.privateLinkText, url, decision.publicText, url.split("/").pop());
+      cardToken = url.split("/").pop() || null;
+      cardUrl = url;
+      reply = composePublicReply(target.privateLinkText, url, decision.publicText, cardToken || undefined);
       patch.private_status = "link";
     } else {
       // Minting failed. Fall back to the old behaviour rather than dropping the
@@ -540,7 +583,36 @@ export async function processClaimedComment(
   // of instant replies is exactly what gets an account throttled or blocked.
   await humanPause(target.minDelaySec, target.maxDelaySec);
 
-  const sent = await sendReply(target, comment.videoId, comment.commentId, reply);
+  /*
+   * The card, when armed and when there is a code to put on it.
+   *
+   * Both switches must be on, and BOTH failures are silent: a card that will not
+   * render and an upload TikTok refuses both fall through to the text reply that
+   * has always worked. The customer never pays for an experiment — the worst case
+   * is the comment they would have got anyway.
+   *
+   * The upload is attempted per reply rather than cached because the QR encodes
+   * THIS customer's one-off link; two customers cannot share a card.
+   */
+  let card: CommentImage | null = null;
+  if (cardToken && cardUrl && target.replyImage && commentImagesArmed()) {
+    try {
+      const png = await renderCodeCard({
+        code: cardToken,
+        url: cardUrl,
+        domainLabel: siteHost("/r"),
+        brand: target.pageName,
+      });
+      if (png) {
+        const token = await getValidAccessToken(target.accountId);
+        if (token) card = await uploadCommentImage(token, businessIdFromOpenId(target.openId), png);
+      }
+    } catch {
+      card = null;   // undocumented scope; refusal is an expected outcome, not an error
+    }
+  }
+
+  const sent = await sendReply(target, comment.videoId, comment.commentId, reply, card);
   if (sent.ok && decision.like) await like(target, comment.commentId);
   await finishComment(comment.commentId, {
     ...patch,
