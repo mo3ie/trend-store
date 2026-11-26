@@ -469,7 +469,7 @@ function CreateCampaignInner() {
         { label: t("الدفع", "Payment") },
       ]} />
 
-      <div style={{ maxWidth: 720, margin: "0 auto", padding: "22px 20px", display: "grid", gap: 18 }}>
+      <div style={{ maxWidth: 720, margin: "0 auto", padding: "22px 20px", display: "grid", gap: 18, gridTemplateColumns: "minmax(0,1fr)" }}>
 
         {error && (
           /*
@@ -495,7 +495,7 @@ function CreateCampaignInner() {
           <div style={{ position: "relative" }}>
             <button type="button" onClick={() => setPageMenuOpen((o) => !o)}
               style={{ ...input, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", textAlign: rtl ? "right" : "left" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+              <span style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 8, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
                 {selectedPageObj && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={pagePic(selectedPageObj.page_id)} alt="" style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
@@ -528,7 +528,7 @@ function CreateCampaignInner() {
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={pagePic(p.page_id)} alt="" style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, objectFit: "cover", background: c.inputBg }} />
 
-                        <span style={{ flex: 1, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{p.page_name}</span>
+                        <span style={{ minWidth: 0, flex: 1, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{p.page_name}</span>
                         {active && <CheckCircle size={15} color={PINK} style={{ flexShrink: 0 }} />}
                       </button>
                     );
@@ -866,7 +866,7 @@ function CreateCampaignInner() {
           <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6, fontSize: 12, color: c.muted }}>
             <Users2 size={13} /> {t("العمر والجنس", "Age & gender")}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.4fr", gap: 12, alignItems: "end" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr) minmax(0,1.4fr)", gap: 12, alignItems: "end" }}>
             <div>
               <label style={{ fontSize: 11.5, color: c.dim, display: "block", marginBottom: 6, whiteSpace: "nowrap" }}>{t("العمر من", "Age from")}</label>
               <input type="number" min={13} max={65} value={ageMin} onChange={(e) => setAgeMin(Math.max(13, Math.min(65, Number(e.target.value) || 13)))} style={input} />
@@ -1061,7 +1061,7 @@ function CreateCampaignInner() {
               ✨ {t("يوزّع فيسبوك إعلانك تلقائياً على أفضل المواضع (فيسبوك، إنستغرام، ماسنجر) لأفضل نتيجة بأقل تكلفة.", "Facebook automatically places your ad across the best spots (Facebook, Instagram, Messenger) for the best result at the lowest cost.")}
             </p>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 10 }}>
               {([
                 ["facebook", t("فيسبوك", "Facebook")],
                 ["instagram", t("إنستغرام", "Instagram")],
@@ -1203,7 +1203,7 @@ function CreateCampaignInner() {
                 </div>
               </button>
 
-              <div style={{ display: "grid", gridTemplateColumns: continuous ? "1fr" : "1fr 1fr", gap: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: continuous ? "minmax(0,1fr)" : "minmax(0,1fr) minmax(0,1fr)", gap: 14 }}>
                 <div>
                   <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 6 }}>{continuous ? t("الميزانية اليومية (دولار)", "Daily budget (USD)") : t("الميزانية (دولار)", "Budget (USD)")}</label>
                   <input type="number" min={1} value={usdInput} onChange={(e) => setUsdInput(e.target.value)} placeholder={t("مثال: 5", "e.g. 5")} style={input} />
@@ -1234,7 +1234,7 @@ function CreateCampaignInner() {
           ) : (
             <>
               {/* Tier selector */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)", gap: 10, marginBottom: 14 }}>
                 {AD_TIER_PACKAGES.map((p) => {
                   const medal = p.level === 1 ? "#f0b429" : p.level === 2 ? "#9aa4b2" : "#c07b45";
                   const active = tierPkgId === p.id;
@@ -1251,7 +1251,7 @@ function CreateCampaignInner() {
 
               {/* Duration selector */}
               <label style={{ fontSize: 12, color: c.muted, display: "block", marginBottom: 8 }}>{t("المدة", "Duration")}</label>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
                 {tierPkg.options.map((o) => {
                   const active = pkgDays === o.days;
                   return (

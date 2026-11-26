@@ -143,7 +143,7 @@ function CheckoutInner() {
         { label: t("الدفع", "Payment") },
       ]} />
 
-      <div style={{ maxWidth: 560, margin: "0 auto", padding: "14px 18px", display: "grid", gap: 16 }}>
+      <div style={{ maxWidth: 560, margin: "0 auto", padding: "14px 18px", display: "grid", gap: 16, gridTemplateColumns: "minmax(0,1fr)" }}>
 
         {error && (
           <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #ef444455", borderRadius: 14, padding: "12px 16px", color: "#f87171", display: "flex", gap: 10, alignItems: "center" }}>

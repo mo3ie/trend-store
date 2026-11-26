@@ -119,7 +119,8 @@ const CSS = `
 .fbh-bell{padding:0 10px}
 .fbh-avatar{height:40px;padding:0 8px;border-radius:12px;border:1px solid var(--fbh-border);display:flex;align-items:center;gap:4px;font-weight:700;font-size:14px}
 .fbh button:focus-visible,.fbh a:focus-visible{outline:2px solid #438DF5;outline-offset:2px}
-@media (max-width:640px){.fbh-hide-sm{display:none}.fbh-nav{display:none}.fbh-mnav .fbh-nav{display:flex;order:3;flex-basis:100%}.fbh-in{gap:10px}}
+@media (max-width:640px){.fbh-hide-sm{display:none}.fbh-nav{display:none}.fbh-mnav .fbh-nav{display:flex;order:3;flex-basis:100%}.fbh-in{gap:8px;min-height:58px;flex-wrap:nowrap}.fbh-mnav .fbh-in{flex-wrap:wrap}.fbh-tools{gap:5px}.fbh-icon,.fbh-ghost{height:36px;min-width:36px;padding:0}.fbh-ghost{justify-content:center}.fbh-bell{padding:0}.fbh-avatar{height:36px;padding:0 6px}}
+@media (max-width:480px){.fbh-brand>span:last-child{display:none}}
 `;
 const PH_CSS = `
 .fbph{max-width:1240px;margin:0 auto;padding:20px max(16px,env(safe-area-inset-right,0px)) 4px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:12px}
@@ -140,16 +141,16 @@ export function FbSteps({ steps, current, accent = "#438DF5" }: { steps: { label
   const { dark } = useTheme();
   const P = fbPalette(!dark);
   return (
-    <ol aria-label={t("خطوات العملية", "Steps")} style={{ listStyle: "none", maxWidth: 1240, margin: "0 auto", padding: "10px max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))", display: "flex", gap: 8, flexWrap: "wrap", fontFamily: FB_FONT }}>
+    <ol aria-label={t("خطوات العملية", "Steps")} style={{ listStyle: "none", maxWidth: 1240, margin: "0 auto", padding: "10px max(16px,env(safe-area-inset-right,0px)) 2px max(16px,env(safe-area-inset-left,0px))", display: "flex", gap: 8, flexWrap: "nowrap", overflowX: "auto", scrollbarWidth: "none", fontFamily: FB_FONT }}>
       {steps.map((s, i) => {
         const done = i < current, on = i === current;
         const inner = (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 12px 7px 10px", borderRadius: 999, border: `1px solid ${on ? accent : P.border}`, background: on ? `${accent}14` : P.surface, color: on ? accent : done ? P.text : P.muted, fontSize: 13.5, fontWeight: on ? 700 : 600 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "6px 11px 6px 9px", borderRadius: 999, whiteSpace: "nowrap", border: `1px solid ${on ? accent : P.border}`, background: on ? `${accent}14` : P.surface, color: on ? accent : done ? P.text : P.muted, fontSize: 13.5, fontWeight: on ? 700 : 600 }}>
             <span style={{ width: 22, height: 22, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 800, background: on || done ? accent : P.soft, color: on || done ? "#fff" : P.muted }}>{done ? "✓" : i + 1}</span>
             {s.label}
           </span>
         );
-        return <li key={i} aria-current={on ? "step" : undefined}>{done && s.href ? <a href={s.href} style={{ textDecoration: "none" }}>{inner}</a> : inner}</li>;
+        return <li key={i} style={{ flex: "none" }} aria-current={on ? "step" : undefined}>{done && s.href ? <a href={s.href} style={{ textDecoration: "none" }}>{inner}</a> : inner}</li>;
       })}
     </ol>
   );

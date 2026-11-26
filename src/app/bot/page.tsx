@@ -157,7 +157,7 @@ export default function BotDashboard() {
                       </div>
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.page_name}</div>
+                      <div style={{ minWidth: 0, fontWeight: 700, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.page_name}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
                         {on ? (
                           <span style={{ fontSize: 12, color: GREEN, display: "flex", alignItems: "center", gap: 4 }}><CheckCircle size={13} /> {t("يعمل", "Running")}</span>

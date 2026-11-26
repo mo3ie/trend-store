@@ -602,7 +602,7 @@ function RulesTab({ configId, flash, t }: { configId: string; flash: (m: string)
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 14 }}>{r.name || (r.keywords[0] ?? t("قاعدة", "Rule"))}</div>
-                    <div style={{ fontSize: 12, color: c.muted, marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div style={{ minWidth: 0, fontSize: 12, color: c.muted, marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {r.match_type === "catch_all" ? t("كل التعليقات", "All comments") : (r.keywords.join("، ") || "—")}
                     </div>
                   </div>
@@ -800,7 +800,7 @@ function AccountsTab({ config, patch, flash, t }: { config: Config; patch: (p: P
               <div key={tk.id} style={{ background: isActive ? `${GREEN}10` : CARD, border: `1px solid ${isActive ? `${GREEN}55` : BORDER}`, borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <div style={{ width: 10, height: 10, borderRadius: "50%", background: statusColor[tk.status] || "#94a3b8", flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 120 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ minWidth: 0, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 6 }}>
                     {tk.label || t("حساب", "Account")}
                     {isActive && <span style={{ fontSize: 11, color: GREEN, background: `${GREEN}22`, padding: "2px 8px", borderRadius: 6, display: "inline-flex", alignItems: "center", gap: 3 }}><CheckCircle2 size={11} /> {t("يردّ الآن", "Replying")}</span>}
                   </div>
@@ -924,7 +924,7 @@ function PostsTab({ config, pageId, patch, flash, t }: { config: Config; pageId:
                     <div style={{ width: 48, height: 48, borderRadius: 10, background: c.surface, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Newspaper size={20} color="#64748b" /></div>
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.message || t("(منشور بدون نص)", "(post with no text)")}</div>
+                    <div style={{ minWidth: 0, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.message || t("(منشور بدون نص)", "(post with no text)")}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
                       <span style={{ fontSize: 11, color: c.dim }}>{new Date(p.createdTime).toLocaleDateString(t("ar-LY", "en-GB"))}</span>
                       {custom && <span style={{ fontSize: 11, color: GREEN, display: "inline-flex", alignItems: "center", gap: 3 }}><MessageSquare size={11} /> {t("ردّ مخصّص", "Custom reply")}</span>}
@@ -1043,7 +1043,7 @@ function PostReplyEditor({ post, initial, t, onClose, onSave }: { post: Post; in
           // eslint-disable-next-line @next/next/no-img-element
           <img src={post.picture} alt="" style={{ width: 44, height: 44, borderRadius: 9, objectFit: "cover" }} />
         ) : <div style={{ width: 44, height: 44, borderRadius: 9, background: c.surface, display: "flex", alignItems: "center", justifyContent: "center" }}><Newspaper size={18} color="#64748b" /></div>}
-        <div style={{ fontSize: 12, color: "#cbd5e1", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{post.message || t("(منشور بدون نص)", "(post with no text)")}</div>
+        <div style={{ minWidth: 0, fontSize: 12, color: "#cbd5e1", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{post.message || t("(منشور بدون نص)", "(post with no text)")}</div>
       </div>
 
       <div style={{ fontSize: 12, color: c.muted, marginTop: 12, lineHeight: 1.7 }}>
@@ -1322,7 +1322,7 @@ function CatalogTab({ config, pageId, patch, flash, t }: { config: Config; pageI
                 <img src={r.images[0]} alt="" style={{ width: 44, height: 44, borderRadius: 9, objectFit: "cover", flexShrink: 0 }} />
               ) : <div style={{ width: 44, height: 44, borderRadius: 9, background: c.card, flexShrink: 0 }} />}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+                <div style={{ minWidth: 0, fontSize: 13.5, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
                 <div style={{ fontSize: 12, color: c.muted }}>{r.price_text || t("بلا سعر", "no price")}</div>
               </div>
               <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
@@ -1374,7 +1374,7 @@ function ActivityTab({ configId, t }: { configId: string; t: TF }) {
   return (
     <div>
       {stats && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 10, marginBottom: 16 }}>
           {[[t("ردود خاصة", "DMs sent"), stats.private_sent, GREEN], [t("ردود علنية", "Public replies"), stats.public_sent, BLUE], [t("إخفاقات", "Failures"), stats.failed, "#ef4444"]].map(([l, v, hue], i) => (
             <div key={i} style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
               <div style={{ fontSize: 22, fontWeight: 800, color: hue as string }}>{v as number}</div>
@@ -1395,7 +1395,7 @@ function ActivityTab({ configId, t }: { configId: string; t: TF }) {
                 <span style={{ fontWeight: 700, fontSize: 13 }}>{l.commenter_name || t("زائر", "Visitor")}</span>
                 <span style={{ marginInlineStart: "auto", display: "flex", gap: 6 }}>{badge(l.public_status)}{badge(l.private_status)}</span>
               </div>
-              <div style={{ fontSize: 13, color: "#cbd5e1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.comment_message || "—"}</div>
+              <div style={{ minWidth: 0, fontSize: 13, color: "#cbd5e1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.comment_message || "—"}</div>
               {l.error && <div style={{ fontSize: 11, color: "#f87171", marginTop: 4 }}>{l.error}</div>}
               <div style={{ fontSize: 11, color: c.dim, marginTop: 4 }}>{new Date(l.created_at).toLocaleString(t("ar-LY", "en-GB"))}</div>
             </div>

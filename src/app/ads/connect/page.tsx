@@ -329,7 +329,7 @@ function ConnectPageInner() {
                   style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", background: G_META, flexShrink: 0 }} />
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{page.page_name}</div>
+                  <div style={{ minWidth: 0, fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{page.page_name}</div>
                   {health[page.page_id] === "dead" ? (
                     <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 3, background: "rgba(245,158,11,0.15)", color: "#f59e0b", borderRadius: 100, padding: "2px 9px", fontSize: 11, fontWeight: 800 }}>
                       <XCircle size={11} /> {t("تحتاج إعادة صلاحية", "Needs re-authorization")}

@@ -838,7 +838,7 @@ export default function StudioPage() {
             <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
             <div style={{ position: "relative", flex: 1 }}>
               <button type="button" onClick={() => setPageMenu((o) => !o)} style={{ ...input, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", textAlign: rtl ? "right" : "left" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 9, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                <span style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 9, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
                   {selPage && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={pagePic(selPage)} alt="" style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
@@ -861,7 +861,7 @@ export default function StudioPage() {
                     <button key={`${p.platform ?? "meta"}:${p.page_id}`} type="button" onClick={() => { setSelectedPage(p.page_id); setPageMenu(false); setPageSearch(""); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: p.page_id === selectedPage ? PINK_BG : "transparent", border: "none", cursor: "pointer", color: p.page_id === selectedPage ? PINK : c.text, textAlign: rtl ? "right" : "left", fontSize: 14, fontFamily: "inherit" }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={pagePic(p)} alt="" style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
-                      <span style={{ flex: 1, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{p.page_name}</span>
+                      <span style={{ minWidth: 0, flex: 1, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{p.page_name}</span>
                       {p.platform === "tiktok" && (
                         <span style={{ fontSize: 10, fontWeight: 800, borderRadius: 100, padding: "2px 7px", background: "rgba(255,0,80,0.15)", color: "#ff0050", flexShrink: 0 }}>TikTok</span>
                       )}
@@ -989,8 +989,8 @@ export default function StudioPage() {
                       <div style={{ width: 52, height: 52, borderRadius: 11, background: c.inputBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Package size={20} color={c.dim} /></div>
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
-                      <div style={{ fontSize: 12, color: c.dim, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{[p.category, p.price_text].filter(Boolean).join(" · ") || t("بدون سعر", "no price")}</div>
+                      <div style={{ minWidth: 0, fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
+                      <div style={{ minWidth: 0, fontSize: 12, color: c.dim, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{[p.category, p.price_text].filter(Boolean).join(" · ") || t("بدون سعر", "no price")}</div>
                     </div>
                     {!selectMode && <>
                       <button onClick={() => toggleAvailable(p)} title={avail ? t("متوفر", "In stock") : t("غير متوفر", "Out of stock")}
@@ -1018,7 +1018,7 @@ export default function StudioPage() {
                        "Admin account — unlimited. Note: your own generations bill the real fal.ai balance.")}
                   </div>
                 )}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, opacity: quota.unlimited ? 0.55 : 1 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 10, opacity: quota.unlimited ? 0.55 : 1 }}>
                   {([["images", t("صور عالية الجودة", "High-quality images")], ["videos", t("فيديوهات", "Videos")]] as const).map(([k, label]) => {
                     const q = quota[k];
                     const total = q.limit + q.extra;
@@ -1106,7 +1106,7 @@ export default function StudioPage() {
                 <div style={card}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800, fontSize: 15, marginBottom: 6 }}><Sparkles size={17} color={PINK} /> {plan ? t("توليد خطة جديدة", "Generate a new plan") : t("خطة النشر", "Content plan")}</div>
                   <p style={{ color: c.dim, fontSize: 12.5, margin: "0 0 14px", lineHeight: 1.7 }}>{t("حدّد عدد المنشورات اليومية والمدة، ويصمّم الموظف الخطة كاملة (نصوص + صور).", "Set posts per day and duration; the employee designs the full plan (captions + images).")}</p>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12 }}>
                     <Field muted={c.muted} label={t("منشورات يومياً", "Posts per day")}><input type="number" min={1} max={10} style={input} value={postsPerDay} onChange={(e) => setPostsPerDay(Math.max(1, Math.min(10, Number(e.target.value) || 1)))} /></Field>
                     <Field muted={c.muted} label={t("عدد الأيام", "Number of days")}><input type="number" min={1} max={30} style={input} value={durationDays} onChange={(e) => setDurationDays(Math.max(1, Math.min(30, Number(e.target.value) || 7)))} /></Field>
                   </div>
@@ -1457,7 +1457,7 @@ export default function StudioPage() {
               <button onClick={() => setShowAdd(false)} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer" }}><X size={20} /></button>
             </div>
             <Field muted={c.muted} label={t("اسم الصنف", "Item name")}><input autoFocus style={input} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder={t("مثال: عطر فلورا", "e.g. Flora perfume")} /></Field>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 10 }}>
               <Field muted={c.muted} label={t("القسم", "Category")}><input style={input} value={draft.category || ""} onChange={(e) => setDraft({ ...draft, category: e.target.value })} placeholder={t("عطور", "Perfumes")} /></Field>
               <Field muted={c.muted} label={t("السعر", "Price")}><input style={input} value={draft.price_text || ""} onChange={(e) => setDraft({ ...draft, price_text: e.target.value })} placeholder={t("50 د.ل", "50 LYD")} /></Field>
             </div>
@@ -1677,7 +1677,7 @@ export default function StudioPage() {
                 <div style={{ width: 40, height: 23, borderRadius: 100, background: editPost.boost ? "#f0b429" : c.border, position: "relative", flexShrink: 0 }}><div style={{ position: "absolute", top: 3, insetInlineStart: editPost.boost ? 20 : 3, width: 17, height: 17, borderRadius: "50%", background: "#fff" }} /></div>
               </button>
               {editPost.boost && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 10, marginTop: 12 }}>
                   <div><label style={{ fontSize: 11.5, color: c.muted, display: "block", marginBottom: 5 }}>{t("الميزانية اليومية ($)", "Daily budget ($)")}</label><input type="number" min={1} style={input} value={editPost.boost_budget_usd ?? 5} onChange={(e) => setEditPost({ ...editPost, boost_budget_usd: Number(e.target.value) || 0 })} /></div>
                   <div><label style={{ fontSize: 11.5, color: c.muted, display: "block", marginBottom: 5 }}>{t("المدة (أيام)", "Days")}</label><input type="number" min={1} max={30} style={input} value={editPost.boost_days ?? 3} onChange={(e) => setEditPost({ ...editPost, boost_days: Number(e.target.value) || 0 })} /></div>
                 </div>
@@ -1887,7 +1887,7 @@ export default function StudioPage() {
               <div style={{ fontWeight: 900, fontSize: 16, display: "inline-flex", alignItems: "center", gap: 8 }}><DollarSign size={18} color="#f0b429" /> {t(`تمويل ${selectedPlanPosts.size} منشوراً`, `Boost ${selectedPlanPosts.size} posts`)}</div>
               <button onClick={() => setShowBulkBoost(false)} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer" }}><X size={20} /></button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12, marginTop: 10 }}>
               <Field muted={c.muted} label={t("الميزانية اليومية ($)", "Daily budget ($)")}><input type="number" min={1} style={input} value={bbBudget} onChange={(e) => setBbBudget(e.target.value)} /></Field>
               <Field muted={c.muted} label={t("المدة (أيام)", "Days")}><input type="number" min={1} max={30} style={input} value={bbDays} onChange={(e) => setBbDays(e.target.value)} /></Field>
             </div>

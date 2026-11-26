@@ -174,7 +174,7 @@ export default function MyPagesPage() {
                         ? <img src={p.page_picture} alt="" style={{ width: 46, height: 46, borderRadius: "50%", objectFit: "cover", flex: "none" }} /> // eslint-disable-line @next/next/no-img-element
                         : <span style={{ width: 46, height: 46, borderRadius: "50%", background: c.chipBlue, display: "grid", placeItems: "center", flex: "none", fontWeight: 700 }}>{(p.page_name || "؟").slice(0, 1)}</span>}
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 15.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.page_name}</div>
+                        <div style={{ minWidth: 0, fontWeight: 700, fontSize: 15.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.page_name}</div>
                         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 3 }}>
                           <span dir="ltr" style={{ fontSize: 12, color: c.dim }}>ID: {p.page_id}</span>
                           {st === "alive" && <span style={chip(c.chipGreen, c.greenText)}><CheckCircle2 size={12} /> {pub === false ? t("تعمل — النشر يحتاج إعادة ربط", "Works — publishing needs reconnect") : t("تعمل", "Working")}</span>}
