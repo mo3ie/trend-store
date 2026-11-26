@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Loader2, Sparkles, Play, Clock, Copy, Check,
-  Package, Film, AlertCircle, Calendar, Music2, Type, Megaphone, Save,
+  Package, Film, AlertCircle, Calendar, Music2, Type, Megaphone, Save, Plus,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
@@ -81,6 +81,54 @@ export default function TikTokStudioPage() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [bulk, setBulk] = useState("");
+  const [savingProducts, setSavingProducts] = useState(false);
+
+  /**
+   * Parses the box and saves. One product per line, price after a dash.
+   *
+   * Accepts the three dashes people actually type — em dash, en dash, hyphen —
+   * and the Arabic comma, because a merchant copying a list from WhatsApp is not
+   * going to match a separator we picked. A line with no separator is still a
+   * product; it just has no price yet, which is better than refusing the line.
+   */
+  async function addProducts() {
+    const items = bulk.split(/\r?\n/).map((raw) => {
+      const line = raw.trim();
+      if (!line) return null;
+      const m = line.split(/\s*[—–\-،:]\s*/);
+      const name = (m[0] || "").trim();
+      if (!name) return null;
+      const price = m.slice(1).join(" - ").trim();
+      return { name, price_text: price || null };
+    }).filter(Boolean);
+    if (!items.length || !pageId) return;
+
+    setSavingProducts(true);
+    try {
+      const r = await fetch("/api/studio/products", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pageId, items }),
+      });
+      const d = await r.json();
+      if (d.products) {
+        setProducts((prev) => [...prev, ...d.products]);
+        setBulk("");
+      } else {
+        setError(d.error || t("تعذّر الحفظ", "Could not save"));
+      }
+    } catch {
+      setError(t("تعذّر الاتصال", "Connection failed"));
+    }
+    setSavingProducts(false);
+  }
+
+  async function removeProduct(id: string) {
+    // Removed from the list first: the row is gone from the screen the moment it
+    // is pressed, and a failed delete simply reappears on the next load.
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+    await fetch(`/api/studio/products?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
+  }
   const [open, setOpen] = useState<Post | null>(null);
 
   // Generation controls
@@ -341,17 +389,54 @@ export default function TikTokStudioPage() {
               {t("منها يختار الموظف الذكي منتج كل فيديو، ومنها يأخذ البوت السعر في ردوده.",
                  "The AI Employee picks each video's product from here, and the bot takes its prices from here too.")}
             </p>
+            {/*
+              The add box, which did not exist.
+
+              This tab was read-only, and its empty state said "أضفها من الموظف
+              الذكي" — from the screen the owner was already standing on. A dead
+              end that points at itself, on the one tab whose whole job is to
+              hold the stock that everything else reads.
+
+              A textarea rather than a form per product: a shop types thirty
+              items at once, from a list it already has, and thirty rounds of
+              name-field, price-field, Save is why catalogues stay empty. The
+              bulk endpoint already accepted an array; nothing could reach it.
+            */}
+            <textarea
+              value={bulk} onChange={(e) => setBulk(e.target.value)} rows={5}
+              placeholder={t(
+                "منتج في كل سطر، والسعر بعد شرطة:\nايفون 15 برو — 8500 دينار\nسماعة ايربودز — 450 دينار",
+                "One product per line, price after a dash:\niPhone 15 Pro — 8500\nAirPods — 450",
+              )}
+              style={{ ...ttInput(c), resize: "vertical", lineHeight: 1.9, marginBottom: 9 }}
+            />
+            <button
+              onClick={addProducts}
+              disabled={savingProducts || !bulk.trim()}
+              style={{ ...ttPrimary(rtl, savingProducts || !bulk.trim()), width: "100%" }}
+            >
+              {savingProducts ? <Loader2 size={16} className="spin" /> : <Plus size={16} />}
+              {t("أضف للكتالوج", "Add to catalogue")}
+            </button>
+
             {products.length === 0 ? (
-              <div style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.7 }}>
-                {t("لا منتجات بعد — أضفها من الموظف الذكي لتظهر في الخطة والردود.",
-                   "No products yet — add them so they appear in the plan and the replies.")}
+              <div style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.7, marginTop: 14 }}>
+                {t("الكتالوج فارغ. اكتب منتجاتك في الصندوق أعلاه — يقرأها الموظف الذكي للخطة، ويأخذ منها البوت أسعاره.",
+                   "The catalogue is empty. Type your products above — the AI Employee reads them for the plan, and the bot takes its prices from them.")}
               </div>
             ) : (
-              <div style={{ display: "grid", gap: 7 }}>
+              <div style={{ display: "grid", gap: 7, marginTop: 14 }}>
                 {products.map((p) => (
-                  <div key={p.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, background: c.surface2, borderRadius: 10, padding: "10px 12px", fontSize: 13 }}>
-                    <span>{p.name}</span>
-                    <span style={{ color: c.pinkInk, fontWeight: 700 }}>{p.price_text || "—"}</span>
+                  <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: c.surface2, borderRadius: 10, padding: "10px 12px", fontSize: 13 }}>
+                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                      <span style={{ color: c.pinkInk, fontWeight: 700 }}>{p.price_text || "—"}</span>
+                      <button
+                        onClick={() => removeProduct(p.id)}
+                        aria-label={t("حذف", "Delete")}
+                        style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", fontSize: 17, lineHeight: 1, padding: 0, fontFamily: "inherit" }}
+                      >×</button>
+                    </span>
                   </div>
                 ))}
               </div>

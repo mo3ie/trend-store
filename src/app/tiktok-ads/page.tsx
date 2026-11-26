@@ -72,8 +72,11 @@ export default function TikTokAdsPage() {
    * redirect that reports success.
    */
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get("ads_error");
+    const qs = new URLSearchParams(window.location.search);
+    const code = qs.get("ads_error");
     if (!code) return;
+    // TikTok's own numeric code, when the failure came from TikTok rather than us.
+    const tt = qs.get("tt");
     const msg: Record<string, string> = {
       cookie_mismatch: t("انقطع الربط في المنتصف — غالباً لأن نافذة أخرى من أدوات تيك توك بدأت ربطاً في نفس الوقت. أغلق بقية النوافذ واضغط «اربط حساب الإعلانات» مرة واحدة.",
                          "The link was interrupted — most likely another TikTok tools tab started a connection at the same time. Close the other tabs and press Link ad account once."),
@@ -90,6 +93,20 @@ export default function TikTokAdsPage() {
       declined:        t("رُفض الإذن من تيك توك.", "TikTok declined the permission."),
       cancelled:       t("أُلغيت عملية الربط.", "The link was cancelled."),
       not_configured:  t("ربط حساب الإعلانات غير مفعّل بعد.", "Ad-account linking is not enabled yet."),
+      /*
+       * The exchange is where a wrong environment variable shows up, and the
+       * two causes need opposite actions: 40001 means someone must fix a key in
+       * Vercel, 40002 means just press the button again. Telling the operator to
+       * "retry" on a wrong secret would have him retrying for ever.
+       */
+      exchange_failed: tt === "40001"
+        ? t("مفتاح تطبيق الإعلانات غير صحيح (40001) — يجب تصحيح TIKTOK_ADS_APP_SECRET في Vercel. إعادة المحاولة لن تفيد.",
+            "The ads app secret is wrong (40001) — TIKTOK_ADS_APP_SECRET must be fixed in Vercel. Retrying will not help.")
+        : tt === "40002"
+          ? t("انتهت صلاحية رمز الإذن أو استُعمل (40002). اضغط «اربط حساب الإعلانات» وأكمل دون توقّف.",
+              "The authorization code expired or was already used (40002). Press Link ad account and finish without pausing.")
+          : t(`رفضت تيك توك إتمام الربط${tt ? ` (رمز ${tt})` : ""}. أرسل لي الرقم.`,
+              `TikTok refused to finish the link${tt ? ` (code ${tt})` : ""}. Send me that number.`),
     };
     /*
      * The rule guards against cascading renders. This runs once on mount, only

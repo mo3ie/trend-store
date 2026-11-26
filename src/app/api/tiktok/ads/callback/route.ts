@@ -25,8 +25,21 @@ import { siteUrl } from "@/lib/siteUrl";
  * text is reflected into the URL.
  */
 
-function fail(code: string): NextResponse {
-  const res = NextResponse.redirect(siteUrl(`/tiktok-ads?ads_error=${code}`));
+/**
+ * `tt` carries TikTok's own numeric error code when there is one.
+ *
+ * The rule in this file is that no upstream TEXT is reflected into the URL, and
+ * it stands — error text can carry request values. A numeric code carries
+ * nothing but the cause, and it is the single most useful fact there is: 40001
+ * means the app secret is wrong, 40002 that the auth code is spent or invalid.
+ *
+ * Without it the operator saw "تعذّر إكمال الربط. أعد المحاولة." four times and
+ * had no way to know whether to re-press the button or fix an environment
+ * variable, and I had to read production tables to guess.
+ */
+function fail(code: string, tt?: number | null): NextResponse {
+  const q = tt ? `&tt=${encodeURIComponent(String(tt))}` : "";
+  const res = NextResponse.redirect(siteUrl(`/tiktok-ads?ads_error=${code}${q}`));
   res.cookies.set(ADS_OAUTH_STATE_COOKIE, "", stateCookieOptions(0));
   return res;
 }
@@ -109,8 +122,11 @@ export async function GET(req: NextRequest) {
     return res;
   } catch (err) {
     // Safe server-side log only: endpoint, HTTP status, TikTok code, request id.
-    if (err instanceof TikTokAdsError) console.error(err.toLogLine(userId));
-    else console.error("tiktok_ads_callback_failed kind=internal");
+    if (err instanceof TikTokAdsError) {
+      console.error(err.toLogLine(userId));
+      return fail("exchange_failed", err.ttCode ?? null);
+    }
+    console.error("tiktok_ads_callback_failed kind=internal");
     return fail("exchange_failed");
   }
 }
