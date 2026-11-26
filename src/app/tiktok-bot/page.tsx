@@ -15,7 +15,7 @@ import {
 import {
   AccountStrip, ScreenTitle, TabStrip, SubscribeBar, Chip,
 } from "@/components/tiktok/TikTokKit";
-import { ReplySimulator, ReplyThread, type ThreadValue } from "@/components/tiktok/ReplyThread";
+import { ReplyThread, type ThreadValue } from "@/components/tiktok/ReplyThread";
 import {
   BannedWordsEditor, CatalogPanel, ReplyGroupsEditor, type ReplyGroup,
 } from "@/components/bot/ReplySettings";
@@ -104,7 +104,19 @@ function TikTokBotInner() {
   const [config, setConfig] = useState<Config | null>(null);
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"try" | "videos" | "rules" | "smart" | "private" | "queue" | "activity" | "settings">("try");
+  /*
+   * Five doors, not eight.
+   *
+   * The screen had: Try it, Videos, Rules, Smart reply, Private reply, Queue,
+   * Activity, Settings — and the owner reported it exactly as it reads, "تدويخ".
+   * Rules and Smart reply are one subject (which comment gets which answer) split
+   * across two tabs, and "Try it" was a simulator sharing a screen with the
+   * default reply, so the one field he actually had to fill was behind a toy.
+   *
+   * Videos leads now, because that is where the work is: a shop has twenty
+   * products, each is a video, and each needs its own price.
+   */
+  const [tab, setTab] = useState<"videos" | "replies" | "private" | "queue" | "activity" | "settings">("videos");
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [webhook, setWebhook] = useState<{ subscribed: boolean; last_event_at: string | null } | null>(null);
@@ -132,10 +144,12 @@ function TikTokBotInner() {
   const [linking, setLinking] = useState(false);
 
   // Simulator
-  const [probe, setProbe] = useState("");
-  const [simReply, setSimReply] = useState<string | null>(null);
-  const [simSource, setSimSource] = useState<string | null>(null);
-  const [simBusy, setSimBusy] = useState(false);
+  /*
+   * The comment the reply preview is written against. It used to be typed into
+   * the simulator; with that gone it stays empty, and ReplyThread falls back to
+   * its own example — which is what the owner saw first anyway.
+   */
+  const [probe] = useState("");
 
   // Default reply, as a thread
   const [thread, setThread] = useState<ThreadValue>({ variants: [""], like: false });
@@ -188,24 +202,6 @@ function TikTokBotInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Debounced so the simulator does not fire a request per keystroke.
-  useEffect(() => {
-    if (!probe.trim()) { setSimReply(null); setSimSource(null); return; }
-    setSimBusy(true);
-    const id = setTimeout(async () => {
-      try {
-        const r = await fetch("/api/tiktok/bot/simulate", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pageId: pageId || undefined, text: probe }),
-        });
-        const d = await r.json();
-        setSimReply(d.reply ?? d.message ?? null);
-        setSimSource(d.source ?? null);
-      } catch { /* leave the previous answer standing */ }
-      setSimBusy(false);
-    }, 350);
-    return () => clearTimeout(id);
-  }, [probe, pageId]);
 
   // Loaded when the tab is opened rather than on mount: it is a live TikTok call, and
   // an owner who never opens the tab should not pay for it on every page view.
@@ -507,10 +503,8 @@ function TikTokBotInner() {
         <TabStrip
           c={c} value={tab} onChange={setTab}
           tabs={[
-            { key: "try" as const,      label: t("التجربة والردّ", "Try it & reply") },
             { key: "videos" as const,   label: t("الفيديوهات", "Videos") },
-            { key: "rules" as const,    label: `${t("القواعد", "Rules")}${rules.length ? ` (${rules.length})` : ""}` },
-            { key: "smart" as const,    label: t("الردّ الذكي", "Smart reply") },
+            { key: "replies" as const,  label: `${t("الردود", "Replies")}${rules.length ? ` (${rules.length})` : ""}` },
             { key: "private" as const,  label: t("الردّ الخاص", "Private reply") },
             ...((config?.private_delivery || "off") === "assist"
               ? [{ key: "queue" as const, label: t("طابور الرسائل", "Queue") }]
@@ -521,46 +515,8 @@ function TikTokBotInner() {
         />
 
         {/* ── TRY + the default reply ──────────────────────────────────────── */}
-        {tab === "try" && (
-          <>
-            <ReplySimulator
-              c={c} t={t} rtl={rtl} handle={handle}
-              onProbe={setProbe} reply={simReply} source={simSource} busy={simBusy}
-            />
-
-            <div style={{ ...ttCard(c), padding: 16, marginTop: 14 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-                {t("الردّ الافتراضي", "The default reply")}
-              </div>
-              <ReplyThread
-                value={thread} onChange={setThread}
-                c={c} t={t} rtl={rtl}
-                handle={handle} avatarUrl={st?.account?.avatarUrl}
-                triggerComment={probe}
-                hasProduct={config?.catalog_match !== "off"}
-                onInsertPrice={() => {
-                  const v = [...thread.variants];
-                  const i = 0;
-                  v[i] = `${(v[i] || "").trim()} {السعر}`.trim();
-                  setThread({ ...thread, variants: v });
-                }}
-              />
-              <button onClick={saveThread} disabled={saving}
-                style={{ ...ttPrimary(rtl, saving), width: "100%", marginTop: 16 }}>
-                {saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />} {t("حفظ", "Save")}
-              </button>
-            </div>
-
-            {/*
-              The per-video editor used to live on a second screen reached from here.
-              It is a tab now, so this button is gone: two doors to the same room read
-              as two different rooms, which is exactly how it was reported.
-            */}
-          </>
-        )}
-
         {/* ── RULES ────────────────────────────────────────────────────────── */}
-        {tab === "rules" && (
+        {tab === "replies" && (
           <div>
             <p style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.75, margin: "0 0 14px" }}>
               {t("كل قاعدة: كلمات يبحث عنها البوت في التعليق، وردّ علني يُنشره تحته.",
@@ -670,6 +626,42 @@ function TikTokBotInner() {
         {/* ── VIDEOS: a reply of its own for each video ─────────────── */}
         {tab === "videos" && (
           <>
+            {/*
+              The default reply, moved here from the old "Try it" tab.
+
+              It belongs above the grid and nowhere else: this is the answer every
+              video uses until one is given its own, so the owner should read it
+              immediately before he starts overriding it. On its old screen it sat
+              under a simulator, which meant the one field he had to fill was
+              behind a toy that answered questions he had not asked.
+            */}
+            <div style={{ ...ttCard(c), padding: 16, marginBottom: 14 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+                {t("الردّ الافتراضي — لكل الفيديوهات", "The default reply — for every video")}
+              </div>
+              <p style={{ fontSize: 12, color: c.muted, lineHeight: 1.75, margin: "0 0 12px" }}>
+                {t("يُنشر تحت أي تعليق على أي فيديو ليس له ردّ خاص. اضغط فيديو من الشبكة أسفله لتعطيه ردّاً وسعراً خاصّين به.",
+                   "Posted under any comment on any video that has no reply of its own. Tap a video in the grid below to give it its own reply and price.")}
+              </p>
+              <ReplyThread
+                value={thread} onChange={setThread}
+                c={c} t={t} rtl={rtl}
+                handle={handle} avatarUrl={st?.account?.avatarUrl}
+                triggerComment={probe}
+                hasProduct={config?.catalog_match !== "off"}
+                onInsertPrice={() => {
+                  const v = [...thread.variants];
+                  const i = 0;
+                  v[i] = `${(v[i] || "").trim()} {السعر}`.trim();
+                  setThread({ ...thread, variants: v });
+                }}
+              />
+              <button onClick={saveThread} disabled={saving}
+                style={{ ...ttPrimary(rtl, saving), width: "100%", marginTop: 16 }}>
+                {saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />} {t("حفظ", "Save")}
+              </button>
+            </div>
+
             {!st?.account ? (
               <div style={{ ...ttCard(c), padding: 24, textAlign: "center" }}>
                 <Video size={22} color={c.muted} />
@@ -793,7 +785,7 @@ function TikTokBotInner() {
         )}
 
         {/* ── SMART REPLY: keyword groups, banned words, catalog, AI ─────── */}
-        {tab === "smart" && config && (
+        {tab === "replies" && config && (
           <div style={{ display: "grid", gap: 14 }}>
             {/* Keyword groups: different answers for different questions. */}
             <div style={{ ...ttCard(c), padding: 16 }}>
