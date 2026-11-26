@@ -7,16 +7,35 @@ export const dynamic = "force-dynamic";
 type Params = Promise<{ token: string }>;
 
 /**
- * The WhatsApp button, as a redirect rather than a direct `wa.me` href.
+ * Records that a customer pressed "order on WhatsApp".
  *
- * One hop buys the only number in the funnel that means money: how many people
- * who SAW the price went on to ask for the product. Without it the merchant can
- * count comments and opens and still not know whether any of it sells — which is
- * the exact blindness that makes Facebook's private reply impossible to judge.
+ * That count is the only number in the funnel which means money: how many people
+ * who SAW the price went on to ask for the product. Without it a merchant can
+ * count comments and opens and still not know whether any of it sells.
  *
- * The hop is recorded, never gated: a tracking failure must not cost a sale, so
- * the redirect happens whether or not the write succeeded.
+ * ## It is no longer the navigation path
+ *
+ * It used to be: the button linked here and this redirected to wa.me. The
+ * customer arrives inside TikTok's in-app browser, which REFUSES to follow a
+ * redirect off our origin — the live result was a grey shield reading "TikTok
+ * can't open this page directly". The customer had the price, wanted to order,
+ * and hit a wall at the last step.
+ *
+ * The button now points straight at wa.me and calls this as a beacon alongside.
+ * Measurement must never stand between a customer and a purchase. The redirect
+ * is kept for anything still linking here directly, so no old link breaks.
  */
+/** The beacon. `navigator.sendBeacon` issues a POST, so this is the hot path now. */
+export async function POST(req: NextRequest, { params }: { params: Params }) {
+  const { token } = await params;
+  if (token && token.length <= 32) {
+    await supabaseAdmin.rpc("mark_private_link_whatsapp", { p_token: token })
+      .then(() => undefined, () => undefined);
+  }
+  // 204: a beacon's response is discarded, and the page is already navigating away.
+  return new NextResponse(null, { status: 204 });
+}
+
 export async function GET(_req: NextRequest, { params }: { params: Params }) {
   const { token } = await params;
   if (!token || token.length > 32) return NextResponse.redirect(new URL("/", _req.url));

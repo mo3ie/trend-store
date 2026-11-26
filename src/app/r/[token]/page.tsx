@@ -2,6 +2,8 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { whatsappUrl } from "@/lib/privateLinks";
+import { loadShopFacts } from "@/services/shopFacts";
+import { OrderActions, CopyPrice } from "./OrderActions";
 
 /**
  * The page behind a private reply link.
@@ -68,6 +70,7 @@ export default async function PrivateReplyPage({ params }: { params: Params }) {
   if (r.state !== "ok") return <Closed state={r.state} />;
 
   const wa = r.whatsapp ? whatsappUrl(r.whatsapp, r.whatsapp_text ?? null, token) : null;
+  const shop = await loadShopIdentity(token);
 
   return (
     <Shell>
@@ -75,13 +78,41 @@ export default async function PrivateReplyPage({ params }: { params: Params }) {
         background: C.card, border: `1px solid ${C.border}`, borderRadius: 18,
         padding: "22px 20px", boxShadow: "0 18px 40px rgba(0,0,0,.35)",
       }}>
-        {r.brand && (
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: C.accent, letterSpacing: ".3px", marginBottom: 12 }}>
-            {r.brand}
-          </div>
-        )}
+        {/*
+          The shop, with its face.
 
-        <div style={{ fontSize: 19, fontWeight: 800, color: C.text, marginBottom: 14 }}>
+          This page was a floating dark card with a red line of text on it, and a
+          stranger arriving from a comment had no way to tell whose shop it was or
+          whether it was real. The avatar and the name are the cheapest trust this
+          page can buy, and the merchant has already given us both — the avatar
+          from the TikTok account they linked, the rest from the profile they fill
+          in for the bot. Nothing new to type.
+        */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+          {shop.avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={shop.avatar} alt="" width={46} height={46}
+              style={{ width: 46, height: 46, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: `1px solid ${C.border}` }} />
+          ) : (
+            <div style={{
+              width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
+              background: C.accent, color: "#fff", display: "flex", alignItems: "center",
+              justifyContent: "center", fontSize: 19, fontWeight: 800,
+            }}>
+              {(shop.name || r.brand || "T").trim().charAt(0)}
+            </div>
+          )}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.text, lineHeight: 1.4 }}>
+              {shop.name || r.brand || "متجرنا"}
+            </div>
+            {shop.handle && (
+              <div style={{ fontSize: 12.5, color: C.muted, direction: "ltr", textAlign: "right" }}>@{shop.handle}</div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ fontSize: 19, fontWeight: 800, color: C.text, marginBottom: 12 }}>
           {r.name ? `أهلاً ${r.name} 👋` : "أهلاً بك 👋"}
         </div>
 
@@ -91,24 +122,36 @@ export default async function PrivateReplyPage({ params }: { params: Params }) {
           unreadable on a phone.
         */}
         <div style={{
-          fontSize: 16, lineHeight: 1.85, color: C.text, whiteSpace: "pre-wrap",
+          fontSize: 17, lineHeight: 1.85, color: C.text, whiteSpace: "pre-wrap",
           wordBreak: "break-word", background: "#0f1424", border: `1px solid ${C.border}`,
-          borderRadius: 13, padding: "15px 16px",
+          borderRadius: 13, padding: "16px 16px 10px",
         }}>
           {r.body}
+          <div style={{ display: "flex", justifyContent: "flex-start", marginTop: 4 }}>
+            <CopyPrice body={r.body || ""} c={C} />
+          </div>
         </div>
 
-        {wa && (
-          <a
-            href={`/api/r/${token}/wa`}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
-              marginTop: 16, background: C.wa, color: "#06281a", textDecoration: "none",
-              borderRadius: 12, padding: "14px 18px", fontSize: 16, fontWeight: 800,
-            }}
-          >
-            <WhatsAppIcon /> اطلب الآن على واتساب
-          </a>
+        {wa && r.whatsapp && (
+          <OrderActions token={token} waUrl={wa} phone={r.whatsapp} c={C} />
+        )}
+
+        {/*
+          Everything else the shop already told us. A customer who has just learned
+          a price is one question away from "where are you" and "when do you open",
+          and sending them back to a comment thread to ask it is how a sale
+          evaporates. None of this is a price, so none of it is a leak.
+        */}
+        {(shop.addresses.length > 0 || shop.phones.length > 0 || shop.hours || shop.extra) && (
+          <div style={{
+            marginTop: 16, background: "#0f1424", border: `1px solid ${C.border}`,
+            borderRadius: 13, padding: "14px 16px",
+          }}>
+            {shop.addresses.map((a) => <Fact key={a} icon="📍" value={a} />)}
+            {shop.phones.map((n) => <Fact key={n} icon="📞" value={n} ltr />)}
+            {shop.hours && <Fact icon="🕐" value={shop.hours} />}
+            {shop.extra && <Fact icon="🚚" value={shop.extra} />}
+          </div>
         )}
 
         {/*
@@ -147,6 +190,76 @@ export default async function PrivateReplyPage({ params }: { params: Params }) {
  * reads as a broken shop. Each case below names the cause and gives the one action
  * that works — commenting again, which is also what the merchant wants.
  */
+/** One line of shop detail. */
+function Fact({ icon, value, ltr }: { icon: string; value: string; ltr?: boolean }) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "6px 0" }}>
+      <span style={{ fontSize: 15, lineHeight: 1.6, flexShrink: 0 }} aria-hidden>{icon}</span>
+      <span style={{
+        fontSize: 14, color: C.text, lineHeight: 1.8, wordBreak: "break-word",
+        whiteSpace: "pre-wrap",
+        ...(ltr ? { direction: "ltr" as const, textAlign: "right" as const } : {}),
+      }}>{value}</span>
+    </div>
+  );
+}
+
+interface ShopIdentity {
+  name: string | null;
+  handle: string | null;
+  avatar: string | null;
+  addresses: string[];
+  phones: string[];
+  hours: string | null;
+  extra: string | null;
+}
+
+/**
+ * Who this shop is, assembled from what the merchant has already filled in.
+ *
+ * Read with its OWN query, never through `open_private_link`: that RPC spends one
+ * of the customer's opens, and loading a logo must not cost someone their price.
+ *
+ * Every failure returns empties rather than throwing. The price is what the
+ * customer came for; a missing avatar or an unreachable profile must never be
+ * the reason they see an error instead.
+ */
+async function loadShopIdentity(token: string): Promise<ShopIdentity> {
+  const empty: ShopIdentity = {
+    name: null, handle: null, avatar: null, addresses: [], phones: [], hours: null, extra: null,
+  };
+  try {
+    const { data: link } = await supabaseAdmin
+      .from("private_links").select("user_id, page_id, platform, brand_name")
+      .eq("token", token).maybeSingle();
+    if (!link?.user_id) return empty;
+
+    const [facts, account] = await Promise.all([
+      loadShopFacts(link.user_id as string, link.page_id as string | null).catch(() => null),
+      link.platform === "tiktok" && link.page_id
+        ? supabaseAdmin.from("tiktok_accounts")
+            .select("display_name, username, avatar_url")
+            .eq("tiktok_account_id", link.page_id).eq("user_id", link.user_id)
+            .maybeSingle().then((x) => x.data, () => null)
+        : Promise.resolve(null),
+    ]);
+
+    return {
+      // The merchant's own brand name wins over the TikTok display name: it is
+      // the one they chose for customers, not the one the platform shows.
+      name: facts?.brandName || account?.display_name || (link.brand_name as string | null) || null,
+      handle: account?.username || null,
+      avatar: account?.avatar_url || null,
+      addresses: facts?.addresses ?? [],
+      phones: facts?.phones ?? [],
+      hours: facts?.hours ?? null,
+      extra: facts?.extra ?? null,
+    };
+  } catch {
+    return empty;
+  }
+}
+
 function Closed({ state }: { state: OpenResult["state"] }) {
   const copy =
     state === "expired"
@@ -178,13 +291,5 @@ function Shell({ children }: { children: React.ReactNode }) {
     }}>
       <div style={{ width: "100%", maxWidth: 440 }}>{children}</div>
     </div>
-  );
-}
-
-function WhatsAppIcon() {
-  return (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884a9.825 9.825 0 016.993 2.898 9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.889 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-    </svg>
   );
 }

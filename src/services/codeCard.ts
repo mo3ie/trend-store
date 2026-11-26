@@ -1,5 +1,7 @@
 import sharp from "sharp";
 import QRCode from "qrcode";
+import opentype from "opentype.js";
+import { CARD_FONT_B64 } from "@/assets/fonts/cardFont";
 
 /**
  * The picture the bot posts under a comment: the code, big, and a QR beside it.
@@ -56,14 +58,59 @@ const TEXT = "#f2f4f8";
 const MUTED = "#98a0b8";
 const ACCENT = "#fe2c55";
 
-/**
- * Escapes the five XML characters. Every string here comes from the merchant's
- * own settings, and an unescaped `&` in a shop name produces not a wrong card but
- * an invalid document that sharp refuses outright.
+/*
+ * Parsed once per process, not per card. Parsing is ~1ms and a busy video can
+ * mint dozens of cards a minute; there is no reason to pay it each time.
  */
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+let FONT: opentype.Font | null = null;
+function font(): opentype.Font {
+  if (!FONT) {
+    const bytes = Buffer.from(CARD_FONT_B64, "base64");
+    FONT = opentype.parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length));
+  }
+  return FONT;
+}
+
+/**
+ * One line of text, as <path> data rather than <text>.
+ *
+ * This is the whole fix for the empty-box card: a path carries its own shape, so
+ * the renderer needs no font, no fontconfig and no system font directory. Nothing
+ * is left that can be absent.
+ *
+ * `letterSpacing` is applied by drawing glyph by glyph, because opentype's
+ * getPath has no notion of tracking and the five-character code wants air
+ * between its letters to be read off a phone at a glance.
+ */
+function textPath(
+  text: string, x: number, y: number, size: number, fill: string, letterSpacing = 0,
+): string {
+  const f = font();
+  if (!letterSpacing) {
+    const d = f.getPath(text, x, y, size).toPathData(2);
+    return d ? `<path d="${d}" fill="${fill}"/>` : "";
+  }
+  let cursor = x;
+  const parts: string[] = [];
+  for (const ch of text) {
+    const d = f.getPath(ch, cursor, y, size).toPathData(2);
+    if (d) parts.push(`<path d="${d}" fill="${fill}"/>`);
+    cursor += f.getAdvanceWidth(ch, size) + letterSpacing;
+  }
+  return parts.join("");
+}
+
+/** Width of a line as it will actually be drawn, for fitting and centring. */
+function textWidth(text: string, size: number, letterSpacing = 0): number {
+  const w = font().getAdvanceWidth(text, size);
+  return w + Math.max(0, [...text].length - 1) * letterSpacing;
+}
+
+/** Largest size at or below `max` that fits `maxWidth`. Long shop names shrink. */
+function fitSize(text: string, max: number, maxWidth: number, letterSpacing = 0): number {
+  let size = max;
+  while (size > 8 && textWidth(text, size, letterSpacing) > maxWidth) size -= 2;
+  return size;
 }
 
 /**
@@ -123,27 +170,41 @@ export async function renderCodeCard(input: CodeCardInput): Promise<Uint8Array |
     const qr = await qrFragment(input.url, W - qrSize - 90, H - qrSize - 90, qrSize);
 
     /*
-     * Font stack, widest-net first. DejaVu ships with practically every Linux
-     * image; Liberation and Arial cover the rest; the generic families are the
-     * floor. No webfont is referenced: librsvg would have to fetch it, and a
-     * network call inside image rendering is a failure waiting for a bad day.
+     * Every line is drawn as paths — see textPath. There is no font-family
+     * anywhere in this document on purpose: the previous version named a stack
+     * five deep and every single one was missing on the render host.
+     *
+     * The code is sized to FIT rather than fixed at 190px. A six-character code
+     * at a fixed size silently overran the card's right edge and sat under the
+     * QR; letting it shrink means the card cannot be broken by its own content.
      */
-    const mono = "DejaVu Sans Mono, Liberation Mono, Courier New, monospace";
-    const sans = "DejaVu Sans, Liberation Sans, Arial, Helvetica, sans-serif";
+    const PAD = 90;
+    const INNER = W - PAD * 2;
+    const codeSpacing = 14;
+    const codeSize = fitSize(code, 190, INNER - 40, codeSpacing);
+    const brandSize = brand ? fitSize(brand, 46, INNER) : 0;
+    const domainSize = fitSize(domain, 46, INNER);
+
+    const yBrand = 190;
+    const yLabel = brand ? 262 : 210;
+    const yCode = (brand ? 470 : 430) - (190 - codeSize) * 0.35;
+    const yRule = yCode + 52;
+    const yAt = yRule + 86;
+    const yDomain = yAt + 66;
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <rect width="${W}" height="${H}" fill="${BG}"/>
   <rect x="48" y="48" width="${W - 96}" height="${H - 96}" rx="48" fill="${CARD}" stroke="${BORDER}" stroke-width="3"/>
   <rect x="48" y="48" width="${W - 96}" height="14" rx="7" fill="${ACCENT}"/>
-  ${brand ? `<text x="90" y="190" font-family="${sans}" font-size="46" font-weight="bold" fill="${TEXT}">${esc(brand)}</text>` : ""}
-  <text x="90" y="${brand ? 262 : 210}" font-family="${sans}" font-size="38" fill="${MUTED}">YOUR CODE</text>
-  <text x="90" y="${brand ? 470 : 430}" font-family="${mono}" font-size="190" font-weight="bold" fill="${TEXT}" letter-spacing="14">${esc(code)}</text>
-  <rect x="90" y="${brand ? 520 : 480}" width="${W - 180}" height="2" fill="${BORDER}"/>
-  <text x="90" y="${brand ? 606 : 566}" font-family="${sans}" font-size="40" fill="${MUTED}">Enter it at</text>
-  <text x="90" y="${brand ? 672 : 632}" font-family="${sans}" font-size="46" font-weight="bold" fill="${ACCENT}">${esc(domain)}</text>
+  ${brand ? textPath(brand, PAD, yBrand, brandSize, TEXT) : ""}
+  ${textPath("YOUR CODE", PAD, yLabel, 38, MUTED)}
+  ${textPath(code, PAD, yCode, codeSize, TEXT, codeSpacing)}
+  <rect x="${PAD}" y="${yRule}" width="${INNER}" height="2" fill="${BORDER}"/>
+  ${textPath("Enter it at", PAD, yAt, 40, MUTED)}
+  ${textPath(domain, PAD, yDomain, domainSize, ACCENT)}
   <rect x="${W - qrSize - 138}" y="${H - qrSize - 138}" width="${qrSize + 96}" height="${qrSize + 96}" rx="28" fill="#ffffff"/>
   ${qr}
-  <text x="90" y="${H - 110}" font-family="${sans}" font-size="32" fill="${MUTED}">or scan →</text>
+  ${textPath("or scan the code", PAD, H - 110, 32, MUTED)}
 </svg>`;
 
     const png = await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toBuffer();
