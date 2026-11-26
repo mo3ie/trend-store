@@ -11,12 +11,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Megaphone, MessageCircleReply, Bot, Check, Link2, Bell, Target, Receipt, CalendarClock, Inbox,
-  BarChart3, Music2, Moon, Sun, Home, ChevronLeft, ChevronRight, ChevronDown, Wallet, BadgeCheck, Sparkles,
+  BarChart3, Music2, ChevronLeft, ChevronRight, ChevronDown, Wallet, BadgeCheck,
 } from "lucide-react";
 import RobotCanvas, { type RobotApi } from "@/components/holo/RobotCanvas";
 import TrendyChat from "@/components/holo/TrendyChat";
-import NotificationBell from "@/components/NotificationBell";
-import LangToggle from "@/components/LangToggle";
+import FbHeader from "@/components/fb/FbHeader";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import { AD_TIER_PACKAGES } from "@/services/campaigns";
@@ -88,11 +87,6 @@ export default function FacebookToolsPage() {
     setTimeout(() => bot.current?.setMood(next ? "confirm" : "neutral"), 1200);
     if (next) setTimeout(() => document.getElementById(`tool-${next}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 900);
   };
-  const toggleTheme = () => {
-    const nextLight = dark;
-    document.documentElement.classList.toggle("light", nextLight);
-    try { localStorage.setItem("theme", nextLight ? "light" : "dark"); } catch {}
-  };
 
   const n = (v: number) => v.toLocaleString(lang === "ar" ? "ar-LY" : "en-US");
   const priceBot = planMin.bot ?? 50, priceStudio = planMin.studio ?? 250;
@@ -152,29 +146,7 @@ export default function FacebookToolsPage() {
     <div className="fbx" dir={rtl ? "rtl" : "ltr"} style={vars}>
       <style>{CSS}</style>
 
-      {/* header */}
-      <header className="fbx-head">
-        <div className="fbx-wrap fbx-head-in">
-          <a href="/facebook" className="fbx-brand" aria-label={t("أدوات فيسبوك", "Facebook Tools")}>
-            <span className="fbx-logo"><Megaphone size={18} color="#fff" /></span>
-            <span><b>{t("أدوات فيسبوك", "Facebook Tools")}</b><small>{t("من محل ترند", "by Trend Store")}</small></span>
-          </a>
-          <nav className="fbx-nav" aria-label={t("الأدوات", "Tools")}>
-            <a className="on" href="/facebook">{t("الرئيسية", "Home")}</a>
-            <a href="/ads">{t("الإعلانات", "Ads")}</a>
-            <a href="/bot">{t("الرد الآلي", "Auto-Reply")}</a>
-            <a href="/studio">{t("الموظف الذكي", "AI Employee")}</a>
-            <a href="/subscriptions">{t("الاشتراكات", "Subscriptions")}</a>
-          </nav>
-          <div className="fbx-tools">
-            <a href="/" className="fbx-ghost"><Home size={16} /> <span className="fbx-hide-sm">{t("المتجر", "Store")}</span></a>
-            <LangToggle />
-            <button type="button" className="fbx-icon" onClick={toggleTheme} aria-label={t("تبديل الوضع الداكن", "Toggle dark mode")}>{dark ? <Sun size={17} /> : <Moon size={17} />}</button>
-            <span className="fbx-icon fbx-bell"><NotificationBell /></span>
-            <a href={signed ? "/account" : "/login?next=/facebook"} className="fbx-avatar" aria-label={t("حسابي", "My account")}>{(ov?.name || "؟").trim().slice(0, 1) || "؟"}<ChevronDown size={13} /></a>
-          </div>
-        </div>
-      </header>
+      <FbHeader active="home" mobileNav />
 
       <main className="fbx-wrap fbx-main">
         {/* HERO + Trendy */}

@@ -9,11 +9,13 @@ import {
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import { botColors } from "@/lib/botTheme";
-import LangToggle from "@/components/LangToggle";
+import FbHeader, { FbPageHead } from "@/components/fb/FbHeader";
+import AdsBottomNav from "@/components/AdsBottomNav";
 import { startPageConnect } from "@/lib/connectPage";
+import { FB_FONT, G_BOT } from "@/lib/fbTheme";
 
-const BLUE     = "#1877f2";
-const GREEN    = "#22c55e";
+const BLUE     = "#438DF5";
+const GREEN    = "#20BE83";
 
 interface Sub { status: string; expires_at: string | null; }
 interface Config { id: string; enabled: boolean; }
@@ -36,7 +38,6 @@ export default function BotDashboard() {
   const CARD_BG = c.card;
   const router = useRouter();
   const { t, rtl } = useLang();
-  const Back = rtl ? ArrowLeft : ArrowRight;
   const [pages, setPages]   = useState<PageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [price, setPrice]   = useState(50);
@@ -69,24 +70,23 @@ export default function BotDashboard() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: GRADIENT, color: c.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80 }}>
-      <div style={{ padding: "20px 24px", borderBottom: `1px solid ${c.borderSoft}`, display: "flex", alignItems: "center", gap: 12 }}>
-        <button onClick={() => router.push("/")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-          <Back size={18} /> {t("رجوع", "Back")}
-        </button>
-        <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
-          <Bot size={20} color={BLUE} /> {t("بوت الرد الآلي", "Auto-Reply Bot")}
-        </h1>
-        <div style={{ marginInlineStart: "auto" }}><LangToggle /></div>
-      </div>
+    <div style={{ minHeight: "100vh", background: GRADIENT, color: c.text, fontFamily: FB_FONT, direction: rtl ? "rtl" : "ltr", paddingBottom: 96 }}>
+      <FbHeader active="bot" />
+      <FbPageHead
+        crumbs={[{ label: t("الرد الآلي", "Auto-Reply") }]}
+        icon={<Bot size={24} />}
+        accent={GREEN}
+        title={t("بوت الرد الآلي", "Auto-Reply Bot")}
+        desc={t("اختر الصفحة التي تريد تشغيل الرد الآلي عليها، ثم اضبط ردودها.", "Pick the Page to run auto-replies on, then set its replies.")}
+      />
 
-      <div style={{ maxWidth: 720, margin: "0 auto", padding: "36px 24px" }}>
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "20px 16px 24px" }}>
         {/* Hero */}
-        <div style={{ background: `linear-gradient(135deg, ${BLUE}22, #6b46c122)`, border: `1px solid ${BLUE}33`, borderRadius: 20, padding: 28, marginBottom: 28 }}>
+        <div style={{ background: `linear-gradient(135deg, ${GREEN}1f, ${BLUE}14)`, border: `1px solid ${GREEN}33`, borderRadius: 20, padding: 28, marginBottom: 28 }}>
           <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 10px" }}>
-            {t("ردّ تلقائي على كل تعليق ورسالة", "Auto-reply to every comment & DM")}
+            {t("ردّ تلقائي على كل تعليق", "Auto-reply to every comment")}
           </h2>
-          <p style={{ color: "#cbd5e1", fontSize: 14, lineHeight: 1.9, margin: "0 0 18px" }}>
+          <p style={{ color: c.muted, fontSize: 14, lineHeight: 1.9, margin: "0 0 18px" }}>
             {t(
               "يرد البوت على تعليقات صفحتك تلقائياً ويرسل السعر والتفاصيل في الخاص فوراً — على مدار الساعة، دون أن تفوتك أي فرصة بيع.",
               "The bot replies to your Page comments and instantly sends the price & details in a private message — 24/7, so you never miss a sale.",
@@ -95,11 +95,11 @@ export default function BotDashboard() {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
             {([
               [MessageSquare, t("رد علني + رسالة خاصة", "Public reply + private DM")],
-              [Zap, t("تبديل تلقائي بين الحسابات ضد الحظر", "Auto account-switch anti-block")],
+              [Zap, t("تبديل تلقائي بين الحسابات للحد من الحظر", "Auto account-switch to reduce blocks")],
               [Sparkles, t("ردود ذكية بالذكاء الاصطناعي", "Smart AI replies")],
               [ShieldCheck, t("صلاحيات فيسبوك رسمية", "Official Facebook permissions")],
             ] as Array<[React.ComponentType<{ size?: number; color?: string }>, string]>).map(([Icon, label], i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#e2e8f0" }}>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: c.text }}>
                 <Icon size={16} color={BLUE} /> {label}
               </div>
             ))}
@@ -118,14 +118,14 @@ export default function BotDashboard() {
               {t("اربط صفحة فيسبوك أولاً لتفعيل البوت عليها", "Connect a Facebook Page first to enable the bot on it")}
             </p>
             <button onClick={() => startPageConnect("/bot")}
-              style={{ background: `linear-gradient(135deg, ${BLUE}, #1565c0)`, border: "none", borderRadius: 12, padding: "13px 26px", color: c.text, fontWeight: 700, fontSize: 15, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
+              style={{ background: G_BOT, border: "none", borderRadius: 12, padding: "13px 26px", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
               <Plus size={18} /> {t("ربط صفحة", "Connect a Page")}
             </button>
           </div>
         ) : (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 14px", flexWrap: "wrap" }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#cbd5e1", margin: 0 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: c.muted, margin: 0 }}>
                 {t("صفحاتك", "Your Pages")} ({pages.length})
               </h3>
               <button onClick={() => startPageConnect("/bot")}
@@ -182,6 +182,7 @@ export default function BotDashboard() {
       </div>
 
       <style>{`@keyframes spin-anim { to { transform: rotate(360deg); } } .spin { animation: spin-anim 1s linear infinite; }`}</style>
+      <AdsBottomNav />
     </div>
   );
 }

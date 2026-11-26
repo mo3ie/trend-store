@@ -10,14 +10,14 @@ import {
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
-import LangToggle from "@/components/LangToggle";
+import FbHeader, { FbPageHead } from "@/components/fb/FbHeader";
 import AdsBottomNav from "@/components/AdsBottomNav";
 import WalletModal from "@/components/WalletModal";
 import { startPageConnect } from "@/lib/connectPage";
+import { G_STUDIO as G_HERO, fbPalette, FB_FONT, ACCENT } from "@/lib/fbTheme";
+const PINK = ACCENT.studio.main;
+const PINK_BG = ACCENT.studio.bg;
 
-const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
-const PINK    = "#d6409f";
-const PINK_BG = "rgba(214,64,159,0.12)";
 
 interface Page { id?: string; page_id: string; page_name: string; page_picture?: string | null; platform?: "meta" | "tiktok"; account_id?: string | null; }
 interface Product { id: string; category?: string; name: string; price_text?: string; description?: string; images?: string[]; active?: boolean; available?: boolean; }
@@ -78,13 +78,7 @@ export default function StudioPage() {
   const { light } = useTheme();
   const Back = rtl ? ArrowLeft : ArrowRight;
 
-  const c = light ? {
-    bg: "#fbf7ff", text: "#1e1330", muted: "#6b5b78", dim: "#8b7d97",
-    surface: "#ffffff", border: "rgba(120,60,160,0.14)", inputBg: "#f4eefb", menuBg: "#ffffff",
-  } : {
-    bg: "#100a18", text: "#f6eefb", muted: "#a394b0", dim: "#7a6d88",
-    surface: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.10)", inputBg: "rgba(255,255,255,0.06)", menuBg: "#1a1226",
-  };
+  const c = fbPalette(light);
   const input: React.CSSProperties = {
     width: "100%", minWidth: 0, background: c.inputBg, border: `1px solid ${c.border}`,
     borderRadius: 11, padding: "11px 13px", color: c.text, fontSize: 14, outline: "none",
@@ -788,12 +782,15 @@ export default function StudioPage() {
 
   if (notAuthed) {
     return (
-      <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: FB_FONT, direction: rtl ? "rtl" : "ltr" }}>
+        <FbHeader active="studio" />
+        <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
         <div style={{ ...card, textAlign: "center", maxWidth: 380 }}>
           <div style={{ width: 56, height: 56, borderRadius: 16, background: G_HERO, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}><Bot size={26} color="#fff" /></div>
           <div style={{ fontWeight: 900, fontSize: 17, marginBottom: 8 }}>{t("لم تسجّل الدخول", "You're not logged in")}</div>
           <p style={{ color: c.muted, fontSize: 13.5, lineHeight: 1.8, margin: "0 0 18px" }}>{t("سجّل الدخول لاستخدام الموظف الذكي لإدارة محتوى صفحتك.", "Sign in to use the AI Employee to manage your Page content.")}</p>
           <button onClick={() => router.push(`/login?next=${encodeURIComponent("/studio")}`)} style={{ width: "100%", background: G_HERO, border: "none", borderRadius: 14, padding: "13px 0", color: "#fff", fontWeight: 900, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>{t("تسجيل الدخول", "Sign in")}</button>
+        </div>
         </div>
       </div>
     );
@@ -809,23 +806,17 @@ export default function StudioPage() {
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 90, overflowX: "hidden", transition: "background .2s,color .2s" }}>
-      {/* Header */}
-      <div style={{ padding: "16px 18px", maxWidth: 760, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => router.push("/facebook")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}><Back size={18} /> {t("رجوع", "Back")}</button>
-          <div style={{ marginInlineStart: "auto" }}><LangToggle /></div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
-          <div style={{ width: 46, height: 46, borderRadius: 14, background: G_HERO, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Bot size={24} color="#fff" /></div>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 900, margin: 0 }}>{t("الموظف الذكي", "AI Employee")}</h1>
-            <div style={{ fontSize: 12.5, color: c.muted }}>{t("ينشر لك يوميّاً كموظف تسويق حقيقي", "Posts daily for you like a real marketing employee")}</div>
-          </div>
-        </div>
-      </div>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: FB_FONT, direction: rtl ? "rtl" : "ltr", paddingBottom: 90, overflowX: "hidden", transition: "background .2s,color .2s" }}>
+      <FbHeader active="studio" />
+      <FbPageHead
+        crumbs={[{ label: t("الموظف الذكي", "AI Employee") }]}
+        icon={<Bot size={24} />}
+        accent="#9367ED"
+        title={t("الموظف الذكي", "AI Employee")}
+        desc={t("يُعدّ لك خطة نشر أسبوعية بالنصوص والصور كموظف تسويق حقيقي.", "Builds your weekly posting plan with captions and images, like a real marketing employee.")}
+      />
 
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "8px 18px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ maxWidth: 820, margin: "0 auto", padding: "16px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
         {pages.length === 0 ? (
           <div style={{ ...card, textAlign: "center", padding: 34 }}>
             <p style={{ color: c.muted, fontSize: 14, marginBottom: 18 }}>{t("اربط صفحة فيسبوك أولاً ليعمل الموظف الذكي عليها.", "Connect a Facebook Page first for the AI Employee to work on.")}</p>
@@ -984,7 +975,7 @@ export default function StudioPage() {
                   const avail = p.available !== false;
                   const sel = selectedProds.has(p.id);
                   return (
-                  <div key={p.id} onClick={selectMode ? () => toggleSelectProd(p.id) : undefined} style={{ ...card, padding: 14, display: "flex", gap: 12, alignItems: "center", opacity: avail ? 1 : 0.65, cursor: selectMode ? "pointer" : "default", borderColor: sel ? `${PINK}88` : c.border, background: sel ? "rgba(214,64,159,0.06)" : c.surface }}>
+                  <div key={p.id} onClick={selectMode ? () => toggleSelectProd(p.id) : undefined} style={{ ...card, padding: 14, display: "flex", gap: 12, alignItems: "center", opacity: avail ? 1 : 0.65, cursor: selectMode ? "pointer" : "default", borderColor: sel ? `${PINK}88` : c.border, background: sel ? "rgba(147,103,237,0.06)" : c.surface }}>
                     {selectMode && (sel ? <CheckSquare size={20} color={PINK} style={{ flexShrink: 0 }} /> : <Square size={20} color={c.dim} style={{ flexShrink: 0 }} />)}
                     {p.images && p.images[0] ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -1017,7 +1008,7 @@ export default function StudioPage() {
                   <Sparkles size={13} color={PINK} /> {t("حصة الذكاء القوي هذا الشهر", "This month's strong-AI allowance")}
                 </div>
                 {quota.unlimited && (
-                  <div style={{ fontSize: 12, color: "#a855f7", lineHeight: 1.8, marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, color: "#9367ED", lineHeight: 1.8, marginBottom: 4 }}>
                     {t("حساب أدمن — بلا حدود. انتبه: توليدك يُحاسب على رصيد fal.ai الحقيقي مثل أي عميل.",
                        "Admin account — unlimited. Note: your own generations bill the real fal.ai balance.")}
                   </div>
@@ -1084,7 +1075,7 @@ export default function StudioPage() {
                 {/* Employee brain / your signature */}
                 <div style={{ ...card, padding: 16 }}>
                   <button type="button" onClick={() => setShowBrain((v) => !v)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: rtl ? "right" : "left", padding: 0 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#6d28d9,#d6409f)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Brain size={17} color="#fff" /></div>
+                    <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#438DF5,#9367ED)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Brain size={17} color="#fff" /></div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 800 }}>{t("عقل الموظف — بصمتك الخاصة", "Employee brain — your signature")}</div>
                       <div style={{ fontSize: 11.5, color: c.dim, marginTop: 2 }}>{t("يتذكّر أسلوبك ولغتك ويطوّرها في كل خطة.", "Remembers your style & voice and refines it each plan.")}</div>
@@ -1173,12 +1164,12 @@ export default function StudioPage() {
                             <button onClick={() => setShowBulkBoost(true)} disabled={selectedPlanPosts.size === 0} style={{ background: PINK_BG, border: `1px solid ${PINK}55`, borderRadius: 9, padding: "6px 11px", color: PINK, fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}><DollarSign size={13} /> {t("تمويل", "Boost")}</button>
                             <button onClick={() => publishPlan(true)} disabled={selectedPlanPosts.size === 0 || publishing}
                               title={t("انشر المحدّد فقط — مفيد إن انقطع الاتصال أثناء نشر دفعة كبيرة", "Publish only the selected — useful when a big batch was cut short")}
-                              style={{ background: "rgba(109,40,217,0.16)", border: "1px solid rgba(109,40,217,0.45)", borderRadius: 9, padding: "6px 11px", color: light ? "#6d28d9" : "#c4b5fd", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 || publishing ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                              style={{ background: "rgba(109,40,217,0.16)", border: "1px solid rgba(109,40,217,0.45)", borderRadius: 9, padding: "6px 11px", color: light ? "#438DF5" : "#c4b5fd", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 || publishing ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}>
                               {publishing ? <Loader2 size={13} className="spin" /> : <Send size={13} />} {t("انشر المحدّد", "Publish selected")}
                             </button>
                             <button onClick={() => bulkPostAction("approve")} disabled={selectedPlanPosts.size === 0} style={{ background: "rgba(34,197,94,0.14)", border: "1px solid #22c55e55", borderRadius: 9, padding: "6px 11px", color: "#22c55e", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}><CircleCheck size={13} /> {t("اعتماد", "Approve")}</button>
                             {/* Spend the month's paid-AI allowance on the selected posts only. */}
-                            <button onClick={upgradeSelected} disabled={selectedPlanPosts.size === 0 || upgrading} style={{ background: "rgba(168,85,247,0.14)", border: "1px solid rgba(168,85,247,0.35)", borderRadius: 9, padding: "6px 11px", color: "#a855f7", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 || upgrading ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                            <button onClick={upgradeSelected} disabled={selectedPlanPosts.size === 0 || upgrading} style={{ background: "rgba(168,85,247,0.14)", border: "1px solid rgba(168,85,247,0.35)", borderRadius: 9, padding: "6px 11px", color: "#9367ED", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 || upgrading ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}>
                               {upgrading ? <Loader2 size={13} className="spin" /> : <Sparkles size={13} />} {t("صور بجودة عالية", "High-quality images")}
                             </button>
                             <button onClick={() => bulkPostAction("delete")} disabled={selectedPlanPosts.size === 0} style={{ background: "rgba(239,68,68,0.14)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 9, padding: "6px 11px", color: "#ef4444", fontWeight: 800, cursor: "pointer", fontSize: 12, fontFamily: "inherit", opacity: selectedPlanPosts.size === 0 ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}><Trash2 size={13} /> {t("حذف", "Delete")}</button>
@@ -1260,7 +1251,7 @@ export default function StudioPage() {
                       [t("مجدول", "Scheduled"), report.summary.scheduled, "#3b82f6"],
                       [t("مسوّدة", "Draft"), report.summary.draft, c.muted],
                       [t("فشل", "Failed"), report.summary.failed, "#ef4444"],
-                      [t("ردود البوت", "Bot replies"), report.summary.repliesSent, "#a855f7"],
+                      [t("ردود البوت", "Bot replies"), report.summary.repliesSent, "#9367ED"],
                     ] as const).map(([label, n, col], i) => (
                       <div key={i} style={{ background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: "11px 12px" }}>
                         <div style={{ fontSize: 20, fontWeight: 900, color: col as string, fontVariantNumeric: "tabular-nums" }}>{n}</div>
@@ -1325,7 +1316,7 @@ export default function StudioPage() {
                             {r.scheduledFor && <span>{new Date(r.scheduledFor).toLocaleString(rtl ? "ar-LY" : "en-GB")}</span>}
                             {r.boost && <span style={{ color: "#f0b429" }}>{t("مموّل", "boosted")}</span>}
                             {r.repliesSent > 0 && (
-                              <span style={{ color: "#a855f7" }}>
+                              <span style={{ color: "#9367ED" }}>
                                 <MessageSquareReply size={11} style={{ verticalAlign: "-1px" }} /> {r.repliesSent} {t("ردّ", "replies")}
                               </span>
                             )}
@@ -1455,7 +1446,7 @@ export default function StudioPage() {
       {/* Add product modal */}
       {showAdd && (
         <div onClick={(e) => { if (e.target === e.currentTarget) setShowAdd(false); }} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 12, direction: rtl ? "rtl" : "ltr" }}>
-          <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 480, borderRadius: 22, padding: 20, fontFamily: "Cairo,sans-serif", maxHeight: "88vh", overflowY: "auto" }}>
+          <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 480, borderRadius: 22, padding: 20, fontFamily: FB_FONT, maxHeight: "88vh", overflowY: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <div style={{ fontWeight: 900, fontSize: 16 }}>{editingId ? t("تعديل الصنف", "Edit item") : t("صنف جديد", "New item")}</div>
               <button onClick={() => setShowAdd(false)} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer" }}><X size={20} /></button>
@@ -1516,7 +1507,7 @@ export default function StudioPage() {
       {/* Bulk quick-add modal */}
       {showBulk && (
         <div onClick={(e) => { if (e.target === e.currentTarget) setShowBulk(false); }} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 12, direction: rtl ? "rtl" : "ltr" }}>
-          <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 480, borderRadius: 22, padding: 20, fontFamily: "Cairo,sans-serif", maxHeight: "88vh", overflowY: "auto" }}>
+          <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 480, borderRadius: 22, padding: 20, fontFamily: FB_FONT, maxHeight: "88vh", overflowY: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <div style={{ fontWeight: 900, fontSize: 16 }}>{t("قائمة سريعة بالأصناف", "Quick item list")}</div>
               <button onClick={() => setShowBulk(false)} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer" }}><X size={20} /></button>
@@ -1542,7 +1533,7 @@ export default function StudioPage() {
       {/* Edit planned post modal */}
       {editPost && (
         <div onClick={(e) => { if (e.target === e.currentTarget) setEditPost(null); }} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 12, direction: rtl ? "rtl" : "ltr" }}>
-          <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 500, borderRadius: 22, padding: 20, fontFamily: "Cairo,sans-serif", maxHeight: "90vh", overflowY: "auto" }}>
+          <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 500, borderRadius: 22, padding: 20, fontFamily: FB_FONT, maxHeight: "90vh", overflowY: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <div style={{ fontWeight: 900, fontSize: 16 }}>{t("تعديل المنشور", "Edit post")}</div>
               <button onClick={() => setEditPost(null)} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer" }}><X size={20} /></button>
@@ -1704,7 +1695,7 @@ export default function StudioPage() {
 
                   {editPost.boost_targeting_note && (
                     <div style={{ marginTop: 10, background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.3)", borderRadius: 10, padding: 10 }}>
-                      <div style={{ fontSize: 12, color: "#a855f7", fontWeight: 800, marginBottom: 5, display: "flex", alignItems: "center", gap: 5 }}>
+                      <div style={{ fontSize: 12, color: "#9367ED", fontWeight: 800, marginBottom: 5, display: "flex", alignItems: "center", gap: 5 }}>
                         <Sparkles size={12} /> {t("اختار الذكاء الاصطناعي هذا الاستهداف", "The AI chose this targeting")}
                       </div>
                       <div style={{ fontSize: 12, lineHeight: 1.8, color: c.text }}>{editPost.boost_targeting_note}</div>
@@ -1803,7 +1794,7 @@ export default function StudioPage() {
       {editLive && (
         <div onClick={(e) => { if (e.target === e.currentTarget) setEditLive(null); }}
           style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 12, direction: rtl ? "rtl" : "ltr" }}>
-          <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 480, borderRadius: 22, padding: 20, fontFamily: "Cairo,sans-serif", maxHeight: "90vh", overflowY: "auto" }}>
+          <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 480, borderRadius: 22, padding: 20, fontFamily: FB_FONT, maxHeight: "90vh", overflowY: "auto" }}>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <div style={{ fontWeight: 900, fontSize: 16 }}>
@@ -1869,7 +1860,7 @@ export default function StudioPage() {
                 });
                 setEditLive(null);
               }}
-              style={{ width: "100%", marginTop: 12, background: "rgba(168,85,247,0.14)", border: "1px solid rgba(168,85,247,0.4)", borderRadius: 12, padding: "11px 0", color: "#a855f7", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              style={{ width: "100%", marginTop: 12, background: "rgba(168,85,247,0.14)", border: "1px solid rgba(168,85,247,0.4)", borderRadius: 12, padding: "11px 0", color: "#9367ED", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               <MessageSquareReply size={15} /> {t("احفظ الردّ وفعّله فوراً", "Save the reply and arm it now")}
             </button>
 
@@ -1886,7 +1877,7 @@ export default function StudioPage() {
       {/* Bulk boost modal */}
       {showBulkBoost && (
         <div onClick={(e) => { if (e.target === e.currentTarget) setShowBulkBoost(false); }} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 12, direction: rtl ? "rtl" : "ltr" }}>
-          <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 440, borderRadius: 22, padding: 20, fontFamily: "Cairo,sans-serif" }}>
+          <div style={{ background: c.bg, color: c.text, width: "100%", maxWidth: 440, borderRadius: 22, padding: 20, fontFamily: FB_FONT }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <div style={{ fontWeight: 900, fontSize: 16, display: "inline-flex", alignItems: "center", gap: 8 }}><DollarSign size={18} color="#f0b429" /> {t(`تمويل ${selectedPlanPosts.size} منشوراً`, `Boost ${selectedPlanPosts.size} posts`)}</div>
               <button onClick={() => setShowBulkBoost(false)} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer" }}><X size={20} /></button>

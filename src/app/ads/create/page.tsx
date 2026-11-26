@@ -14,16 +14,16 @@ import dynamic from "next/dynamic";
 import { priceFor, mergeAdsPricing, DEFAULT_ADS_PRICING, AD_TIER_PACKAGES, findTierOption, type AdsPricing, type Tier } from "@/services/campaigns";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
-import LangToggle from "@/components/LangToggle";
+import FbHeader, { FbPageHead, FbSteps } from "@/components/fb/FbHeader";
 import AdsBottomNav from "@/components/AdsBottomNav";
 import type { MapPin as MapPinType } from "@/components/AdRadiusMap";
+import { G_ADS as G_HERO, fbPalette, FB_FONT, ACCENT } from "@/lib/fbTheme";
+const PINK = ACCENT.ads.main;
+const PINK_BG = ACCENT.ads.bg;
 
 // Leaflet touches window — load the map only on the client.
 const AdRadiusMap = dynamic(() => import("@/components/AdRadiusMap"), { ssr: false });
 
-const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
-const PINK    = "#d6409f";
-const PINK_BG = "rgba(214,64,159,0.12)";
 
 interface ConnectedPage { id: string; page_id: string; page_name: string; page_picture?: string; }
 interface PagePost { id: string; postId: string; message: string; createdTime: string; picture?: string; permalinkUrl?: string; promotable?: boolean | null; }
@@ -42,13 +42,7 @@ function CreateCampaignInner() {
   // Permanent public Page picture (stored fbcdn URLs expire → broken logos).
   const pagePic = (id: string) => `https://graph.facebook.com/${id}/picture?type=square&width=80&height=80`;
 
-  const c = light ? {
-    bg: "#fbf7ff", text: "#1e1330", muted: "#6b5b78", dim: "#8b7d97",
-    surface: "#ffffff", border: "rgba(120,60,160,0.14)", inputBg: "#f4eefb", menuBg: "#ffffff",
-  } : {
-    bg: "#100a18", text: "#f6eefb", muted: "#a394b0", dim: "#7a6d88",
-    surface: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.10)", inputBg: "rgba(255,255,255,0.06)", menuBg: "#1a1226",
-  };
+  const c = fbPalette(light);
 
   const input: React.CSSProperties = {
     width: "100%", minWidth: 0, background: c.inputBg, border: `1px solid ${c.border}`,
@@ -438,7 +432,10 @@ function CreateCampaignInner() {
 
   if (pages.length === 0) {
     return (
-      <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16, padding: 24 }}>
+      <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: FB_FONT, direction: rtl ? "rtl" : "ltr" }}>
+      <FbHeader active="ads" />
+      <FbSteps current={0} steps={[{ label: t("ربط الصفحة", "Connect Page") }, { label: t("إنشاء الحملة", "Create campaign") }, { label: t("الدفع", "Payment") }]} />
+      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16, padding: 24 }}>
         <AlertCircle size={48} color="#f59e0b" />
         <p style={{ fontSize: 16, color: c.muted, textAlign: "center" }}>{t("يجب ربط صفحة فيسبوك أولاً قبل إنشاء حملة", "You must connect a Facebook Page before creating a campaign")}</p>
         <button onClick={() => router.push("/ads/connect")}
@@ -446,21 +443,24 @@ function CreateCampaignInner() {
           {t("ربط صفحة الآن", "Connect a Page now")}
         </button>
       </div>
+      </div>
     );
   }
 
   const card: React.CSSProperties = { background: c.surface, border: `2px solid ${c.border}`, borderRadius: 18, padding: 22 };
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80, overflowX: "hidden", transition: "background .2s,color .2s" }}>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: FB_FONT, direction: rtl ? "rtl" : "ltr", paddingBottom: 80, overflowX: "hidden", transition: "background .2s,color .2s" }}>
 
-      <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", gap: 12, maxWidth: 720, margin: "0 auto" }}>
-        <button onClick={() => router.push("/ads/connect")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
-          <Back size={18} /> {t("رجوع", "Back")}
-        </button>
-        <h1 style={{ fontSize: 18, fontWeight: 900, margin: 0 }}>{t("إنشاء حملة إعلانية", "Create a campaign")}</h1>
-        <div style={{ marginInlineStart: "auto" }}><LangToggle /></div>
-      </div>
+      <FbHeader active="ads" />
+      <FbPageHead crumbs={[{ label: t("الإعلانات", "Ads"), href: "/ads" }, { label: t("إنشاء حملة", "New campaign") }]}
+        icon={<Megaphone size={24} />} title={t("إنشاء حملة إعلانية", "Create a campaign")}
+        desc={t("اختر المنشور والهدف والجمهور والباقة، ثم انتقل إلى الدفع.", "Pick the post, goal, audience and package, then go to payment.")} />
+      <FbSteps current={1} steps={[
+        { label: t("ربط الصفحة", "Connect Page"), href: "/ads/connect" },
+        { label: t("إنشاء الحملة", "Create campaign"), href: "/ads/create" },
+        { label: t("الدفع", "Payment") },
+      ]} />
 
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "22px 20px", display: "grid", gap: 18 }}>
 
@@ -695,7 +695,7 @@ function CreateCampaignInner() {
         <div style={card}>
           <button type="button" onClick={() => setCopyOpen((o) => !o)}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: rtl ? "right" : "left", padding: 0 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 11, background: "linear-gradient(135deg,#6d28d9,#d6409f)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 11, background: "linear-gradient(135deg,#438DF5,#438DF5)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <PenLine size={18} color="#fff" />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -886,14 +886,14 @@ function CreateCampaignInner() {
           {/* Advantage+ audience */}
           <button type="button" onClick={() => setAdvantageAudience((v) => !v)}
             style={{ marginTop: 16, width: "100%", display: "flex", alignItems: "center", gap: 12, background: advantageAudience ? "rgba(109,40,217,0.10)" : c.inputBg, border: `1px solid ${advantageAudience ? "rgba(109,40,217,0.4)" : c.border}`, borderRadius: 13, padding: "13px 14px", cursor: "pointer", fontFamily: "inherit", textAlign: rtl ? "right" : "left" }}>
-            <div style={{ width: 34, height: 34, borderRadius: 10, background: advantageAudience ? "linear-gradient(135deg,#6d28d9,#d6409f)" : c.surface, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: advantageAudience ? "linear-gradient(135deg,#438DF5,#438DF5)" : c.surface, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Wand2 size={17} color={advantageAudience ? "#fff" : c.muted} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: advantageAudience ? (light ? "#6d28d9" : "#c4b5fd") : c.text }}>{t("جمهور Advantage+ التلقائي", "Advantage+ audience")}</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: advantageAudience ? (light ? "#438DF5" : "#c4b5fd") : c.text }}>{t("جمهور Advantage+ التلقائي", "Advantage+ audience")}</div>
               <div style={{ fontSize: 11.5, color: c.dim, marginTop: 2, lineHeight: 1.5 }}>{t("يسمح لفيسبوك بالوصول لأشخاص إضافيين مشابهين لجمهورك لتحسين النتائج.", "Lets Facebook reach extra similar people to improve results.")}</div>
             </div>
-            <div style={{ width: 42, height: 24, borderRadius: 100, background: advantageAudience ? "#6d28d9" : c.border, position: "relative", flexShrink: 0, transition: "background .15s" }}>
+            <div style={{ width: 42, height: 24, borderRadius: 100, background: advantageAudience ? "#438DF5" : c.border, position: "relative", flexShrink: 0, transition: "background .15s" }}>
               <div style={{ position: "absolute", top: 3, insetInlineStart: advantageAudience ? 21 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "inset-inline-start .15s" }} />
             </div>
           </button>
@@ -982,7 +982,7 @@ function CreateCampaignInner() {
                 {interests.length > 0 && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
                     {interests.map((i) => (
-                      <span key={i.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(109,40,217,0.14)", border: "1px solid rgba(109,40,217,0.4)", color: light ? "#6d28d9" : "#c4b5fd", borderRadius: 100, padding: "4px 10px", fontSize: 12 }}>
+                      <span key={i.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(109,40,217,0.14)", border: "1px solid rgba(109,40,217,0.4)", color: light ? "#438DF5" : "#c4b5fd", borderRadius: 100, padding: "4px 10px", fontSize: 12 }}>
                         {i.name}<X size={13} style={{ cursor: "pointer" }} onClick={() => removeInterest(i.id)} />
                       </span>
                     ))}
@@ -1109,14 +1109,14 @@ function CreateCampaignInner() {
         <div style={card}>
           <button type="button" onClick={() => setAbOn((v) => !v)}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: rtl ? "right" : "left", padding: 0 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 11, background: abOn ? "linear-gradient(135deg,#6d28d9,#d6409f)" : c.inputBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 11, background: abOn ? "linear-gradient(135deg,#438DF5,#438DF5)" : c.inputBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <SplitSquareHorizontal size={18} color={abOn ? "#fff" : c.muted} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 800 }}>{t("اختبار A/B (مقارنة جمهورين)", "A/B test (compare two audiences)")}</div>
               <div style={{ fontSize: 11.5, color: c.dim, marginTop: 2, lineHeight: 1.5 }}>{t("يُقسّم الميزانية بين جمهورين، ويعرض النتائج لكل منهما.", "Splits the budget between two audiences and reports each one's results.")}</div>
             </div>
-            <div style={{ width: 42, height: 24, borderRadius: 100, background: abOn ? "#6d28d9" : c.border, position: "relative", flexShrink: 0, transition: "background .15s" }}>
+            <div style={{ width: 42, height: 24, borderRadius: 100, background: abOn ? "#438DF5" : c.border, position: "relative", flexShrink: 0, transition: "background .15s" }}>
               <div style={{ position: "absolute", top: 3, insetInlineStart: abOn ? 21 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "inset-inline-start .15s" }} />
             </div>
           </button>
@@ -1127,7 +1127,7 @@ function CreateCampaignInner() {
                 {t("الجمهور الحالي الذي حددته بالأعلى", "The audience you set above")}
               </div>
               <label style={{ fontSize: 12.5, color: c.muted, display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <span style={{ background: "rgba(109,40,217,0.14)", color: light ? "#6d28d9" : "#c4b5fd", borderRadius: 6, padding: "2px 8px", fontWeight: 800, fontSize: 11 }}>B</span>
+                <span style={{ background: "rgba(109,40,217,0.14)", color: light ? "#438DF5" : "#c4b5fd", borderRadius: 6, padding: "2px 8px", fontWeight: 800, fontSize: 11 }}>B</span>
                 {t("الجمهور المقابل — اختر من الجمهور المحفوظ", "The rival audience — pick a saved audience")}
               </label>
               {audiences.length === 0 ? (

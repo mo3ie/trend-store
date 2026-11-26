@@ -6,9 +6,10 @@ import { Home, Megaphone, MessageSquareReply, Bot, Wallet, LifeBuoy, X, Phone } 
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import WalletModal from "@/components/WalletModal";
+import { G_HERO, FB_FONT, ACCENT } from "@/lib/fbTheme";
+const PINK = ACCENT.ads.main;
+const PINK_BG = ACCENT.ads.bg;
 
-const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
-const PINK   = "#d6409f";
 const SUPPORT_PHONE = "218918621511"; // WhatsApp support
 
 // Shared quick-access bar for the Facebook Tools area (ads + bot + AI employee).
@@ -23,8 +24,8 @@ export default function AdsBottomNav() {
   const [help, setHelp] = useState(false);
 
   const c = light
-    ? { bar: "#ffffff", border: "rgba(120,60,160,0.14)", text: "#1e1330", muted: "#8b7d97" }
-    : { bar: "#150f22", border: "rgba(255,255,255,0.10)", text: "#f6eefb", muted: "#7a6d88" };
+    ? { bar: "#FFFFFF", border: "#E8ECF4", text: "#111827", muted: "#64748B" }
+    : { bar: "#111827", border: "#263247", text: "#F8FAFC", muted: "#A0AEC0" };
 
   const section: "ads" | "bot" | "studio" | "home" =
     path.startsWith("/studio") ? "studio" : path.startsWith("/bot") ? "bot" : path.startsWith("/ads") ? "ads" : "home";
@@ -95,7 +96,7 @@ export default function AdsBottomNav() {
         <div style={{ maxWidth: 680, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(6,1fr)", padding: "6px 4px" }}>
           {items.map((it) => (
             <button key={it.key} onClick={() => (it.onClick ? it.onClick() : router.push(it.href!))}
-              style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 0", color: it.active ? PINK : c.muted }}>
+              style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 0", color: it.active ? (it.key === "bot" ? "#20BE83" : it.key === "studio" ? "#9367ED" : PINK) : c.muted }}>
               <it.icon size={19} />
               <span style={{ fontSize: 9.5, fontWeight: it.active ? 800 : 600, whiteSpace: "nowrap" }}>{it.label}</span>
             </button>
@@ -108,7 +109,7 @@ export default function AdsBottomNav() {
       {help && (
         <div onClick={(e) => { if (e.target === e.currentTarget) setHelp(false); }}
           style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 12, direction: rtl ? "rtl" : "ltr" }}>
-          <div style={{ background: c.bar, color: c.text, width: "100%", maxWidth: 480, borderRadius: 22, padding: 22, fontFamily: "Cairo,sans-serif", maxHeight: "85vh", overflowY: "auto" }}>
+          <div style={{ background: c.bar, color: c.text, width: "100%", maxWidth: 480, borderRadius: 22, padding: 22, fontFamily: FB_FONT, maxHeight: "85vh", overflowY: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <div style={{ fontWeight: 900, fontSize: 17, display: "flex", alignItems: "center", gap: 8 }}><LifeBuoy size={18} color={PINK} /> {guide.title}</div>
               <button onClick={() => setHelp(false)} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer" }}><X size={20} /></button>

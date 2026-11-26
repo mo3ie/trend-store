@@ -2,18 +2,18 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, Wallet, Loader2, AlertCircle, CheckCircle, Phone, CreditCard } from "lucide-react";
+import { ArrowLeft, ArrowRight, Wallet, Loader2, AlertCircle, CheckCircle, Phone, CreditCard , Megaphone } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
-import LangToggle from "@/components/LangToggle";
+import FbHeader, { FbPageHead, FbSteps } from "@/components/fb/FbHeader";
 import WalletModal from "@/components/WalletModal";
+import { G_ADS as G_HERO, fbPalette, FB_FONT } from "@/lib/fbTheme";
 
-const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
 const METHOD_GRADS: Record<string, string> = {
   edfali:   "linear-gradient(135deg,#10b981,#22d3ee)",
   moamalat: "linear-gradient(135deg,#f59e0b,#ef4444)",
   mobicash: "linear-gradient(135deg,#3b82f6,#22d3ee)",
-  wallet:   "linear-gradient(135deg,#a855f7,#ec4899)",
+  wallet:   "linear-gradient(135deg,#9367ED,#438DF5)",
 };
 
 interface Campaign {
@@ -42,13 +42,7 @@ function CheckoutInner() {
   const Back = rtl ? ArrowLeft : ArrowRight;
   const LYD  = t("د.ل", "LYD");
 
-  const c = light ? {
-    bg: "#fbf7ff", text: "#1e1330", muted: "#6b5b78", dim: "#8b7d97",
-    surface: "#ffffff", border: "rgba(120,60,160,0.14)", inputBg: "#f4eefb",
-  } : {
-    bg: "#100a18", text: "#f6eefb", muted: "#a394b0", dim: "#7a6d88",
-    surface: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.10)", inputBg: "rgba(255,255,255,0.06)",
-  };
+  const c = fbPalette(light);
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [method, setMethod]     = useState("edfali");
@@ -121,7 +115,7 @@ function CheckoutInner() {
   if (loading || !campaign) {
     return (
       <div style={{ minHeight: "100vh", background: c.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Loader2 size={32} color="#d6409f" className="spin" />
+        <Loader2 size={32} color="#438DF5" className="spin" />
         <style>{`@keyframes spin-anim{to{transform:rotate(360deg)}} .spin{animation:spin-anim 1s linear infinite}`}</style>
       </div>
     );
@@ -134,15 +128,17 @@ function CheckoutInner() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80, transition: "background .2s,color .2s" }}>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: FB_FONT, direction: rtl ? "rtl" : "ltr", paddingBottom: 80, transition: "background .2s,color .2s" }}>
 
-      <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", gap: 12, maxWidth: 560, margin: "0 auto" }}>
-        <button onClick={() => router.back()} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
-          <Back size={18} /> {t("رجوع", "Back")}
-        </button>
-        <h1 style={{ fontSize: 18, fontWeight: 900, margin: 0 }}>{t("تأكيد الدفع", "Confirm payment")}</h1>
-        <div style={{ marginInlineStart: "auto" }}><LangToggle /></div>
-      </div>
+      <FbHeader active="ads" />
+      <FbPageHead crumbs={[{ label: t("الإعلانات", "Ads"), href: "/ads" }, { label: t("إنشاء حملة", "New campaign"), href: "/ads/create" }, { label: t("تأكيد الدفع", "Confirm payment") }]}
+        icon={<Megaphone size={24} />} title={t("تأكيد الدفع", "Confirm payment")}
+        desc={t("راجع ملخص الحملة واختر طريقة الدفع.", "Review the campaign summary and choose how to pay.")} />
+      <FbSteps current={2} steps={[
+        { label: t("ربط الصفحة", "Connect Page"), href: "/ads/connect" },
+        { label: t("إنشاء الحملة", "Create campaign"), href: "/ads/create" },
+        { label: t("الدفع", "Payment") },
+      ]} />
 
       <div style={{ maxWidth: 560, margin: "0 auto", padding: "14px 18px", display: "grid", gap: 16 }}>
 
@@ -173,7 +169,7 @@ function CheckoutInner() {
         {/* Payment methods */}
         <div>
           <h2 style={{ fontSize: 16, fontWeight: 900, margin: "0 0 12px", display: "flex", alignItems: "center", gap: 8 }}>
-            <Wallet size={17} color="#d6409f" /> {t("اختر طريقة الدفع", "Payment method")}
+            <Wallet size={17} color="#438DF5" /> {t("اختر طريقة الدفع", "Payment method")}
           </h2>
           {!otpStep && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
@@ -181,7 +177,7 @@ function CheckoutInner() {
                 const on = method === m.id;
                 return (
                   <button key={m.id} onClick={() => setMethod(m.id)}
-                    style={{ display: "flex", alignItems: "center", gap: 13, padding: "14px 16px", borderRadius: 15, border: on ? "2px solid #d6409f" : `2px solid ${c.border}`, background: on ? "rgba(214,64,159,0.08)" : c.surface, cursor: "pointer", fontFamily: "inherit", textAlign: "start" }}>
+                    style={{ display: "flex", alignItems: "center", gap: 13, padding: "14px 16px", borderRadius: 15, border: on ? "2px solid #438DF5" : `2px solid ${c.border}`, background: on ? "rgba(67,141,245,0.08)" : c.surface, cursor: "pointer", fontFamily: "inherit", textAlign: "start" }}>
                     <div style={{ width: 44, height: 44, borderRadius: 12, background: METHOD_GRADS[m.id], display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontWeight: 800, fontSize: 12, color: "#fff" }}>{m.tag}</div>
                     <div style={{ flex: 1, fontWeight: 800, fontSize: 15, color: c.text }}>{t(m.label, m.labelEn)}</div>
                     <div style={{ width: 22, height: 22, borderRadius: "50%", border: on ? "none" : `2px solid ${c.border}`, background: on ? G_HERO : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>

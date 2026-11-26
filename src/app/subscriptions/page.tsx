@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Loader2, Wallet, Check, CreditCard, X, ReceiptText, ShieldCheck, RefreshCw, AlertTriangle, RotateCw } from "lucide-react";
 import WalletModal from "@/components/WalletModal";
+import FbHeader, { FbPageHead } from "@/components/fb/FbHeader";
+import AdsBottomNav from "@/components/AdsBottomNav";
+import { useTheme } from "@/hooks/useTheme";
+import { fbPalette, FB_FONT } from "@/lib/fbTheme";
 
 interface Plan {
   id: string; product: string; tier: string;
@@ -200,19 +204,22 @@ export default function SubscriptionsPage() {
   const daysLeft = (iso: string | null) =>
     iso ? Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000) : null;
 
-  if (loading) return <div className="min-h-screen bg-[#0b0f1a] flex justify-center items-center"><Loader2 className="animate-spin text-purple-400" size={34} /></div>;
+  const { light } = useTheme();
+  const fbVars = Object.fromEntries(Object.entries(fbPalette(light)).map(([k, v]) => [`--fb-${k}`, v])) as React.CSSProperties;
+  if (loading) return <div className="min-h-screen bg-[var(--fb-bg)] flex justify-center items-center" style={fbVars}><Loader2 className="animate-spin text-[#9367ED]" size={34} /></div>;
+
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#0b0f1a] text-white px-4 py-6 md:px-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-2xl font-black flex items-center gap-2">
-            <CreditCard className="text-purple-400" size={26} /> الاشتراكات والباقات
-          </h1>
-          <div className="flex items-center gap-2 bg-white/5 border border-purple-500/20 rounded-2xl px-4 py-2">
-            <Wallet size={18} className="text-blue-400" />
-            <span className="text-slate-400 text-sm">الرصيد</span>
-            <span className="font-extrabold text-blue-300">{balance.toLocaleString()} د.ل</span>
+    <div dir="rtl" className="min-h-screen bg-[var(--fb-bg)] text-[var(--fb-text)] pb-24" style={{ fontFamily: FB_FONT, ...fbVars }}>
+      <FbHeader active="billing" />
+      <FbPageHead crumbs={[{ label: "الاشتراكات والباقات" }]} icon={<CreditCard size={24} />} title="الاشتراكات والباقات"
+        desc="اشترك في الأدوات، وتابع فواتيرك، وجدّد أو رقِّ باقتك بسهولة." />
+      <div className="max-w-5xl mx-auto space-y-6 px-4 pt-4 md:px-8">
+        <div className="flex items-center justify-end flex-wrap gap-3">
+          <div className="flex items-center gap-2 bg-[var(--fb-surface)] border border-[var(--fb-border)] rounded-2xl px-4 py-2">
+            <Wallet size={18} className="text-[#438DF5]" />
+            <span className="text-[var(--fb-muted)] text-sm">الرصيد</span>
+            <span className="font-extrabold text-[#438DF5]">{balance.toLocaleString()} د.ل</span>
           </div>
         </div>
 
@@ -220,137 +227,137 @@ export default function SubscriptionsPage() {
         <div className="flex gap-2 flex-wrap">
           {PRODUCTS.map((p) => (
             <button key={p.key} onClick={() => setProduct(p.key)}
-              className={`px-4 py-2 rounded-xl font-bold text-sm transition ${product === p.key ? "bg-gradient-to-l from-purple-600 to-blue-600" : "bg-white/5 border border-purple-500/20 text-slate-300"}`}>
+              className={`px-4 py-2 rounded-xl font-bold text-sm transition ${product === p.key ? "bg-gradient-to-l from-[#438DF5] to-[#9367ED] text-white" : "bg-[var(--fb-surface)] border border-[var(--fb-border)] text-[var(--fb-text)]"}`}>
               {p.label}
             </button>
           ))}
         </div>
 
         {access?.admin && (
-          <p className="text-sm bg-purple-500/10 border border-purple-500/30 text-purple-200 rounded-xl px-4 py-3">
+          <p className="text-sm bg-[var(--fb-chipBlue)] border border-[var(--fb-border)] text-[var(--fb-blueText)] rounded-xl px-4 py-3">
             حساب أدمن — كل الأدوات والمزايا مفتوحة لك للتجربة والاختبار دون اشتراك.
           </p>
         )}
         {access && !access.admin && access.trial && (
-          <p className="text-sm bg-green-500/10 border border-green-500/30 text-green-200 rounded-xl px-4 py-3">
+          <p className="text-sm bg-green-500/10 border border-green-500/30 text-[var(--fb-greenText)] rounded-xl px-4 py-3">
             🎁 أنت في فترة التجربة المجانية — كل الأدوات مفتوحة
             {access.trialEndsAt ? ` حتى ${new Date(access.trialEndsAt).toLocaleDateString("ar-LY")} (${Math.max(0, Math.ceil((new Date(access.trialEndsAt).getTime() - Date.now()) / 86400000))} يوم متبقٍّ)` : ""}.
             بعدها يلزم الاشتراك للاستمرار.
           </p>
         )}
         {access && !access.admin && !access.trial && subs.length === 0 && (
-          <p className="text-sm bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-xl px-4 py-3">
+          <p className="text-sm bg-amber-500/10 border border-amber-500/30 text-[var(--fb-amberText)] rounded-xl px-4 py-3">
             انتهت تجربتك المجانية — اشترك في الأداة التي تريدها للاستمرار.
           </p>
         )}
 
         {plans.filter((p) => p.product === product).length === 0 && (
-          <p className="text-sm bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-xl px-4 py-3">
+          <p className="text-sm bg-amber-500/10 border border-amber-500/30 text-[var(--fb-amberText)] rounded-xl px-4 py-3">
             أسعار هذه الأداة قيد الإعداد — ستظهر الباقات هنا بمجرد تحديدها. يمكنك تجهيز
             كل شيء داخل الأداة الآن، ويعمل فور تفعيل الاشتراك.
           </p>
         )}
 
         {product === "ads" && (
-          <p className="text-sm bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-xl px-4 py-3">
+          <p className="text-sm bg-amber-500/10 border border-amber-500/30 text-[var(--fb-amberText)] rounded-xl px-4 py-3">
             اشتراك الإعلانات VIP للمزايا فقط — تدفع قيمة الإعلان بشكل منفصل (أي مبلغ تريده).
           </p>
         )}
 
         {/* Scope + duration */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-1 bg-white/5 border border-purple-500/20 rounded-xl p-1">
+          <div className="flex gap-1 bg-[var(--fb-surface)] border border-[var(--fb-border)] rounded-xl p-1">
             {scopesForProduct.map((s) => (
               <button key={s} onClick={() => setScope(s as typeof scope)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${scope === s ? "bg-purple-600" : "text-slate-300"}`}>
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${scope === s ? "bg-[#9367ED]" : "text-[var(--fb-text)]"}`}>
                 {SCOPE_LABEL[s]}
               </button>
             ))}
           </div>
-          <div className="flex gap-1 bg-white/5 border border-purple-500/20 rounded-xl p-1">
+          <div className="flex gap-1 bg-[var(--fb-surface)] border border-[var(--fb-border)] rounded-xl p-1">
             {DUR.map((d) => (
               <button key={d.key} onClick={() => setDuration(d.key)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${duration === d.key ? "bg-blue-600" : "text-slate-300"}`}>
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${duration === d.key ? "bg-[#438DF5]" : "text-[var(--fb-text)]"}`}>
                 {d.label}
               </button>
             ))}
           </div>
-          <label className="flex items-center gap-2 bg-white/5 border border-purple-500/20 rounded-xl px-3 py-2 text-sm cursor-pointer select-none">
+          <label className="flex items-center gap-2 bg-[var(--fb-surface)] border border-[var(--fb-border)] rounded-xl px-3 py-2 text-sm cursor-pointer select-none">
             <input type="checkbox" checked={autoRenewNew} onChange={(e) => setAutoRenewNew(e.target.checked)}
               className="accent-purple-500 w-4 h-4" />
-            <RefreshCw size={15} className="text-purple-300" />
-            <span className="text-slate-300">جدّد اشتراكي تلقائياً</span>
+            <RefreshCw size={15} className="text-[#9367ED]" />
+            <span className="text-[var(--fb-text)]">جدّد اشتراكي تلقائياً</span>
           </label>
         </div>
 
         {/* Tier cards */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {cards.map(({ tier, plan, discount }) => (
-            <div key={tier} className="bg-white/5 border border-purple-500/20 rounded-2xl p-5 flex flex-col">
+            <div key={tier} className="bg-[var(--fb-surface)] border border-[var(--fb-border)] rounded-2xl p-5 flex flex-col">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-lg">{TIER_LABEL[tier] ?? tier}</h3>
-                {discount > 0 && <span className="text-xs font-bold bg-green-500/15 text-green-300 rounded-full px-2 py-0.5">وفّر {discount}%</span>}
+                {discount > 0 && <span className="text-xs font-bold bg-green-500/15 text-[#20BE83] rounded-full px-2 py-0.5">وفّر {discount}%</span>}
               </div>
               <div className="my-3">
-                <span className="text-3xl font-black text-purple-300">{plan!.price_lyd.toLocaleString()}</span>
-                <span className="text-slate-400 text-sm"> د.ل / {DUR.find((d) => d.key === plan!.duration)?.label}</span>
+                <span className="text-3xl font-black text-[#9367ED]">{plan!.price_lyd.toLocaleString()}</span>
+                <span className="text-[var(--fb-muted)] text-sm"> د.ل / {DUR.find((d) => d.key === plan!.duration)?.label}</span>
               </div>
               <ul className="space-y-1.5 mb-4 flex-1">
                 {plan!.features.map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-slate-300">
-                    <Check size={15} className="text-green-400 shrink-0" /> {FEATURE_LABEL[f] ?? f}
+                  <li key={f} className="flex items-center gap-2 text-sm text-[var(--fb-text)]">
+                    <Check size={15} className="text-[#20BE83] shrink-0" /> {FEATURE_LABEL[f] ?? f}
                   </li>
                 ))}
               </ul>
               {/* The monthly allowance is the single most important number on a Studio
                   plan, so it is stated on the card rather than discovered after paying. */}
               {plan!.product.endsWith("studio") && ((plan!.ai_image_quota ?? 0) > 0 || (plan!.ai_video_quota ?? 0) > 0) && (
-                <div className="bg-purple-500/10 border border-purple-500/25 rounded-xl px-3 py-2.5 mb-4 text-xs leading-6">
-                  <div className="font-bold text-purple-200 mb-0.5">حصة الذكاء القوي شهرياً</div>
-                  <div className="text-slate-300">
+                <div className="bg-[var(--fb-chipBlue)] border border-[var(--fb-border)] rounded-xl px-3 py-2.5 mb-4 text-xs leading-6">
+                  <div className="font-bold text-[var(--fb-blueText)] mb-0.5">حصة الذكاء القوي شهرياً</div>
+                  <div className="text-[var(--fb-text)]">
                     {(plan!.ai_image_quota ?? 0) > 0 && <>🖼️ {plan!.ai_image_quota} صورة عالية الجودة</>}
                     {(plan!.ai_image_quota ?? 0) > 0 && (plan!.ai_video_quota ?? 0) > 0 && " · "}
                     {(plan!.ai_video_quota ?? 0) > 0 && <>🎬 {plan!.ai_video_quota} فيديو</>}
                   </div>
-                  <div className="text-slate-500 mt-0.5">التوليد المجاني وصور الإنترنت والكتالوج بلا حدود</div>
+                  <div className="text-[var(--fb-dim)] mt-0.5">التوليد المجاني وصور الإنترنت والكتالوج بلا حدود</div>
                 </div>
               )}
               <button onClick={() => startBuy(plan!)}
-                className="w-full bg-gradient-to-l from-purple-600 to-blue-600 rounded-xl py-2.5 font-bold">
+                className="w-full bg-gradient-to-l from-[#438DF5] to-[#9367ED] text-white rounded-xl py-2.5 font-bold">
                 اشترك الآن
               </button>
             </div>
           ))}
-          {cards.length === 0 && <p className="text-slate-500 col-span-full">لا توجد باقات لهذا الخيار.</p>}
+          {cards.length === 0 && <p className="text-[var(--fb-dim)] col-span-full">لا توجد باقات لهذا الخيار.</p>}
         </div>
 
         {/* Active subscriptions — expiry countdown, renew now, auto-renew switch */}
         {subs.length > 0 && (
-          <section className="bg-white/5 border border-purple-500/20 rounded-2xl p-5">
-            <h2 className="font-bold mb-3 flex items-center gap-2"><ShieldCheck size={18} className="text-green-400" /> اشتراكاتك الفعّالة</h2>
+          <section className="bg-[var(--fb-surface)] border border-[var(--fb-border)] rounded-2xl p-5">
+            <h2 className="font-bold mb-3 flex items-center gap-2"><ShieldCheck size={18} className="text-[#20BE83]" /> اشتراكاتك الفعّالة</h2>
             <div className="space-y-2">
               {subs.map((s) => {
                 const left = daysLeft(s.expires_at);
                 const soon = left !== null && left <= 7;
                 return (
-                  <div key={s.id} className={`rounded-xl px-4 py-3 text-sm border ${soon ? "bg-amber-500/10 border-amber-500/30" : "bg-white/5 border-transparent"}`}>
+                  <div key={s.id} className={`rounded-xl px-4 py-3 text-sm border ${soon ? "bg-amber-500/10 border-amber-500/30" : "bg-[var(--fb-surface)] border-transparent"}`}>
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <span className="font-semibold">{PRODUCTS.find((p) => p.key === s.product)?.label} — {TIER_LABEL[s.tier ?? ""] ?? s.tier} · {SCOPE_LABEL[s.page_scope ?? ""] ?? s.page_scope}</span>
-                      <span className={soon ? "text-amber-300 font-bold flex items-center gap-1" : "text-slate-400"}>
+                      <span className={soon ? "text-[#F2A74B] font-bold flex items-center gap-1" : "text-[var(--fb-muted)]"}>
                         {soon && <AlertTriangle size={14} />}
                         ينتهي {s.expires_at ? new Date(s.expires_at).toLocaleDateString("ar-LY") : "—"}
                         {left !== null && ` (${left > 0 ? `${left} يوم متبقٍّ` : "اليوم"})`}
                       </span>
                     </div>
                     <div className="flex items-center justify-between flex-wrap gap-3 mt-2.5">
-                      <label className="flex items-center gap-2 cursor-pointer select-none text-slate-300">
+                      <label className="flex items-center gap-2 cursor-pointer select-none text-[var(--fb-text)]">
                         <input type="checkbox" checked={!!s.auto_renew} disabled={busyId === s.id}
                           onChange={(e) => toggleAutoRenew(s, e.target.checked)}
                           className="accent-purple-500 w-4 h-4" />
                         التجديد التلقائي من المحفظة
                       </label>
                       <button onClick={() => renewNow(s)} disabled={busyId === s.id}
-                        className="flex items-center gap-1.5 bg-gradient-to-l from-purple-600 to-blue-600 rounded-xl px-4 py-1.5 font-bold disabled:opacity-50">
+                        className="flex items-center gap-1.5 bg-gradient-to-l from-[#438DF5] to-[#9367ED] text-white rounded-xl px-4 py-1.5 font-bold disabled:opacity-50">
                         {busyId === s.id ? <Loader2 className="animate-spin" size={15} /> : <RotateCw size={15} />}
                         جدّد الآن
                       </button>
@@ -365,15 +372,15 @@ export default function SubscriptionsPage() {
 
         {/* Lapsed subscriptions — one click brings them back on the same plan */}
         {expiredSubs.length > 0 && (
-          <section className="bg-white/5 border border-red-500/20 rounded-2xl p-5">
+          <section className="bg-[var(--fb-surface)] border border-red-500/20 rounded-2xl p-5">
             <h2 className="font-bold mb-3 flex items-center gap-2"><AlertTriangle size={18} className="text-red-400" /> اشتراكات منتهية</h2>
             <div className="space-y-2">
               {expiredSubs.map((s) => (
-                <div key={s.id} className="flex items-center justify-between flex-wrap gap-2 bg-white/5 rounded-xl px-4 py-2.5 text-sm">
-                  <span className="font-semibold text-slate-300">{PRODUCTS.find((p) => p.key === s.product)?.label ?? s.product} — {TIER_LABEL[s.tier ?? ""] ?? s.tier}</span>
-                  <span className="text-slate-500">انتهى {s.expires_at ? new Date(s.expires_at).toLocaleDateString("ar-LY") : "—"}</span>
+                <div key={s.id} className="flex items-center justify-between flex-wrap gap-2 bg-[var(--fb-surface)] rounded-xl px-4 py-2.5 text-sm">
+                  <span className="font-semibold text-[var(--fb-text)]">{PRODUCTS.find((p) => p.key === s.product)?.label ?? s.product} — {TIER_LABEL[s.tier ?? ""] ?? s.tier}</span>
+                  <span className="text-[var(--fb-dim)]">انتهى {s.expires_at ? new Date(s.expires_at).toLocaleDateString("ar-LY") : "—"}</span>
                   <button onClick={() => renewNow(s)} disabled={busyId === s.id}
-                    className="flex items-center gap-1.5 bg-white/10 border border-purple-500/30 rounded-xl px-4 py-1.5 font-bold disabled:opacity-50">
+                    className="flex items-center gap-1.5 bg-[var(--fb-soft)] border border-[var(--fb-border)] rounded-xl px-4 py-1.5 font-bold disabled:opacity-50">
                     {busyId === s.id ? <Loader2 className="animate-spin" size={15} /> : <RotateCw size={15} />}
                     إعادة التفعيل
                   </button>
@@ -385,20 +392,20 @@ export default function SubscriptionsPage() {
         )}
 
         {/* Payment-activity window */}
-        <section className="bg-white/5 border border-purple-500/20 rounded-2xl p-5">
-          <h2 className="font-bold mb-3 flex items-center gap-2"><ReceiptText size={18} className="text-blue-400" /> سجل الدفعات والفواتير</h2>
+        <section className="bg-[var(--fb-surface)] border border-[var(--fb-border)] rounded-2xl p-5">
+          <h2 className="font-bold mb-3 flex items-center gap-2"><ReceiptText size={18} className="text-[#438DF5]" /> سجل الدفعات والفواتير</h2>
           {payments.length === 0 ? (
-            <p className="text-slate-500 text-sm">لا توجد دفعات بعد.</p>
+            <p className="text-[var(--fb-dim)] text-sm">لا توجد دفعات بعد.</p>
           ) : (
             <div className="space-y-2">
               {payments.map((p) => (
-                <div key={p.id} className="flex items-center justify-between flex-wrap gap-2 bg-white/5 rounded-xl px-4 py-2.5 text-sm">
+                <div key={p.id} className="flex items-center justify-between flex-wrap gap-2 bg-[var(--fb-surface)] rounded-xl px-4 py-2.5 text-sm">
                   <span className="font-semibold">
                     {PRODUCTS.find((x) => x.key === p.product)?.label ?? p.product}
-                    {p.kind === "renewal" && <span className="mr-2 text-xs font-bold bg-purple-500/15 text-purple-300 rounded-full px-2 py-0.5">تجديد</span>}
+                    {p.kind === "renewal" && <span className="mr-2 text-xs font-bold bg-[var(--fb-chipBlue)] text-[#9367ED] rounded-full px-2 py-0.5">تجديد</span>}
                   </span>
-                  <span className="text-slate-400">{new Date(p.created_at).toLocaleString("ar-LY")}</span>
-                  <span className="font-extrabold text-blue-300">{Number(p.amount_lyd).toLocaleString()} د.ل</span>
+                  <span className="text-[var(--fb-muted)]">{new Date(p.created_at).toLocaleString("ar-LY")}</span>
+                  <span className="font-extrabold text-[#438DF5]">{Number(p.amount_lyd).toLocaleString()} د.ل</span>
                 </div>
               ))}
             </div>
@@ -409,13 +416,13 @@ export default function SubscriptionsPage() {
       {/* Page picker modal */}
       {picker && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => !buying && setPicker(null)}>
-          <div dir="rtl" className="bg-[#111827] border border-purple-500/30 rounded-2xl p-5 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <div dir="rtl" className="bg-[var(--fb-surface)] border border-[var(--fb-border)] rounded-2xl p-5 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-bold">اختر {picker.page_limit === 1 ? "الصفحة" : `حتى ${picker.page_limit} صفحات`}</h3>
-              <button onClick={() => setPicker(null)} className="text-slate-400"><X size={18} /></button>
+              <button onClick={() => setPicker(null)} className="text-[var(--fb-muted)]"><X size={18} /></button>
             </div>
             {pages.length === 0 ? (
-              <p className="text-slate-400 text-sm">لا توجد صفحات مرتبطة بحسابك. اربط صفحة أولاً من صفحة الإعلانات.</p>
+              <p className="text-[var(--fb-muted)] text-sm">لا توجد صفحات مرتبطة بحسابك. اربط صفحة أولاً من صفحة الإعلانات.</p>
             ) : (
               <div className="space-y-2 max-h-72 overflow-y-auto">
                 {pages.map((pg) => {
@@ -424,10 +431,10 @@ export default function SubscriptionsPage() {
                   return (
                     <button key={pg.page_id} disabled={full}
                       onClick={() => setChosenPages((c) => on ? c.filter((x) => x !== pg.page_id) : [...c, pg.page_id])}
-                      className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 border text-sm ${on ? "border-purple-400 bg-purple-500/10" : "border-white/10 bg-white/5"} ${full ? "opacity-40" : ""}`}>
+                      className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 border text-sm ${on ? "border-[#438DF5] bg-[var(--fb-chipBlue)]" : "border-[var(--fb-border)] bg-[var(--fb-surface)]"} ${full ? "opacity-40" : ""}`}>
                       {pg.page_picture && <img src={pg.page_picture} alt="" className="w-8 h-8 rounded-full" />}
                       <span className="flex-1 text-right font-semibold">{pg.page_name || pg.page_id}</span>
-                      {on && <Check size={16} className="text-purple-300" />}
+                      {on && <Check size={16} className="text-[#9367ED]" />}
                     </button>
                   );
                 })}
@@ -437,7 +444,7 @@ export default function SubscriptionsPage() {
             <button
               disabled={buying || chosenPages.length === 0}
               onClick={() => doBuy(picker, chosenPages)}
-              className="w-full mt-4 bg-gradient-to-l from-purple-600 to-blue-600 rounded-xl py-2.5 font-bold flex items-center justify-center gap-2 disabled:opacity-50">
+              className="w-full mt-4 bg-gradient-to-l from-[#438DF5] to-[#9367ED] text-white rounded-xl py-2.5 font-bold flex items-center justify-center gap-2 disabled:opacity-50">
               {buying ? <Loader2 className="animate-spin" size={17} /> : <CreditCard size={17} />}
               ادفع {picker.price_lyd.toLocaleString()} د.ل
             </button>
@@ -464,20 +471,21 @@ export default function SubscriptionsPage() {
       {/* Invoice confirmation */}
       {invoice && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setInvoice(null)}>
-          <div dir="rtl" className="bg-[#111827] border border-green-500/30 rounded-2xl p-6 w-full max-w-sm text-center" onClick={(e) => e.stopPropagation()}>
+          <div dir="rtl" className="bg-[var(--fb-surface)] border border-green-500/30 rounded-2xl p-6 w-full max-w-sm text-center" onClick={(e) => e.stopPropagation()}>
             <div className="w-14 h-14 rounded-full bg-green-500/15 flex items-center justify-center mx-auto mb-3">
-              <Check className="text-green-400" size={30} />
+              <Check className="text-[#20BE83]" size={30} />
             </div>
             <h3 className="font-bold text-lg mb-1">تم الاشتراك بنجاح</h3>
-            <p className="text-slate-400 text-sm mb-3">{invoice.plan}</p>
-            <div className="bg-white/5 rounded-xl px-4 py-3 mb-4">
-              <span className="text-slate-400 text-sm">المبلغ المدفوع</span>
-              <div className="text-2xl font-black text-green-300">{invoice.amount.toLocaleString()} د.ل</div>
+            <p className="text-[var(--fb-muted)] text-sm mb-3">{invoice.plan}</p>
+            <div className="bg-[var(--fb-surface)] rounded-xl px-4 py-3 mb-4">
+              <span className="text-[var(--fb-muted)] text-sm">المبلغ المدفوع</span>
+              <div className="text-2xl font-black text-[#20BE83]">{invoice.amount.toLocaleString()} د.ل</div>
             </div>
-            <button onClick={() => setInvoice(null)} className="w-full bg-gradient-to-l from-purple-600 to-blue-600 rounded-xl py-2.5 font-bold">تم</button>
+            <button onClick={() => setInvoice(null)} className="w-full bg-gradient-to-l from-[#438DF5] to-[#9367ED] text-white rounded-xl py-2.5 font-bold">تم</button>
           </div>
         </div>
       )}
+      <AdsBottomNav />
     </div>
   );
 }

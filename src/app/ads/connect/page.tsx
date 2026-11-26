@@ -2,15 +2,15 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Globe, CheckCircle, XCircle, Trash2, Plus, ArrowLeft, ArrowRight, Loader2, Search, CheckSquare, Square } from "lucide-react";
+import { Globe, CheckCircle, XCircle, Trash2, Plus, ArrowLeft, ArrowRight, Loader2, Search, CheckSquare, Square , Megaphone } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
-import LangToggle from "@/components/LangToggle";
+import FbHeader, { FbPageHead, FbSteps } from "@/components/fb/FbHeader";
 import AdsBottomNav from "@/components/AdsBottomNav";
+import { G_ADS as G_HERO, G_META, fbPalette, FB_FONT, ACCENT } from "@/lib/fbTheme";
+const PINK = ACCENT.ads.main;
+const PINK_BG = ACCENT.ads.bg;
 
-const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
-const G_META = "linear-gradient(135deg,#3b82f6,#22d3ee)";
-const PINK    = "#d6409f";
 
 interface ConnectedPage {
   id:           string;
@@ -26,13 +26,7 @@ function ConnectPageInner() {
   const { light } = useTheme();
   const Back = rtl ? ArrowLeft : ArrowRight;
 
-  const c = light ? {
-    bg: "#fbf7ff", text: "#1e1330", muted: "#6b5b78", dim: "#8b7d97",
-    surface: "#ffffff", border: "rgba(120,60,160,0.14)", inputBg: "#f4eefb",
-  } : {
-    bg: "#100a18", text: "#f6eefb", muted: "#a394b0", dim: "#7a6d88",
-    surface: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.10)", inputBg: "rgba(255,255,255,0.06)",
-  };
+  const c = fbPalette(light);
 
   const [pages, setPages]     = useState<ConnectedPage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,15 +148,17 @@ function ConnectPageInner() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", padding: "0 0 80px", overflowX: "hidden", transition: "background .2s,color .2s" }}>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: FB_FONT, direction: rtl ? "rtl" : "ltr", padding: "0 0 80px", overflowX: "hidden", transition: "background .2s,color .2s" }}>
 
-      <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", gap: 12, maxWidth: 680, margin: "0 auto" }}>
-        <button onClick={() => router.push("/ads")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
-          <Back size={18} /> {t("رجوع", "Back")}
-        </button>
-        <h1 style={{ fontSize: 18, fontWeight: 900, margin: 0 }}>{t("ربط صفحة فيسبوك", "Connect a Facebook Page")}</h1>
-        <div style={{ marginInlineStart: "auto" }}><LangToggle /></div>
-      </div>
+      <FbHeader active="ads" />
+      <FbPageHead crumbs={[{ label: t("الإعلانات", "Ads"), href: "/ads" }, { label: t("ربط صفحة", "Connect a Page") }]}
+        icon={<Megaphone size={24} />} title={t("ربط صفحة فيسبوك", "Connect a Facebook Page")}
+        desc={t("اختر الصفحة التي ستُموَّل منها الإعلانات.", "Choose the Page your ads will run from.")} />
+      <FbSteps current={0} steps={[
+        { label: t("ربط الصفحة", "Connect Page"), href: "/ads/connect" },
+        { label: t("إنشاء الحملة", "Create campaign"), href: "/ads/create" },
+        { label: t("الدفع", "Payment") },
+      ]} />
 
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "22px 20px" }}>
 
@@ -310,7 +306,7 @@ function ConnectPageInner() {
               const isSel = selected.has(page.id);
               return (
               <div key={page.id} onClick={() => toggleSelect(page.id)}
-                style={{ background: isSel ? "rgba(214,64,159,0.08)" : c.surface, border: `2px solid ${isSel ? `${PINK}88` : c.border}`, borderRadius: 15, padding: "15px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
+                style={{ background: isSel ? "rgba(67,141,245,0.08)" : c.surface, border: `2px solid ${isSel ? `${PINK}88` : c.border}`, borderRadius: 15, padding: "15px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
                 {isSel ? <CheckSquare size={20} color={PINK} style={{ flexShrink: 0 }} /> : <Square size={20} color={c.dim} style={{ flexShrink: 0 }} />}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={`https://graph.facebook.com/${page.page_id}/picture?type=square&width=88&height=88`} alt=""

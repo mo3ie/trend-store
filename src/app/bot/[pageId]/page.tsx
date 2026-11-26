@@ -11,11 +11,13 @@ import {
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
 import { botColors } from "@/lib/botTheme";
-import LangToggle from "@/components/LangToggle";
+import FbHeader, { FbPageHead } from "@/components/fb/FbHeader";
+import AdsBottomNav from "@/components/AdsBottomNav";
 import WalletModal from "@/components/WalletModal";
 import { startPageConnect } from "@/lib/connectPage";
+import { FB_FONT } from "@/lib/fbTheme";
 
-const BLUE = "#1877f2", GREEN = "#22c55e";
+const BLUE = "#438DF5", GREEN = "#20BE83";
 
 interface Attachment { type: "image" | "file"; url: string; }
 interface ReplyGroup {
@@ -150,18 +152,17 @@ export default function BotManage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: GRADIENT, color: c.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80 }}>
-      <div style={{ padding: "18px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 12 }}>
-        <button onClick={() => router.push("/bot")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-          <Back size={18} /> {t("رجوع", "Back")}
-        </button>
-        <h1 style={{ fontSize: 16, fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <Bot size={19} color={BLUE} /> <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pageName}</span>
-        </h1>
-        <div style={{ marginInlineStart: "auto" }}><LangToggle /></div>
-      </div>
+    <div style={{ minHeight: "100vh", background: GRADIENT, color: c.text, fontFamily: FB_FONT, direction: rtl ? "rtl" : "ltr", paddingBottom: 96 }}>
+      <FbHeader active="bot" />
+      <FbPageHead
+        crumbs={[{ label: t("الرد الآلي", "Auto-Reply"), href: "/bot" }, { label: pageName || t("الصفحة", "Page") }]}
+        icon={<Bot size={24} />}
+        accent={GREEN}
+        title={pageName || t("إعدادات الرد الآلي", "Auto-Reply settings")}
+        desc={t("فعّل البوت واضبط الردود العلنية والخاصة وقواعد هذه الصفحة.", "Turn the bot on and set this Page's public and private replies and rules.")}
+      />
 
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 20px" }}>
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "16px 16px 24px" }}>
         {/* Subscription / power bar */}
         <div style={{ background: running ? `${GREEN}14` : CARD, border: `1px solid ${running ? `${GREEN}44` : BORDER}`, borderRadius: 16, padding: "16px 20px", marginBottom: 20, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <Power size={20} color={running ? GREEN : "#64748b"} />
@@ -233,6 +234,7 @@ export default function BotManage() {
         />
       )}
       <style>{`@keyframes spin-anim { to { transform: rotate(360deg); } } .spin { animation: spin-anim 1s linear infinite; } input, textarea, select { font-family: inherit; }`}</style>
+      <AdsBottomNav />
     </div>
   );
 }

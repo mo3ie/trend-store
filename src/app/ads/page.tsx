@@ -10,18 +10,13 @@ import { supabase } from "@/lib/supabaseClient";
 import { AD_TIER_PACKAGES, VIP_MONTHLY_LYD, type Tier } from "@/services/campaigns";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
-import LangToggle from "@/components/LangToggle";
+import FbHeader, { FbPageHead } from "@/components/fb/FbHeader";
 import AdsBottomNav from "@/components/AdsBottomNav";
+import { G_ADS as G_HERO, G_BLUE, G_PURPLE, G_AMBER, G_GREEN, G_ADS, fbPalette, FB_FONT, fbBtn, fbBtnGhost } from "@/lib/fbTheme";
 
 // Vivid gradient tokens — shared across dark & light (the "حيوي جريء" direction).
-const G_HERO   = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
-const G_BRAND  = "linear-gradient(135deg,#ff5c8a,#ffa14a)";
-const G_BLUE   = "linear-gradient(135deg,#22d3ee,#3b82f6)";
-const G_PURPLE = "linear-gradient(135deg,#a855f7,#ec4899)";
-const G_AMBER  = "linear-gradient(135deg,#f59e0b,#ef4444)";
-const G_GREEN  = "linear-gradient(135deg,#10b981,#22d3ee)";
 const FEATURE_GRADS = [G_BLUE, G_PURPLE, G_AMBER, G_GREEN];
-const PAY_GRADS     = [G_GREEN, G_AMBER, G_BLUE, G_PURPLE];
+const PAY_GRADS     = [G_GREEN, G_AMBER, G_BLUE, G_PURPLE, G_HERO, G_BLUE];
 
 export default function AdsLandingPage() {
   const router = useRouter();
@@ -34,13 +29,7 @@ export default function AdsLandingPage() {
   const Fwd = rtl ? ArrowLeft : ArrowRight;
 
   // Theme palette.
-  const c = light ? {
-    bg: "#fbf7ff", text: "#1e1330", muted: "#6b5b78", dim: "#8b7d97",
-    surface: "#ffffff", border: "rgba(120,60,160,0.14)",
-  } : {
-    bg: "#100a18", text: "#f6eefb", muted: "#a394b0", dim: "#7a6d88",
-    surface: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.10)",
-  };
+  const c = fbPalette(light);
 
   const features = [
     { icon: Zap,       title: t("إعداد فوري", "Instant setup"),      desc: t("اختر المنشور، ادفع، وينطلق إعلانك خلال دقائق", "Pick a post, pay, and your ad goes live within minutes") },
@@ -50,15 +39,15 @@ export default function AdsLandingPage() {
   ];
 
   const payMethods = [
-    t("ادفع لي", "Edfali"), t("معاملات", "Moamalat"), t("موبي كاش", "MobiCash"), t("المحفظة", "Wallet"),
+    t("المحفظة", "Wallet"), t("معاملات", "Moamalat"), t("إدفع لي", "Edfali"), t("موبي كاش", "MobiCash"), t("يُسر", "Yusor"), t("مصرفي باي", "Masarafi Pay"),
   ];
 
   const steps = [
     { n: "1", t: t("سجّل دخولك", "Sign in"),          d: t("أنشئ حساباً أو سجّل دخولك في ثوانٍ", "Create an account or sign in within seconds") },
     { n: "2", t: t("اربط صفحتك", "Connect your Page"), d: t("صلاحيات رسمية من Meta — آمن تماماً", "Official Meta permissions — fully secure") },
     { n: "3", t: t("أنشئ الحملة", "Create a campaign"), d: t("اختر المنشور، الميزانية والمدة", "Pick your post, budget and duration") },
-    { n: "4", t: t("ادفع بالدينار", "Pay in LYD"),     d: t("ادفع لي، معاملات، موبي كاش، أو المحفظة", "Edfali, Moamalat, MobiCash, or wallet") },
-    { n: "5", t: t("يبدأ إعلانك", "Your ad goes live"), d: t("نشغّل الحملة تلقائياً خلال دقائق من الدفع", "We launch the campaign automatically within minutes") },
+    { n: "4", t: t("ادفع بالدينار", "Pay in LYD"),     d: t("المحفظة أو معاملات أو إدفع لي أو موبي كاش أو يُسر أو مصرفي باي", "Wallet, Moamalat, Edfali, MobiCash, Yusor or Masarafi Pay") },
+    { n: "5", t: t("يبدأ إعلانك", "Your ad goes live"), d: t("نُطلق الحملة تلقائياً بعد الدفع، وتبدأ بعد مراجعة Meta", "We launch it automatically after payment; it starts after Meta’s review") },
   ];
 
   useEffect(() => {
@@ -76,35 +65,21 @@ export default function AdsLandingPage() {
   const card: React.CSSProperties = { background: c.surface, border: `2px solid ${c.border}`, borderRadius: 18 };
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo, sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 96, overflowX: "hidden", transition: "background .2s,color .2s" }}>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: FB_FONT, direction: rtl ? "rtl" : "ltr", paddingBottom: 96, overflowX: "hidden", transition: "background .2s,color .2s" }}>
 
-      {/* Nav */}
-      <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 12, background: G_BRAND, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Megaphone size={19} color="#fff" />
-          </div>
-          <div style={{ fontWeight: 900, fontSize: 15 }}>{t("ترند ستور", "Trend Store")}</div>
-        </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          {user ? (
-            <button onClick={() => router.push("/ads/campaigns")}
-              style={{ background: c.surface, border: `2px solid ${c.border}`, borderRadius: 11, padding: "8px 14px", color: c.text, cursor: "pointer", fontSize: 12.5, fontWeight: 800, fontFamily: "inherit" }}>
-              {t("حملاتي", "My campaigns")}
-            </button>
-          ) : (
-            <button onClick={() => router.push("/login?next=/ads")}
-              style={{ background: G_HERO, border: "none", borderRadius: 11, padding: "8px 16px", color: "#fff", cursor: "pointer", fontSize: 12.5, fontWeight: 800, fontFamily: "inherit" }}>
-              {t("تسجيل الدخول", "Sign in")}
-            </button>
-          )}
-          <button onClick={() => router.push("/")}
-            style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
-            {t("المتجر", "Store")}
-          </button>
-          <LangToggle />
-        </div>
-      </nav>
+      <FbHeader active="ads" />
+      <FbPageHead
+        crumbs={[{ label: t("إعلانات فيسبوك", "Facebook Ads") }]}
+        icon={<Megaphone size={24} />}
+        title={t("إعلانات فيسبوك", "Facebook Ads")}
+        desc={t("حملات ممولة حقيقية على Meta بباقات ثابتة بالدينار.", "Real Meta campaigns with fixed LYD packages.")}
+        actions={user ? (<>
+          <button onClick={() => router.push("/ads/campaigns")} style={fbBtnGhost(c)}>{t("حملاتي", "My campaigns")}</button>
+          <button onClick={handleStart} style={fbBtn(G_ADS)}>{t("حملة جديدة", "New campaign")}</button>
+        </>) : (
+          <button onClick={() => router.push("/login?next=/ads")} style={fbBtn(G_ADS)}>{t("تسجيل الدخول", "Sign in")}</button>
+        )}
+      />
 
       {/* Hero */}
       <section style={{ maxWidth: 760, margin: "0 auto", padding: "20px 18px 8px" }}>
@@ -112,17 +87,17 @@ export default function AdsLandingPage() {
           <div style={{ position: "absolute", top: -40, insetInlineEnd: -30, width: 160, height: 160, borderRadius: "50%", background: "rgba(255,255,255,0.18)" }} />
           <div style={{ position: "relative" }}>
             <div style={{ display: "inline-block", background: "rgba(255,255,255,0.22)", borderRadius: 100, padding: "6px 15px", fontSize: 12.5, color: "#fff", fontWeight: 800, marginBottom: 18 }}>
-              ✦ {t("إعلانات فيسبوك بضغطة", "Facebook ads in a tap")}
+              ✦ {t("إعلانات فيسبوك بنقرة واحدة", "Facebook ads in a tap")}
             </div>
             <h1 style={{ fontSize: "clamp(34px,7vw,46px)", fontWeight: 900, lineHeight: 1.12, margin: "0 0 14px", color: "#fff", letterSpacing: "-1px" }}>
-              {t("وصّل إعلانك", "Get your ad")}<br />{t("للعملاء 🚀", "in front of customers 🚀")}
+              {t("أوصل إعلانك", "Get your ad")}<br />{t("إلى العملاء", "in front of customers")}
             </h1>
             <p style={{ color: "rgba(255,255,255,0.92)", fontSize: "clamp(14px,2.2vw,15px)", lineHeight: 1.7, margin: "0 0 26px", maxWidth: 420 }}>
               {t("اختر منشوراً، حدّد الميزانية، وادفع بالدينار — ونُطلق حملتك الحقيقية على Meta خلال دقائق.",
                  "Pick a post, set a budget, pay in LYD — and we launch your real Meta campaign within minutes.")}
             </p>
             <button onClick={handleStart} disabled={loading}
-              style={{ border: "none", cursor: "pointer", borderRadius: 15, padding: "15px 30px", fontFamily: "inherit", fontWeight: 900, fontSize: 16, color: "#d6409f", background: "#fff", boxShadow: "0 12px 30px rgba(0,0,0,0.20)", display: "inline-flex", alignItems: "center", gap: 9 }}>
+              style={{ border: "none", cursor: "pointer", borderRadius: 15, padding: "15px 30px", fontFamily: "inherit", fontWeight: 900, fontSize: 16, color: "#438DF5", background: "#fff", boxShadow: "0 12px 30px rgba(0,0,0,0.20)", display: "inline-flex", alignItems: "center", gap: 9 }}>
               {t("ابدأ الإعلان الآن", "Start advertising")}
               <Fwd size={18} />
             </button>
@@ -135,7 +110,7 @@ export default function AdsLandingPage() {
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {[
             { g: G_BLUE,   big: t("دقائق", "Minutes"), sub: t("للانطلاق", "to launch") },
-            { g: G_PURPLE, big: t("4 طرق", "4 ways"),  sub: t("دفع محلية", "local payment") },
+            { g: G_PURPLE, big: t("6 طرق", "6 ways"),  sub: t("دفع محلية", "local payment") },
             { g: G_AMBER,  big: "Meta",                sub: t("رسمي", "official") },
           ].map((s) => (
             <div key={s.sub} style={{ flex: "1 1 100px", borderRadius: 18, padding: "16px 10px", textAlign: "center", background: s.g }}>
@@ -148,7 +123,7 @@ export default function AdsLandingPage() {
 
       {/* Features */}
       <section style={{ maxWidth: 1000, margin: "0 auto", padding: "26px 18px 8px" }}>
-        <h2 style={{ fontWeight: 900, fontSize: 24, margin: "0 0 16px" }}>{t("مزايا تفرق 💥", "Features that matter 💥")}</h2>
+        <h2 style={{ fontWeight: 900, fontSize: 24, margin: "0 0 16px" }}>{t("مزايا تصنع الفرق", "Features that matter")}</h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>
           {features.map((f, i) => (
             <div key={f.title} style={{ ...card, padding: 18 }}>
@@ -164,7 +139,7 @@ export default function AdsLandingPage() {
 
       {/* Payment methods */}
       <section style={{ maxWidth: 800, margin: "0 auto", padding: "26px 18px 8px" }}>
-        <h2 style={{ fontWeight: 900, fontSize: 24, margin: "0 0 6px" }}>{t("ادفع بالدينار 💳", "Pay in LYD 💳")}</h2>
+        <h2 style={{ fontWeight: 900, fontSize: 24, margin: "0 0 6px" }}>{t("ادفع بالدينار الليبي", "Pay in LYD")}</h2>
         <p style={{ color: c.muted, fontSize: 13.5, margin: "0 0 14px" }}>{t("طرق دفع ليبية محلية — كلها مُفعّلة.", "Local Libyan payment methods — all active.")}</p>
         <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
           {payMethods.map((m, i) => (
@@ -215,12 +190,12 @@ export default function AdsLandingPage() {
         {/* trust strip */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 16 }}>
           {[
-            { icon: Eye,       label: t("ضمان وصول المشاهدات", "Guaranteed views delivery") },
+            { icon: Eye,       label: t("مشاهدات متوقعة لكل باقة", "Expected views for every package") },
             { icon: BarChart3, label: t("تقارير دورية للأداء", "Regular performance reports") },
             { icon: Check,     label: t("إدارة احترافية", "Professional management") },
           ].map((x) => (
             <div key={x.label} style={{ flex: "1 1 200px", display: "flex", alignItems: "center", gap: 9, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: "12px 14px" }}>
-              <x.icon size={17} color="#ec4899" />
+              <x.icon size={17} color="#438DF5" />
               <span style={{ fontSize: 12.5, color: c.muted, fontWeight: 600 }}>{x.label}</span>
             </div>
           ))}
@@ -288,21 +263,21 @@ export default function AdsLandingPage() {
       {/* CTA */}
       <section style={{ maxWidth: 640, margin: "0 auto", padding: "20px 18px 8px" }}>
         <div style={{ textAlign: "center", borderRadius: 26, padding: "clamp(30px,6vw,40px) 24px", background: G_HERO }}>
-          <div style={{ fontWeight: 900, fontSize: 24, marginBottom: 8, color: "#fff" }}>{t("ابدأ حملتك اليوم 🎯", "Start your campaign today 🎯")}</div>
+          <div style={{ fontWeight: 900, fontSize: 24, marginBottom: 8, color: "#fff" }}>{t("ابدأ حملتك اليوم", "Start your campaign today")}</div>
           <div style={{ color: "rgba(255,255,255,0.92)", fontSize: 13.5, lineHeight: 1.7, marginBottom: 22 }}>
-            {t("انضمّ لمئات التجار الليبيين الذين يعزّزون مبيعاتهم عبر الإعلانات الرقمية.",
+            {t("انضمّ إلى التجار الليبيين الذين يعزّزون مبيعاتهم عبر الإعلانات الرقمية.",
                "Join hundreds of Libyan merchants boosting their sales through digital ads.")}
           </div>
           <button onClick={handleStart}
-            style={{ width: "100%", border: "none", cursor: "pointer", borderRadius: 100, padding: "16px 0", fontFamily: "inherit", fontWeight: 900, fontSize: 16, color: "#d6409f", background: "#fff" }}>
-            {t("ابدأ الآن مجاناً", "Get started free")}
+            style={{ width: "100%", border: "none", cursor: "pointer", borderRadius: 100, padding: "16px 0", fontFamily: "inherit", fontWeight: 900, fontSize: 16, color: "#438DF5", background: "#fff" }}>
+            {t("ابدأ الآن", "Get started")}
           </button>
         </div>
       </section>
 
       {/* Footer */}
       <div style={{ textAlign: "center", padding: 24, color: c.dim, fontSize: 12 }}>
-        {t("© 2025 ترند ستور — خدمات الإعلانات الرقمية", "© 2025 Trend Store — Digital advertising services")}
+        {t("© 2026 محل ترند — خدمات الإعلانات الرقمية", "© 2026 Trend Store — Digital advertising services")}
       </div>
 
       <AdsBottomNav />

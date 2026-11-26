@@ -11,12 +11,13 @@ import {
 import { CAMPAIGN_STATUS_LABELS, CAMPAIGN_STATUS_LABELS_EN, CAMPAIGN_STATUS_COLORS } from "@/services/campaigns";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
-import LangToggle from "@/components/LangToggle";
+import FbHeader, { FbPageHead } from "@/components/fb/FbHeader";
 import AdsBottomNav from "@/components/AdsBottomNav";
 import WalletModal from "@/components/WalletModal";
+import { G_ADS as G_HERO, fbPalette, FB_FONT, ACCENT, fbBtn, fbBtnGhost, G_ADS } from "@/lib/fbTheme";
+const PINK = ACCENT.ads.main;
+const PINK_BG = ACCENT.ads.bg;
 
-const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
-const PINK    = "#d6409f";
 
 interface Campaign {
   id:                  string;
@@ -70,13 +71,7 @@ function CampaignsInner() {
   const LYD  = t("د.ل", "LYD");
   const statusLabels = rtl ? CAMPAIGN_STATUS_LABELS : CAMPAIGN_STATUS_LABELS_EN;
 
-  const c = light ? {
-    bg: "#fbf7ff", text: "#1e1330", muted: "#6b5b78", dim: "#8b7d97",
-    surface: "#ffffff", border: "rgba(120,60,160,0.14)",
-  } : {
-    bg: "#100a18", text: "#f6eefb", muted: "#a394b0", dim: "#7a6d88",
-    surface: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.10)",
-  };
+  const c = fbPalette(light);
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -117,31 +112,17 @@ function CampaignsInner() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 80, overflowX: "hidden", transition: "background .2s,color .2s" }}>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: FB_FONT, direction: rtl ? "rtl" : "ltr", paddingBottom: 80, overflowX: "hidden", transition: "background .2s,color .2s" }}>
 
-      <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 800, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => router.push("/ads")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
-            <Back size={18} /> {t("رجوع", "Back")}
-          </button>
-          <h1 style={{ fontSize: 18, fontWeight: 900, margin: 0 }}>{t("حملاتي الإعلانية", "My campaigns")}</h1>
-        </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button onClick={() => router.push("/ads/payments")} title={t("نشاطات الدفع", "Payment activity")}
-            style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "8px 12px", color: c.muted, cursor: "pointer" }}>
-            <Wallet size={15} />
-          </button>
-          <button onClick={() => loadCampaigns(true)} disabled={syncing} title={t("تحديث", "Refresh")}
-            style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "8px 12px", color: c.muted, cursor: "pointer" }}>
-            <RefreshCw size={15} className={syncing ? "spin" : ""} />
-          </button>
-          <button onClick={() => router.push("/ads/create")}
-            style={{ background: G_HERO, border: "none", borderRadius: 11, padding: "9px 16px", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
-            <Plus size={15} /> {t("حملة جديدة", "New campaign")}
-          </button>
-          <LangToggle />
-        </div>
-      </div>
+      <FbHeader active="ads" />
+      <FbPageHead crumbs={[{ label: t("الإعلانات", "Ads"), href: "/ads" }, { label: t("حملاتي", "My campaigns") }]}
+        icon={<Megaphone size={24} />} title={t("حملاتي الإعلانية", "My campaigns")}
+        desc={t("حالة كل حملة ونتائجها وفواتيرها.", "Each campaign's status, results and invoices.")}
+        actions={<>
+          <button onClick={() => router.push("/ads/payments")} style={fbBtnGhost(c)}><Wallet size={16} /> {t("نشاطات الدفع", "Payment activity")}</button>
+          <button onClick={() => loadCampaigns(true)} disabled={syncing} style={fbBtnGhost(c)} aria-label={t("تحديث النتائج", "Refresh results")}><RefreshCw size={16} className={syncing ? "spin" : ""} /> {t("تحديث", "Refresh")}</button>
+          <button onClick={() => router.push("/ads/create")} style={fbBtn(G_ADS)}><Plus size={16} /> {t("حملة جديدة", "New campaign")}</button>
+        </>} />
 
       <div style={{ maxWidth: 800, margin: "0 auto", padding: "22px 20px" }}>
 
@@ -175,7 +156,7 @@ function CampaignsInner() {
                     {/* Type badges */}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
                       {camp.objective && OBJECTIVE_LABELS[camp.objective] && (
-                        <span style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "3px 9px", background: "rgba(109,40,217,0.14)", color: light ? "#6d28d9" : "#c4b5fd" }}>
+                        <span style={{ fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "3px 9px", background: "rgba(109,40,217,0.14)", color: light ? "#438DF5" : "#c4b5fd" }}>
                           {t(OBJECTIVE_LABELS[camp.objective][0], OBJECTIVE_LABELS[camp.objective][1])}
                         </span>
                       )}
@@ -303,7 +284,7 @@ function CampaignsInner() {
 
                 {camp.status === "pending_payment" && (
                   <button onClick={() => router.push(`/ads/checkout?campaignId=${camp.id}`)}
-                    style={{ marginTop: 14, width: "100%", background: "rgba(214,64,159,0.14)", border: `1px solid ${PINK}55`, borderRadius: 12, padding: "11px 0", color: PINK, fontWeight: 800, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
+                    style={{ marginTop: 14, width: "100%", background: "rgba(67,141,245,0.14)", border: `1px solid ${PINK}55`, borderRadius: 12, padding: "11px 0", color: PINK, fontWeight: 800, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
                     {t("استكمال الدفع", "Complete payment")}
                   </button>
                 )}

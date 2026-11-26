@@ -4,15 +4,15 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Crown, Headphones, Sparkles, Infinity as InfinityIcon, Check, ArrowLeft, ArrowRight,
-  Loader2, Wallet, CheckCircle, AlertCircle,
+  Loader2, Wallet, CheckCircle, AlertCircle, Megaphone,
 } from "lucide-react";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
-import LangToggle from "@/components/LangToggle";
+import FbHeader, { FbPageHead } from "@/components/fb/FbHeader";
 import AdsBottomNav from "@/components/AdsBottomNav";
+import { G_GOLD, fbPalette, FB_FONT } from "@/lib/fbTheme";
 
 const GOLD = "#f0b429";
-const G_GOLD = "linear-gradient(135deg,#f0b429,#ff9d2f)";
 
 interface VipState { vip: boolean; until: string | null; permanent: boolean; price: number; balance: number; }
 
@@ -22,11 +22,7 @@ export default function VipPage() {
   const { light } = useTheme();
   const Back = rtl ? ArrowLeft : ArrowRight;
 
-  const c = light ? {
-    bg: "#fbf7ff", text: "#1e1330", muted: "#6b5b78", dim: "#8b7d97", surface: "#ffffff", border: "rgba(120,60,160,0.14)",
-  } : {
-    bg: "#100a18", text: "#f6eefb", muted: "#a394b0", dim: "#7a6d88", surface: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.10)",
-  };
+  const c = fbPalette(light);
 
   const [st, setSt] = useState<VipState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,15 +67,12 @@ export default function VipPage() {
   const expiry = st.until ? new Date(st.until).toLocaleDateString(rtl ? "ar-LY" : "en-GB") : null;
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 96, overflowX: "hidden", transition: "background .2s,color .2s" }}>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: FB_FONT, direction: rtl ? "rtl" : "ltr", paddingBottom: 96, overflowX: "hidden", transition: "background .2s,color .2s" }}>
 
-      <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", gap: 12, maxWidth: 640, margin: "0 auto" }}>
-        <button onClick={() => router.push("/ads")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
-          <Back size={18} /> {t("رجوع", "Back")}
-        </button>
-        <h1 style={{ fontSize: 18, fontWeight: 900, margin: 0 }}>{t("عضوية VIP", "VIP membership")}</h1>
-        <div style={{ marginInlineStart: "auto" }}><LangToggle /></div>
-      </div>
+      <FbHeader active="ads" />
+      <FbPageHead crumbs={[{ label: t("الإعلانات", "Ads"), href: "/ads" }, { label: t("عضوية VIP", "VIP membership") }]}
+        icon={<Megaphone size={24} />} accent="#d9a21b" title={t("عضوية VIP", "VIP membership")}
+        desc={t("ميزانية مفتوحة بالدولار ومساعد استهداف بالذكاء الاصطناعي.", "An open USD budget and an AI targeting assistant.")} />
 
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "12px 18px" }}>
 

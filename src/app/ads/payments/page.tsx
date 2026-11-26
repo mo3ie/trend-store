@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Loader2, Wallet, Receipt, TrendingUp } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Wallet, Receipt, TrendingUp , Megaphone } from "lucide-react";
 import { CAMPAIGN_STATUS_LABELS, CAMPAIGN_STATUS_LABELS_EN, CAMPAIGN_STATUS_COLORS } from "@/services/campaigns";
 import { useLang } from "@/hooks/useLang";
 import { useTheme } from "@/hooks/useTheme";
-import LangToggle from "@/components/LangToggle";
+import FbHeader, { FbPageHead } from "@/components/fb/FbHeader";
 import AdsBottomNav from "@/components/AdsBottomNav";
+import { G_ADS as G_HERO, fbPalette, FB_FONT, ACCENT } from "@/lib/fbTheme";
+const PINK = ACCENT.ads.main;
+const PINK_BG = ACCENT.ads.bg;
 
-const G_HERO = "linear-gradient(140deg,#6d28d9 0%,#d6409f 55%,#ff7a59 100%)";
-const PINK   = "#d6409f";
 
 interface Campaign {
   id: string; page_name?: string; total_price: number; status: string; created_at: string;
@@ -24,11 +25,7 @@ export default function PaymentsPage() {
   const LYD  = t("د.ل", "LYD");
   const statusLabels = rtl ? CAMPAIGN_STATUS_LABELS : CAMPAIGN_STATUS_LABELS_EN;
 
-  const c = light ? {
-    bg: "#fbf7ff", text: "#1e1330", muted: "#6b5b78", dim: "#8b7d97", surface: "#ffffff", border: "rgba(120,60,160,0.14)",
-  } : {
-    bg: "#100a18", text: "#f6eefb", muted: "#a394b0", dim: "#7a6d88", surface: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.10)",
-  };
+  const c = fbPalette(light);
 
   const [rows, setRows] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,14 +41,11 @@ export default function PaymentsPage() {
   const total = rows.reduce((s, r) => s + (Number(r.total_price) || 0), 0);
 
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: "Cairo,sans-serif", direction: rtl ? "rtl" : "ltr", paddingBottom: 96, overflowX: "hidden", transition: "background .2s,color .2s" }}>
-      <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", gap: 12, maxWidth: 700, margin: "0 auto" }}>
-        <button onClick={() => router.push("/ads/campaigns")} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
-          <Back size={18} /> {t("رجوع", "Back")}
-        </button>
-        <h1 style={{ fontSize: 18, fontWeight: 900, margin: 0 }}>{t("نشاطات الدفع", "Payment activity")}</h1>
-        <div style={{ marginInlineStart: "auto" }}><LangToggle /></div>
-      </div>
+    <div style={{ minHeight: "100vh", background: c.bg, color: c.text, fontFamily: FB_FONT, direction: rtl ? "rtl" : "ltr", paddingBottom: 96, overflowX: "hidden", transition: "background .2s,color .2s" }}>
+      <FbHeader active="ads" />
+      <FbPageHead crumbs={[{ label: t("الإعلانات", "Ads"), href: "/ads" }, { label: t("حملاتي", "My campaigns"), href: "/ads/campaigns" }, { label: t("نشاطات الدفع", "Payment activity") }]}
+        icon={<Megaphone size={24} />} title={t("نشاطات الدفع", "Payment activity")}
+        desc={t("كل ما دفعته للحملات، مع فاتورة لكل حملة.", "Everything you paid for campaigns, with an invoice for each.")} />
 
       <div style={{ maxWidth: 700, margin: "0 auto", padding: "12px 18px" }}>
         {/* Total spent */}
@@ -74,7 +68,7 @@ export default function PaymentsPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {rows.map((r) => (
               <div key={r.id} style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(214,64,159,0.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(67,141,245,0.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <TrendingUp size={18} color={PINK} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>

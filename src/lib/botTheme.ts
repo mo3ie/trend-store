@@ -23,33 +23,34 @@ export interface BotColors {
 }
 
 export function botColors(light: boolean): BotColors {
+  // Same palette as every «أدوات فيسبوك» screen (src/lib/fbTheme.ts).
   return light
     ? {
-        gradient:   "linear-gradient(135deg, #f4f6fb 0%, #e9eefb 100%)",
-        text:       "#16131f",
-        muted:      "#5b6472",
-        dim:        "#8b93a1",
-        card:       "rgba(255,255,255,0.92)",
-        surface:    "rgba(15,19,32,0.04)",
-        border:     "rgba(15,19,32,0.12)",
-        borderSoft: "rgba(15,19,32,0.07)",
-        input:      "rgba(15,19,32,0.03)",
-        menu:       "#ffffff",
-        toast:      "#ffffff",
-        shadow:     "0 8px 30px rgba(15,19,32,0.15)",
+        gradient:   "#F6F8FC",
+        text:       "#111827",
+        muted:      "#64748B",
+        dim:        "#6b7a90",
+        card:       "#FFFFFF",
+        surface:    "#F1F4FA",
+        border:     "#E8ECF4",
+        borderSoft: "#EEF1F6",
+        input:      "#F1F4FA",
+        menu:       "#FFFFFF",
+        toast:      "#FFFFFF",
+        shadow:     "0 1px 2px rgba(17,24,39,.04), 0 8px 24px -18px rgba(17,24,39,.18)",
       }
     : {
-        gradient:   "linear-gradient(135deg, #0f0f1a 0%, #0d1b2a 100%)",
-        text:       "#ffffff",
-        muted:      "#94a3b8",
-        dim:        "#64748b",
-        card:       "rgba(255,255,255,0.04)",
-        surface:    "rgba(255,255,255,0.06)",
-        border:     "rgba(255,255,255,0.1)",
-        borderSoft: "rgba(255,255,255,0.06)",
-        input:      "rgba(255,255,255,0.06)",
+        gradient:   "#0B1120",
+        text:       "#F8FAFC",
+        muted:      "#A0AEC0",
+        dim:        "#8391a7",
+        card:       "#111827",
+        surface:    "#1A2436",
+        border:     "#263247",
+        borderSoft: "#1d2738",
+        input:      "#1A2436",
         menu:       "#111827",
-        toast:      "#1e293b",
+        toast:      "#1A2436",
         shadow:     "0 8px 30px rgba(0,0,0,0.5)",
       };
 }
