@@ -185,11 +185,69 @@ export function composePublicReply(
    * on a desktop copies. Printing them on separate lines costs one newline and
    * serves both; printing only the URL served neither well.
    *
-   * The code goes FIRST and bare — no label — because that is the line that has
-   * to survive being read off a crowded comment list at a glance.
+   * ## The lines are LABELLED, and that was the second lesson
+   *
+   * They shipped bare for one comment's lifetime, on the theory that a naked code
+   * survives a glance down a crowded list. It does — and it means nothing when it
+   * lands. The live reply read:
+   *
+   *     تم الرد عليك داخل الرابط الخاص 📩
+   *     7UT8S
+   *     https://www.trendstore-ly.com/r/7UT8S
+   *
+   * Reported as "مبهم، لماذا سيفعل الزبون". Exactly right. Someone who typed
+   * "بكم" is shown a passive sentence, five characters of apparent noise, and a
+   * URL that TikTok does not make tappable. Nothing tells them that a PRICE is
+   * behind it, and nothing tells them what to DO. Legibility was never the
+   * problem; the comment had no verb.
+   *
+   * So each line now says what it is and what to do with it. Three short words
+   * are cheap. A customer who shrugs and scrolls is not.
    */
-  if (!hasCode && !hasLink) out = `${out}\n${code}\n${url}`;
-  return out;
+  if (!hasCode && !hasLink) out = `${out}\n${LABEL_CODE}${code}\n${LABEL_LINK}${url}`;
+  return clampComment(out, code, url);
+}
+
+/*
+ * Written as instructions, not as nouns. "كودك" and "أو افتح" tell the reader
+ * that the first is theirs to use and the second is the alternative — the two
+ * facts a stranger needs and cannot infer from a bare string.
+ */
+const LABEL_CODE = "كودك: ";
+const LABEL_LINK = "أو افتح: ";
+
+/**
+ * TikTok rejects a comment over 150 characters outright.
+ *
+ * Which is a silent bot: the reply fails, the customer gets nothing, and nothing
+ * on the merchant's screen says why. Nobody had checked, and the margin is
+ * thinner than it looks — the URL alone is ~37 characters and the labelled code
+ * another ~13, so a merchant with a two-sentence greeting is already over.
+ *
+ * Degrading in order, keeping the most useful thing last:
+ *
+ *   1. drop the URL line  — the code plus the bio link is the designed path, and
+ *                           the URL is not tappable on TikTok anyway
+ *   2. trim the merchant's own text — their words yield before the mechanism,
+ *                           because a warm sentence with no code is useless
+ *   3. hard cut           — never return something TikTok will refuse
+ */
+export const COMMENT_MAX = 150;
+
+export function clampComment(text: string, code: string, url: string): string {
+  const len = (s: string) => [...s].length;   // codepoints: an emoji is one char
+  if (len(text) <= COMMENT_MAX) return text;
+
+  const withoutUrl = text.split(`\n${LABEL_LINK}${url}`).join("").split(`\n${url}`).join("");
+  if (len(withoutUrl) <= COMMENT_MAX) return withoutUrl;
+
+  // Keep the tail — the code lives there — and shorten the merchant's opening.
+  const tail = `\n${LABEL_CODE}${code}`;
+  const head = withoutUrl.endsWith(tail) ? withoutUrl.slice(0, -tail.length) : withoutUrl;
+  const room = COMMENT_MAX - len(tail) - 1;
+  if (room > 8) return `${[...head].slice(0, room).join("").trim()}…${tail}`;
+
+  return [...withoutUrl].slice(0, COMMENT_MAX).join("");
 }
 
 /**

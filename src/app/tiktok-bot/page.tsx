@@ -572,6 +572,7 @@ function TikTokBotInner() {
               <PrivateReplyPanel
                 c={c} t={t} rtl={rtl} config={config} patch={patch}
                 siteHost={typeof window === "undefined" ? "" : window.location.host}
+                accountId={st?.account?.id}
               />
             </div>
           ) : (

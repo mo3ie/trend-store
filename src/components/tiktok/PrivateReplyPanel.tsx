@@ -46,13 +46,15 @@ interface LinkRow {
 }
 
 export function PrivateReplyPanel({
-  c, t, rtl, config, patch, siteHost,
+  c, t, rtl, config, patch, siteHost, accountId,
 }: {
   c: TikTokPalette; t: TF; rtl: boolean;
   config: PrivateReplyConfig;
   /** The screen's single writer, so this panel saves exactly like every other card. */
   patch: (fields: Record<string, unknown>) => Promise<boolean>;
   siteHost: string;
+  /** tiktok_accounts.id — needed only by the image probe. */
+  accountId?: string | null;
 }) {
   const mode = (config.private_delivery || "off") as "off" | "link" | "assist";
   const on = mode !== "off";
@@ -63,6 +65,36 @@ export function PrivateReplyPanel({
   const [linkText, setLinkText] = useState(config.private_link_text || "");
   const [wa, setWa] = useState(config.whatsapp_number || "");
   const [kw, setKw] = useState((config.price_keywords || []).join("، "));
+
+  const [probing, setProbing] = useState(false);
+  const [probeMsg, setProbeMsg] = useState("");
+  const [probeOk, setProbeOk] = useState(false);
+
+  /**
+   * Asks TikTok the one question its documentation does not answer: may this app
+   * upload a comment image? Nothing is posted — see the button's comment.
+   *
+   * A refusal is reported with TikTok's own code, because that code is the
+   * finding. It is the fact missing from every source we have, and it is what we
+   * would put in a support ticket.
+   */
+  async function probeImage() {
+    if (!accountId) return;
+    setProbing(true); setProbeMsg("");
+    try {
+      const r = await fetch(`/api/tiktok/bot/test-comment-image?accountId=${encodeURIComponent(accountId)}`);
+      const d = await r.json();
+      setProbeOk(!!d.ok);
+      setProbeMsg(d.ok
+        ? t("✅ تيك توك قبلت الصورة — البطاقة والـQR يعملان. شغّل المفتاح أعلاه.",
+            "✅ TikTok accepted the image — the card and QR work. Turn the switch on above.")
+        : `${t("لم تقبلها تيك توك", "TikTok refused")}: ${d.message || d.stage || ""}${d.tiktokCode ? ` (${d.tiktokCode})` : ""}`);
+    } catch {
+      setProbeOk(false);
+      setProbeMsg(t("تعذّر الاتصال — جرّب مرة أخرى.", "Could not reach the server — try again."));
+    }
+    setProbing(false);
+  }
   const [waText, setWaText] = useState(config.whatsapp_text || "");
 
   const [stats, setStats] = useState<{ sent: number; opened: number; whatsapp: number } | null>(null);
@@ -96,10 +128,42 @@ export function PrivateReplyPanel({
     if (ok) { setSaved(t("حُفظ", "Saved")); setTimeout(() => setSaved(""), 1800); }
   }
 
-  const DEFAULT_LINK_TEXT = "تم تجهيز ردّك ✅";
-  const previewLine = (linkText || DEFAULT_LINK_TEXT).includes("{link}")
-    ? (linkText || DEFAULT_LINK_TEXT).replace("{link}", `${siteHost}/r/A7K2M9Q`)
-    : `${linkText || DEFAULT_LINK_TEXT}\n${siteHost}/r/A7K2M9Q`;
+  /*
+   * These three must stay identical to src/lib/privateLinks.ts. They are copied
+   * rather than imported because that module pulls in supabaseAdmin and this is a
+   * client component — and a preview that disagrees with the engine is worse than
+   * no preview, which is exactly what happened here: this showed a default of
+   * "تم تجهيز ردّك ✅" that the engine has never used, and appended a bare URL
+   * while the engine appends a labelled code and a labelled link.
+   */
+  const DEFAULT_LINK_TEXT = "كودك {code} — افتح الرابط في البايو واكتب الكود لترى السعر 🔑";
+  const LABEL_CODE = "كودك: ";
+  const LABEL_LINK = "أو افتح: ";
+  const SAMPLE = "7UT8S";
+
+  const base = (linkText || DEFAULT_LINK_TEXT).trim();
+  const sampleUrl = `https://${siteHost}/r/${SAMPLE}`;
+  const previewLine = base.includes("{code}") || base.includes("{link}")
+    ? base.split("{code}").join(SAMPLE).split("{link}").join(sampleUrl)
+    : `${base}\n${LABEL_CODE}${SAMPLE}\n${LABEL_LINK}${sampleUrl}`;
+
+  const previewLen = [...previewLine].length;
+
+  /*
+   * Does the comment tell the customer anything?
+   *
+   * The live test produced "تم الرد عليك داخل الرابط الخاص 📩" — passive, and it
+   * never says the word the commenter typed. Someone who asked "بكم" is shown a
+   * sentence about a link, a code and a URL, with no hint that a PRICE is behind
+   * any of it. The reply was legible and had no verb.
+   *
+   * A keyword list cannot judge writing, so this only checks the two facts that
+   * are objectively absent or present: does it name what is behind the code, and
+   * does it ask for an action. It warns, never blocks — the merchant's words are
+   * the merchant's.
+   */
+  const saysWhat = /سعر|ثمن|تمن|price|سعرها|السعر/i.test(base);
+  const saysDo = /افتح|اكتب|ادخل|انسخ|اضغط|زور|open|enter|type|tap|copy/i.test(base);
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
@@ -226,14 +290,59 @@ export function PrivateReplyPanel({
               placeholder={DEFAULT_LINK_TEXT}
               style={ttInput(c)}
             />
+            {/*
+              Three ready sentences. The blank field is what produced the vague
+              one: asked to write a comment with no idea what it has to achieve,
+              a merchant writes something polite and contentless. Each of these
+              names the price and asks for one action, which is the whole job.
+            */}
+            <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 9 }}>
+              {[
+                t("السعر جاهز لك 👇 اكتب الكود {code} في الرابط بالبايو",
+                  "Your price is ready 👇 enter code {code} at the link in our bio"),
+                t("كودك {code} — افتح الرابط في البايو واكتب الكود لترى السعر 🔑",
+                  "Your code is {code} — open the link in our bio and enter it to see the price 🔑"),
+                t("السعر محجوز لك 🔑 الكود {code}، اكتبه في رابط البايو",
+                  "Price reserved for you 🔑 code {code}, enter it at our bio link"),
+              ].map((s) => (
+                <button key={s} onClick={() => { setLinkText(s); save({ private_link_text: s }); }}
+                  style={{
+                    background: c.stage, border: `1px solid ${c.border ?? "#242c42"}`, borderRadius: 9,
+                    padding: "7px 10px", fontSize: 11, color: c.muted, cursor: "pointer",
+                    fontFamily: "inherit", textAlign: "start", maxWidth: "100%",
+                  }}>
+                  {s.length > 44 ? `${s.slice(0, 44)}…` : s}
+                </button>
+              ))}
+            </div>
+
             <div style={{ marginTop: 10, background: c.stage, borderRadius: 11, padding: "12px 13px" }}>
-              <div style={{ fontSize: 10.5, color: "#8b8f9e", fontWeight: 700, marginBottom: 7, letterSpacing: ".4px" }}>
-                {t("هكذا سيظهر التعليق", "This is how the comment will look")}
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 7 }}>
+                <div style={{ fontSize: 10.5, color: "#8b8f9e", fontWeight: 700, letterSpacing: ".4px" }}>
+                  {t("هكذا سيظهر التعليق", "This is how the comment will look")}
+                </div>
+                {/* TikTok refuses a comment over 150 characters outright — a silent bot. */}
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: previewLen > 150 ? "#ef4444" : "#8b8f9e" }}>
+                  {previewLen}/150
+                </div>
               </div>
               <div style={{ fontSize: 13.5, color: "#fff", lineHeight: 1.85, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
                 {t("أحمد، ", "Ahmed, ")}{previewLine}
               </div>
             </div>
+
+            {(!saysWhat || !saysDo) && (
+              <div style={{ marginTop: 9, fontSize: 11.5, color: "#f59e0b", lineHeight: 1.8 }}>
+                {!saysWhat && !saysDo
+                  ? t("زبونك سألك عن السعر، وهذا التعليق لا يذكر السعر ولا يطلب منه شيئاً — فسيقرأ كوداً لا يعرف ما هو، ويمضي. اذكر «السعر» واطلب فعلاً واحداً.",
+                      "Your customer asked a price, and this comment mentions neither the price nor what to do — so they read a code they cannot place, and scroll on. Name the price and ask for one action.")
+                  : !saysWhat
+                    ? t("لا يذكر «السعر» — وهو الكلمة التي سأل عنها الزبون.",
+                        "It never says \"price\" — the word your customer actually asked about.")
+                    : t("لا يطلب فعلاً — قل له ماذا يفعل بالكود بالضبط.",
+                        "It asks for no action — tell them exactly what to do with the code.")}
+              </div>
+            )}
           </Field>
 
           {/* ── 3. WhatsApp ────────────────────────────────────────────────── */}
@@ -326,6 +435,34 @@ export function PrivateReplyPanel({
               {t("تيك توك لم توثّق الصلاحية اللازمة لرفع الصور، فقد ترفضها. إن رفضت، يُرسَل الكود نصّاً كالمعتاد ولا يضيع شيء.",
                  "TikTok has not documented the permission image uploads need, so it may refuse. If it does, the code goes out as text as usual and nothing is lost.")}
             </div>
+
+            {/*
+              The probe, as a button.
+
+              It existed as an endpoint and the owner was told to open it with an
+              accountId he had no way to know — which is not a test he can run, it
+              is a test I can run. It uploads one image and posts NOTHING: no
+              comment, no code spent, no customer involved. Safe to press twice.
+            */}
+            {accountId && (
+              <>
+                <button onClick={probeImage} disabled={probing}
+                  style={{ ...ttInput(c), cursor: probing ? "default" : "pointer", marginTop: 9, fontWeight: 700, textAlign: "center" }}>
+                  {probing
+                    ? t("جارٍ الاختبار…", "Testing…")
+                    : t("اختبر الآن — هل تسمح تيك توك بالصور؟", "Test now — does TikTok allow images?")}
+                </button>
+                {probeMsg && (
+                  <div style={{ fontSize: 11.5, lineHeight: 1.8, marginTop: 8, color: probeOk ? c.ok : "#f59e0b" }}>
+                    {probeMsg}
+                  </div>
+                )}
+                <div style={{ fontSize: 10.5, color: c.muted, lineHeight: 1.75, marginTop: 6 }}>
+                  {t("يرفع صورة واحدة ولا ينشر شيئاً — لا تعليق ولا كود ولا زبون.",
+                     "Uploads one image and posts nothing — no comment, no code, no customer.")}
+                </div>
+              </>
+            )}
           </Field>
 
           {/* ── The report ─────────────────────────────────────────────────── */}
