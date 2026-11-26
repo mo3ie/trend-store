@@ -55,6 +55,15 @@ function ConnectPageInner() {
     if (e === "no_pages")     setError(t("لم نجد صفحات متاحة في حسابك", "No available Pages found in your account"));
     if (e === "oauth_failed") {
       const reason = searchParams.get("reason");
+      // Facebook's raw reasons are English and technical — say what to do instead.
+      const known: [RegExp, string][] = [
+        [/authorization code has been used/i, "انتهت صلاحية رابط الربط لأنه استُخدم مرتين. اضغط «ربط صفحة جديدة» مرة واحدة وانتظر حتى يكتمل."],
+        [/request limit reached|\(#4\)|\(#17\)|\(#32\)/i, "فيسبوك يحدّ الطلبات مؤقتاً. انتظر بضع دقائق ثم أعد المحاولة."],
+        [/expired|session has expired/i, "انتهت صلاحية جلسة فيسبوك. أعد الربط من جديد."],
+        [/permission|scope/i, "لم تُمنح كل الصلاحيات المطلوبة. أعد الربط ووافق على جميع الصلاحيات."],
+      ];
+      const ar = reason ? known.find(([re]) => re.test(reason))?.[1] : null;
+      if (ar) { setError(t(`فشل الربط — ${ar}`, `Connection failed — ${reason}`)); loadPages(); return; }
       setError(t(
         `فشل الربط${reason ? ` — ${reason}` : " — تأكد من صلاحيات التطبيق"}`,
         `Connection failed${reason ? ` — ${reason}` : " — check the app permissions"}`,

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "crypto";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { exchangeCodeForToken, getUserPages, type MetaPage } from "@/services/meta";
 
@@ -58,13 +59,32 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${base}/ads/connect?error=invalid_state`);
   }
 
+  // A Meta code is single-use, but this URL can be hit twice (slow first run with many
+  // pages, then a resend/second tap). Claim the code once; a repeat waits for the first
+  // run's result instead of re-exchanging — the re-exchange always fails ("This
+  // authorization code has been used") and its error page used to hide a success.
+  const codeHash = createHash("sha256").update(code).digest("hex");
+  const { error: claimErr } = await supabaseAdmin.from("oauth_code_uses").insert({ code_hash: codeHash, user_id: userId });
+  if (claimErr) {
+    for (let i = 0; i < 20; i++) {
+      const { data: prior } = await supabaseAdmin.from("oauth_code_uses").select("result").eq("code_hash", codeHash).maybeSingle();
+      if (prior?.result) return NextResponse.redirect(`${base}${back}?${prior.result}`);
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    return NextResponse.redirect(`${base}${back}?success=1`);
+  }
+  const finish = async (query: string) => {
+    await supabaseAdmin.from("oauth_code_uses").update({ result: query }).eq("code_hash", codeHash);
+    return NextResponse.redirect(`${base}${back}?${query}`);
+  };
+
   try {
     const redirectUri = `${base}/api/promo/pages/callback`;
     const userToken   = await exchangeCodeForToken(code, redirectUri);
     const pages       = await getUserPages(userToken);
 
     if (!pages.length) {
-      return NextResponse.redirect(`${base}${back}?error=no_pages`);
+      return finish("error=no_pages");
     }
 
     // Upsert each page
@@ -90,12 +110,12 @@ export async function GET(req: NextRequest) {
     // Diagnostic: how many Pages Facebook returned this login (so we can tell if a
     // Page whose token is dead was actually re-granted). Shown on /ads/connect.
     console.log("OAuth callback OK: user", userId, "pages", pages.length, pages.map((p) => p.id).join(","));
-    return NextResponse.redirect(`${base}${back}?success=1&connected=${pages.length}`);
+    return finish(`success=1&connected=${pages.length}`);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "error";
     console.error("Meta OAuth callback error:", msg);
     // Surface the real Graph error in the URL so failures are diagnosable
     const reason = encodeURIComponent(msg.slice(0, 180));
-    return NextResponse.redirect(`${base}${back}?error=oauth_failed&reason=${reason}`);
+    return finish(`error=oauth_failed&reason=${reason}`);
   }
 }
