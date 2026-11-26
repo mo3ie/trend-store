@@ -245,6 +245,29 @@ export async function getSystemPageToken(pageId: string): Promise<string | null>
 // Quick validity check for a stored Page token (does a trivial page read).
 // Returns false when the token is invalidated/expired (e.g. 190/460) — i.e. the
 // Page needs re-authorization.
+/**
+ * Three-way token check. `isPageTokenAlive` folds every failure into "dead", so when
+ * Graph throttled the app ("(#4) Application request limit reached") every Page looked
+ * dead and the owner was offered to delete healthy Pages. Here only a real token error
+ * (OAuthException 190 / invalid session, or the Page no longer reachable with it) is
+ * "dead"; throttling and network trouble are "throttled"/"unknown" — never a verdict.
+ */
+export type PageTokenStatus = "alive" | "dead" | "throttled" | "unknown";
+export async function pageTokenStatus(pageId: string, token: string | null): Promise<PageTokenStatus> {
+  if (!token) return "dead";
+  try {
+    const res = await fetch(`${BASE}/${pageId}?fields=id&access_token=${encodeURIComponent(token)}`, { cache: "no-store" });
+    const j = await res.json().catch(() => ({}));
+    if (!j?.error) return j?.id ? "alive" : "unknown";
+    const code = Number(j.error.code);
+    if ([4, 17, 32, 613, 80001, 80004].includes(code) || /request limit|rate limit|too many/i.test(String(j.error.message || ""))) return "throttled";
+    if (code === 190 || code === 102 || code === 10 || code === 200 || code === 100) return "dead";
+    return "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
 export async function isPageTokenAlive(pageId: string, token: string | null): Promise<boolean> {
   if (!token) return false;
   try {

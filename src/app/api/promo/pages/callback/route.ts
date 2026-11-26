@@ -96,6 +96,10 @@ export async function GET(req: NextRequest) {
       page_picture:     p.picture?.data?.url ?? null,
       page_access_token: p.access_token,
       connection_type:  "oauth",
+      // fresh token straight from Facebook: alive; publishing permission re-checked later
+      token_status:      "alive",
+      can_publish:       null,
+      health_checked_at: new Date().toISOString(),
     }));
 
     await supabaseAdmin

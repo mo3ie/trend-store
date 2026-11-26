@@ -43,6 +43,7 @@ function ConnectPageInner() {
   // permission was approved stays unable to post until it is re-connected.
   const [publishing, setPublishing] = useState<Record<string, boolean | null>>({});
   const [checking, setChecking] = useState(false);
+  const [healthMsg, setHealthMsg] = useState("");
   const [removingDead, setRemovingDead] = useState(false);
   const [notAuthed, setNotAuthed] = useState(false);
 
@@ -92,6 +93,7 @@ function ConnectPageInner() {
       if (r.ok) {
         setHealth(d.statuses || {});
         setPublishing(d.publishing || {});
+        setHealthMsg(d.message || "");
       }
     } catch { /* ignore */ }
     setChecking(false);
@@ -196,6 +198,11 @@ function ConnectPageInner() {
         {error && (
           <div style={{ background: "rgba(239,68,68,0.15)", border: "1px solid #ef444455", borderRadius: 14, padding: "14px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, color: "#ef4444" }}>
             <XCircle size={18} /> {error}
+          </div>
+        )}
+        {healthMsg && (
+          <div role="status" style={{ background: c.chipAmber, color: c.amberText, borderRadius: 14, padding: "12px 16px", marginBottom: 14, fontSize: 14, fontWeight: 600 }}>
+            {healthMsg}
           </div>
         )}
 
