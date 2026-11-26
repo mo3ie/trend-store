@@ -356,7 +356,7 @@ function ConnectPageInner() {
 
 export default function ConnectPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<FbHeader active="ads" />}>
       <ConnectPageInner />
     </Suspense>
   );

@@ -262,5 +262,5 @@ function CheckoutInner() {
 }
 
 export default function CheckoutPage() {
-  return <Suspense><CheckoutInner /></Suspense>;
+  return <Suspense fallback={<FbHeader active="ads" />}><CheckoutInner /></Suspense>;
 }

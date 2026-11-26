@@ -351,5 +351,5 @@ function CampaignsInner() {
 }
 
 export default function CampaignsPage() {
-  return <Suspense><CampaignsInner /></Suspense>;
+  return <Suspense fallback={<FbHeader active="ads" />}><CampaignsInner /></Suspense>;
 }
