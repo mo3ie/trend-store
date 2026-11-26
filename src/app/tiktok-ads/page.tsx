@@ -36,6 +36,10 @@ interface AdOption { days: number; priceLyd: number; budgetUsd: number; viewsMin
 interface AdPackage { id: string; name: string; nameEn: string; level: number; options: AdOption[] }
 interface Me {
   configured: boolean; connected: boolean; vip: boolean; minDailyUsd: number;
+  /** True when this customer can start a campaign without linking anything. */
+  canAdvertise?: boolean;
+  /** True when the spend comes off the platform's card, not the customer's. */
+  platformFunded?: boolean;
   advertisers: Array<{ advertiserId: string; name: string }>;
   pricing: { packages: AdPackage[]; rate: number; commission: number };
 }
@@ -258,7 +262,15 @@ export default function TikTokAdsPage() {
             )}
 
             <div style={{ display: "flex", gap: 9, marginTop: 18, flexWrap: "wrap" }}>
-              {me?.connected ? (
+              {/*
+                The link step is skipped whenever the platform funds the spend.
+
+                Asking a Libyan shop to open a TikTok Ads Manager account and
+                attach an international card is where almost all of them stop —
+                and it was never needed, because Facebook has always run every
+                customer's campaign from one account of ours. See sql/44.
+              */}
+              {(me?.canAdvertise ?? me?.connected) ? (
                 <button onClick={() => router.push(`/tiktok-ads/create?tier=${tier}&days=${days}`)}
                   style={{ ...ttPrimary(rtl), flex: "1 1 170px" }}>
                   <Plus size={16} /> {t("ابدأ الحملة", "Start the campaign")}
@@ -278,6 +290,13 @@ export default function TikTokAdsPage() {
                 </button>
               )}
             </div>
+
+            {me?.platformFunded && (
+              <div style={{ fontSize: 11.5, color: c.muted, marginTop: 10, lineHeight: 1.75 }}>
+                {t("لا تحتاج حساباً إعلانياً ولا بطاقة — نحن ندفع لتيك توك، وأنت تدفع لنا بالدينار. يبقى عليك شيء واحد: السماح بترويج الفيديو من حسابك، ونوضّحه لك في الخطوة التالية.",
+                   "You need no ad account and no card — we pay TikTok, you pay us in dinars. One thing stays yours: authorising the video for promotion from your own account, which we walk you through next.")}
+              </div>
+            )}
 
             {!me?.configured && (
               <div style={{ fontSize: 11.5, color: c.muted, marginTop: 10, lineHeight: 1.7 }}>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getActiveGrant, readAdvertiserToken } from "@/lib/tiktokAdsTokens";
+import { getActiveGrant, readAdvertiserToken, getPlatformGrant } from "@/lib/tiktokAdsTokens";
 
 /**
  * Resolves the three things every TikTok Marketing API call needs: the advertiser's
@@ -17,6 +17,13 @@ export interface AdsContext {
   advertiserId: string;
   /** Every ad account this grant covers, for the account picker. */
   advertiserIds: string[];
+  /**
+   * TRUE when the campaign will run on the PLATFORM's ad account rather than
+   * the customer's own. Callers that show "which card pays for this" need to
+   * know, and so does anything that might otherwise offer an account picker for
+   * accounts the customer does not own.
+   */
+  platform: boolean;
 }
 
 export type AdsContextResult =
@@ -28,12 +35,40 @@ export async function requireAdsContext(
   requestedAdvertiserId?: string | null,
 ): Promise<AdsContextResult> {
   const grant = await getActiveGrant(userId);
+
+  /*
+   * No grant of their own — run on the platform's ad account.
+   *
+   * This is the Facebook model, and on TikTok it is not a convenience: linking
+   * an advertiser account needs a TikTok Ads Manager account and an
+   * international payment card, which in Libya removes most of the market
+   * before the first campaign. The customer pays us in LYD and we spend from
+   * our own account, exactly as META_AD_ACCOUNT_ID has always done.
+   *
+   * A customer who HAS linked keeps using theirs — checked first, above — so an
+   * agency-style advertiser is not forced onto our card by a decision taken for
+   * the high street.
+   */
   if (!grant) {
+    const platform = await getPlatformGrant();
+    if (platform) {
+      // A customer may not aim a campaign at an ad account that is not theirs,
+      // so the request's advertiserId is ignored here rather than honoured.
+      return {
+        ok: true,
+        ctx: {
+          token: platform.token,
+          advertiserId: platform.advertiserIds[0],
+          advertiserIds: [platform.advertiserIds[0]],
+          platform: true,
+        },
+      };
+    }
     return {
       ok: false,
       res: NextResponse.json({
         error: "not_connected",
-        message: "لم تربط حساب إعلانات تيك توك بعد — اربطه أولاً.",
+        message: "إعلانات تيك توك غير مهيّأة بعد — تواصل معنا.",
       }, { status: 400 }),
     };
   }
@@ -74,7 +109,7 @@ export async function requireAdsContext(
     };
   }
 
-  return { ok: true, ctx: { token, advertiserId, advertiserIds } };
+  return { ok: true, ctx: { token, advertiserId, advertiserIds, platform: false } };
 }
 
 /**

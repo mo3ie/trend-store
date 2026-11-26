@@ -153,3 +153,35 @@ export async function disconnectAdvertiser(userId: string): Promise<DisconnectRe
 
   return { ok: true, remoteRevoked };
 }
+
+/**
+ * The ONE grant whose ad account funds every customer's campaigns.
+ *
+ * Facebook has always worked this way — `META_AD_ACCOUNT_ID`, the platform's own
+ * account, the platform's own card, the customer paying us in LYD. TikTok was
+ * built the opposite way and priced the same, so a TikTok customer was charged
+ * in LYD for ad spend AND billed by TikTok on their own card. See sql/44.
+ *
+ * Returns the row and the decrypted token together, because every caller needs
+ * both and a second query is a second chance for them to disagree.
+ */
+export async function getPlatformGrant(): Promise<
+  { userId: string; advertiserIds: string[]; token: string } | null
+> {
+  assertServer();
+  const { data } = await supabaseAdmin
+    .from("tiktok_ads_authorizations")
+    .select("user_id, advertiser_ids, access_token")
+    .eq("is_platform", true)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!data?.access_token) return null;
+
+  const token = decryptSecret(data.access_token);
+  if (!token) return null;
+
+  const advertiserIds = ((data.advertiser_ids as string[] | null) || []).map(String).filter(Boolean);
+  if (!advertiserIds.length) return null;
+
+  return { userId: data.user_id as string, advertiserIds, token };
+}
