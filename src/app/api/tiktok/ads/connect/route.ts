@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/authUser";
 import { buildAdvertiserAuthorizeUrl, adsConfigured } from "@/services/tiktokAds";
-import { createOAuthState, stateCookieOptions, OAUTH_STATE_COOKIE, OAUTH_STATE_TTL_SEC } from "@/lib/oauthState";
+import { createOAuthState, stateCookieOptions, ADS_OAUTH_STATE_COOKIE, OAUTH_STATE_TTL_SEC } from "@/lib/oauthState";
 import { checkRateLimit, rateLimitedJson, identifierFor, RATE_RULES } from "@/lib/rateLimit";
 
 /**
@@ -47,6 +47,6 @@ export async function GET(req: NextRequest) {
   }
 
   const res = NextResponse.json({ url: buildAdvertiserAuthorizeUrl(created.state) });
-  res.cookies.set(OAUTH_STATE_COOKIE, created.binding, stateCookieOptions(OAUTH_STATE_TTL_SEC));
+  res.cookies.set(ADS_OAUTH_STATE_COOKIE, created.binding, stateCookieOptions(OAUTH_STATE_TTL_SEC));
   return res;
 }

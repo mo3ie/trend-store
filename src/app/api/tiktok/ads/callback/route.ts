@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/authUser";
 import { exchangeAdvertiserAuthCode, adsConfigured, TikTokAdsError } from "@/services/tiktokAds";
 import { storeAdvertiserGrant } from "@/lib/tiktokAdsTokens";
-import { consumeOAuthState, stateCookieOptions, OAUTH_STATE_COOKIE, type ConsumeFailure } from "@/lib/oauthState";
+import { consumeOAuthState, stateCookieOptions, ADS_OAUTH_STATE_COOKIE, type ConsumeFailure } from "@/lib/oauthState";
 import { checkRateLimit, rateLimitedJson, identifierFor, RATE_RULES } from "@/lib/rateLimit";
 import { siteUrl } from "@/lib/siteUrl";
 
@@ -27,15 +27,30 @@ import { siteUrl } from "@/lib/siteUrl";
 
 function fail(code: string): NextResponse {
   const res = NextResponse.redirect(siteUrl(`/tiktok-ads?ads_error=${code}`));
-  res.cookies.set(OAUTH_STATE_COOKIE, "", stateCookieOptions(0));
+  res.cookies.set(ADS_OAUTH_STATE_COOKIE, "", stateCookieOptions(0));
   return res;
 }
 
+/**
+ * One code per cause. It used to collapse four different failures into
+ * `invalid_state`, and that cost a whole diagnosis round: the operator
+ * authorized successfully at TikTok, landed back on `?ads_error=invalid_state`,
+ * and nothing — not the URL, not the logs — could say which of the four it was.
+ * The state rows had to be read out of the database to narrow it down.
+ *
+ * These strings reach the browser, so each one names a cause and nothing else:
+ * no state, no binding, no user id.
+ */
 function codeFor(reason: ConsumeFailure): string {
   switch (reason) {
-    case "not_signed_in": return "not_signed_in";
-    case "expired_state": return "expired";
-    default: return "invalid_state";   // covers flow_mismatch, reuse, binding mismatch, forgery
+    case "not_signed_in":        return "not_signed_in";
+    case "expired_state":        return "expired";
+    case "missing_binding":      return "no_cookie";
+    case "binding_mismatch":     return "cookie_mismatch";
+    case "user_mismatch":        return "wrong_account";
+    case "flow_mismatch":        return "wrong_flow";
+    case "unknown_or_used_state":return "already_used";
+    default:                     return "invalid_state";
   }
 }
 
@@ -64,7 +79,7 @@ export async function GET(req: NextRequest) {
   const user = await getAuthUser();
 
   // 2) Single-use state, bound to the cookie, to that session user, and to the ADVERTISER flow.
-  const binding = req.cookies.get(OAUTH_STATE_COOKIE)?.value;
+  const binding = req.cookies.get(ADS_OAUTH_STATE_COOKIE)?.value;
   const consumed = await consumeOAuthState({
     state,
     binding,
@@ -90,7 +105,7 @@ export async function GET(req: NextRequest) {
     });
 
     const res = NextResponse.redirect(siteUrl(`${returnPath}?ads_connected=1`));
-    res.cookies.set(OAUTH_STATE_COOKIE, "", stateCookieOptions(0));
+    res.cookies.set(ADS_OAUTH_STATE_COOKIE, "", stateCookieOptions(0));
     return res;
   } catch (err) {
     // Safe server-side log only: endpoint, HTTP status, TikTok code, request id.

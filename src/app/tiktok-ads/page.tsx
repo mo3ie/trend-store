@@ -57,6 +57,52 @@ export default function TikTokAdsPage() {
   const [connecting, setConnecting] = useState(false);
   const [linking, setLinking] = useState(false);
 
+
+  const [error, setError] = useState("");
+  const [tier, setTier] = useState("first");
+  const [days, setDays] = useState(3);
+
+  /*
+   * Show what came back from the callback.
+   *
+   * The callback has always redirected here with `?ads_error=…` and this page
+   * has never read it. So the operator authorized at TikTok, saw "Authorized
+   * success", landed back on a page that looked completely normal, and had to
+   * notice the failure in the address bar. A redirect that reports nothing is a
+   * redirect that reports success.
+   */
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("ads_error");
+    if (!code) return;
+    const msg: Record<string, string> = {
+      cookie_mismatch: t("انقطع الربط في المنتصف — غالباً لأن نافذة أخرى من أدوات تيك توك بدأت ربطاً في نفس الوقت. أغلق بقية النوافذ واضغط «اربط حساب الإعلانات» مرة واحدة.",
+                         "The link was interrupted — most likely another TikTok tools tab started a connection at the same time. Close the other tabs and press Link ad account once."),
+      no_cookie:       t("المتصفح لم يُعِد ملف الجلسة. جرّب من نفس النافذة دون وضع التصفح الخاص.",
+                         "Your browser did not return the session file. Try again in the same window, not a private tab."),
+      already_used:    t("هذا الربط استُعمل مرة واحدة بالفعل. اضغط «اربط حساب الإعلانات» من جديد.",
+                         "That link was already used once. Press Link ad account again."),
+      expired:         t("انتهت مهلة الربط (عشر دقائق). اضغط «اربط حساب الإعلانات» من جديد.",
+                         "The link timed out (ten minutes). Press Link ad account again."),
+      wrong_account:   t("أنت مسجّل دخول بحساب مختلف عن الذي بدأ الربط. سجّل بنفس الحساب ثم أعد المحاولة.",
+                         "You are signed in with a different account than the one that started. Sign in with the same account and retry."),
+      not_signed_in:   t("انتهت جلستك أثناء الربط. سجّل الدخول ثم أعد المحاولة.",
+                         "Your session ended during the link. Sign in and retry."),
+      declined:        t("رُفض الإذن من تيك توك.", "TikTok declined the permission."),
+      cancelled:       t("أُلغيت عملية الربط.", "The link was cancelled."),
+      not_configured:  t("ربط حساب الإعلانات غير مفعّل بعد.", "Ad-account linking is not enabled yet."),
+    };
+    /*
+     * The rule guards against cascading renders. This runs once on mount, only
+     * when the URL carries an error, and then strips the parameter so it cannot
+     * run again — the alternative, reading the query during render, needs
+     * `window` and would not survive the server pass.
+     */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setError(msg[code] || t("تعذّر إكمال الربط. أعد المحاولة.", "Could not finish linking. Please try again."));
+    // Clear it, so a refresh does not keep showing a failure that is over.
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [t]);
+
   async function linkAccount() {
     setLinking(true); setError("");
     try {
@@ -67,9 +113,6 @@ export default function TikTokAdsPage() {
     } catch { setError(t("تعذّر الاتصال", "Connection failed")); }
     setLinking(false);
   }
-  const [error, setError] = useState("");
-  const [tier, setTier] = useState("first");
-  const [days, setDays] = useState(3);
 
   useEffect(() => {
     Promise.all([

@@ -17,6 +17,29 @@ import { randomToken, sha256, safeEqualHex } from "@/lib/tokenCrypto";
  */
 
 export const OAUTH_STATE_COOKIE = "tt_oauth_binding";
+
+/**
+ * The ADVERTISER flow gets its own cookie, and this is not a tidiness point —
+ * sharing one name was a real, reproducible bug.
+ *
+ * Both flows wrote `tt_oauth_binding`, and every TikTok screen can start the
+ * organic one: /tiktok, /tiktok-bot, /tiktok-studio and /tiktok-ads itself all
+ * call /api/tiktok/connect. So with the tools open in several tabs — which is
+ * exactly how someone sets this up — any organic link started between pressing
+ * "ربط حساب الإعلانات" and returning from TikTok silently overwrote the
+ * advertiser's binding.
+ *
+ * The symptom was perfect: TikTok said "Authorized success", and we sent the
+ * operator back to `?ads_error=invalid_state`. The state row was found, claimed
+ * and valid; only the cookie belonged to a different state. Twice.
+ *
+ * The failing callback also cleared the shared cookie, so a first failure
+ * sabotaged the retry as well.
+ *
+ * Two names cannot collide. The organic cookie keeps its name so that any link
+ * in flight right now still completes.
+ */
+export const ADS_OAUTH_STATE_COOKIE = "tt_ads_oauth_binding";
 export const OAUTH_STATE_TTL_SEC = 600; // 10 minutes — long enough to consent, short enough to matter
 const COOKIE_PATH = "/api/tiktok";
 

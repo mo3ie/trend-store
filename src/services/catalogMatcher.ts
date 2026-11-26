@@ -59,12 +59,35 @@ function postIdsMatch(a: string, b: string): boolean {
 }
 
 export async function loadCatalog(userId: string, pageId: string): Promise<CatalogProduct[]> {
+  const sel = "id, name, aliases, sku, price_text, description, images, image_hashes, post_ids, available";
   const { data } = await supabaseAdmin
-    .from("studio_products")
-    .select("id, name, aliases, sku, price_text, description, images, image_hashes, post_ids, available")
+    .from("studio_products").select(sel)
     .eq("user_id", userId).eq("page_id", pageId).eq("active", true)
     .limit(1000);
-  return (data || []) as CatalogProduct[];
+  if (data && data.length) return data as CatalogProduct[];
+
+  /*
+   * Nothing for this page — fall back to the merchant's catalogue on another.
+   *
+   * The catalogue is keyed by (user_id, page_id), and a shop's pages are not
+   * separate shops: the Facebook Page and the TikTok account sell the same
+   * products off the same shelf. The live consequence was that the TikTok AI
+   * Employee refused to generate anything — "أضف أصنافاً متوفّرة أولاً في
+   * الكتالوج" — while thirty products sat in the same account under two Facebook
+   * page ids. The merchant is told to enter his stock a third time, for the same
+   * stock, and reasonably concludes the tool is broken.
+   *
+   * Same principle as services/shopFacts.ts: entered once, read by everything.
+   *
+   * Scoped to this user, so it can never show one merchant another's products,
+   * and only reached when the page's own catalogue is EMPTY — a page that has
+   * been given its own products keeps exactly them.
+   */
+  const { data: shared } = await supabaseAdmin
+    .from("studio_products").select(sel)
+    .eq("user_id", userId).eq("active", true)
+    .limit(1000);
+  return (shared || []) as CatalogProduct[];
 }
 
 /**

@@ -81,7 +81,26 @@ export async function POST(req: NextRequest) {
     supabaseAdmin.from("studio_products").select("*").eq("user_id", user.id).eq("page_id", pageId).eq("active", true),
     supabaseAdmin.from("studio_memory").select("style, notes").eq("user_id", user.id).eq("page_id", pageId).maybeSingle(),
   ]);
-  const items = (products || []).filter((p) => p.available !== false);
+  /*
+   * Fall back to the merchant's catalogue on another page before refusing.
+   *
+   * The catalogue is keyed by (user_id, page_id), and a shop's pages are not
+   * separate shops — the Facebook Page and the TikTok account sell the same
+   * products off the same shelf. Live result: the TikTok AI Employee refused
+   * every plan with "أضف أصنافاً متوفّرة أولاً في الكتالوج" while thirty of this
+   * merchant's products sat in the same account under two Facebook page ids. He
+   * is told to type his stock a third time, for the same stock.
+   *
+   * Scoped to this user, and only when the page's own catalogue is empty, so a
+   * page given its own products keeps exactly them.
+   */
+  let items = (products || []).filter((p) => p.available !== false);
+  if (items.length === 0) {
+    const { data: shared } = await supabaseAdmin
+      .from("studio_products").select("*")
+      .eq("user_id", user.id).eq("active", true).limit(1000);
+    items = (shared || []).filter((p) => p.available !== false);
+  }
   if (items.length === 0) return NextResponse.json({ error: "أضف أصنافاً متوفّرة أولاً في الكتالوج" }, { status: 400 });
 
   const brandLines = [
