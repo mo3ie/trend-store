@@ -6,6 +6,9 @@ import {
   BannedWordsEditor, ReplyGroupsEditor,
   type BotPalette, type ReplyGroup,
 } from "@/components/bot/ReplySettings";
+import {
+  PriceDeliveryPicker, PriceDeliveryPreview, type PriceDelivery,
+} from "@/components/bot/PriceDeliveryPicker";
 
 /**
  * The per-item reply editor — one post on Facebook, one video on TikTok.
@@ -24,12 +27,14 @@ export interface PostOverrideValue {
   mode?: "all" | "groups"; groups?: ReplyGroup[]; inherit_groups?: boolean; ai?: boolean;
   banned_words?: string[]; banned_action?: "delete" | "hide" | "ignore";
   mention?: boolean; once_per_user?: boolean;
+  /** How this unit's price travels. See PriceDeliveryPicker. */
+  price_delivery?: PriceDelivery;
 }
 
 type TF = (ar: string, en: string) => string;
 
 export function PostOverrideEditor({
-  initial, onSave, onClose, c, t, accent, unitLabel, privateNote,
+  initial, onSave, onClose, c, t, accent, unitLabel, privateNote, priceSurface,
 }: {
   initial?: PostOverrideValue;
   /**
@@ -39,6 +44,19 @@ export function PostOverrideEditor({
    * typing a price deserves to know which before they type it.
    */
   privateNote?: string;
+  /**
+   * Everything needed to ask "how does this price travel" and then SHOW the
+   * answer. Absent means the old single note is printed instead — the editor
+   * stays usable anywhere that has no code/QR/queue to choose between.
+   */
+  priceSurface?: {
+    /** What the account setting currently resolves to: off | link | assist. */
+    accountDefault: string | null;
+    /** The merchant's public comment template, {code} and all. */
+    commentTemplate: string;
+    /** Bare host for the preview, e.g. trendstore-ly.com. */
+    host: string;
+  };
   onSave: (v: PostOverrideValue) => Promise<void> | void;
   onClose: () => void;
   c: BotPalette; t: TF; accent: string;
@@ -64,6 +82,12 @@ export function PostOverrideEditor({
   const [like, setLike] = useState(initial?.like ?? false);
   const [probe, setProbe] = useState("");
   const [saving, setSaving] = useState(false);
+  /*
+   * How THIS unit's price travels. Absent until the owner picks one, which is
+   * what "default" means — and the picker says out loud what the account default
+   * currently resolves to, so "default" is never a mystery option.
+   */
+  const [priceDelivery, setPriceDelivery] = useState<PriceDelivery>(initial?.price_delivery ?? "default");
 
   // Mirrors the engine's normaliser, so the preview agrees with what will happen.
   const norm = (x: string) => (x || "").toLowerCase()
@@ -95,6 +119,7 @@ export function PostOverrideEditor({
       mention,
       once_per_user: oncePerUser,
       like,
+      price_delivery: priceDelivery,
     });
     setSaving(false);
   }
@@ -124,7 +149,10 @@ export function PostOverrideEditor({
 
       {mode === "groups" && (
         <div style={{ marginTop: 14 }}>
-          <ReplyGroupsEditor groups={groups} onChange={setGroups} c={c} t={t} accent={accent} />
+          <ReplyGroupsEditor
+            groups={groups} onChange={setGroups} c={c} t={t} accent={accent}
+            priceSurface={priceSurface ? { accountDefault: priceSurface.accountDefault } : undefined}
+          />
           <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 12.5, color: c.muted, cursor: "pointer" }}>
             <input type="checkbox" checked={inheritGroups} onChange={(e) => setInheritGroups(e.target.checked)} />
             {t("استخدم أيضاً المجموعات الافتراضية للحساب", "Also use the account's default groups")}
@@ -151,11 +179,40 @@ export function PostOverrideEditor({
         : t("الرد العلني — سطر لكل نص للتنويع", "Public reply — one text per line for variety")}</label>
       <textarea value={pub} onChange={(e) => setPub(e.target.value)} rows={3} style={{ ...inp, resize: "vertical" }} />
 
-      <label style={lbl}>{t("الرسالة التفصيلية (السعر/التفاصيل)", "Detailed message (price/details)")}</label>
-      <textarea value={priv} onChange={(e) => setPriv(e.target.value)} rows={3} style={{ ...inp, resize: "vertical" }} />
-      {privateNote && (
+      <label style={lbl}>{t("السعر — وما يُقال مع السعر", "The price — and whatever goes with it")}</label>
+      <textarea value={priv} onChange={(e) => setPriv(e.target.value)} rows={3} style={{ ...inp, resize: "vertical" }}
+        placeholder={t("٢٨٥٠ دينار — ضمان سنة، التوصيل مجاني داخل بنغازي", "2850 LYD — one-year warranty, free delivery in Benghazi")} />
+
+      {/*
+        The question that used to be answered once for the whole account, asked
+        here instead — next to the price it applies to. Followed immediately by
+        what the customer will see, because the owner was being asked to trust a
+        code, a QR and a queue without being allowed to look inside any of them.
+      */}
+      {priceSurface ? (
+        <>
+          <label style={lbl}>{t("كيف يصل هذا السعر للزبون؟", "How does this price reach the customer?")}</label>
+          <PriceDeliveryPicker
+            value={priceDelivery} onChange={setPriceDelivery}
+            c={c} t={t} accountDefault={priceSurface.accountDefault}
+          />
+          <PriceDeliveryPreview
+            delivery={
+              priceDelivery === "default"
+                ? (priceSurface.accountDefault === "link" ? "code"
+                  : priceSurface.accountDefault === "assist" ? "queue" : "public")
+                : priceDelivery
+            }
+            commentText={priceSurface.commentTemplate}
+            priceText={priv}
+            codeExample="AB3K9"
+            host={priceSurface.host}
+            c={c} t={t}
+          />
+        </>
+      ) : privateNote ? (
         <div style={{ fontSize: 11.5, color: c.muted, lineHeight: 1.7, marginTop: 6 }}>{privateNote}</div>
-      )}
+      ) : null}
 
       <label style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 11, padding: 12, cursor: "pointer" }}>
         <input type="checkbox" checked={useAi} onChange={(e) => setUseAi(e.target.checked)} />

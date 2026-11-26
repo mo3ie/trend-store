@@ -35,6 +35,7 @@ import { loadCatalog, matchProduct, productReply } from "@/services/catalogMatch
 import { featuresFor } from "@/lib/entitlements";
 import { createPrivateLink, composePublicReply } from "@/lib/privateLinks";
 import { shouldGate } from "@/services/priceIntent";
+import { loadShopFacts, factsBlock } from "@/services/shopFacts";
 import { renderCodeCard, commentImagesArmed } from "@/services/codeCard";
 import { siteHost } from "@/lib/siteUrl";
 import type { PostOverride } from "@/services/botEngine";
@@ -253,6 +254,7 @@ async function decideReply(
     like: override?.like ?? target.likeComments,
     flatPublic: override?.public_replies ?? null,
     flatPrivate: override?.private_reply ?? null,
+    flatPriceDelivery: override?.price_delivery ?? null,
     defaultPublic: target.publicReplies,
     defaultPublicOne: target.defaultPublicReply,
     defaultPrivate: target.defaultPrivateReply,
@@ -269,9 +271,10 @@ async function decideReply(
      * a model that can quote a price into the open. The catalog path has its own
      * branch above, and that one IS gated.
      */
+    const facts = factsBlock(await loadShopFacts(target.userId, target.pageId).catch(() => null));
     aiText = await generateAiReply(
       comment.text, target.aiPersona, target.pageName, null,
-      { platform: "tiktok", visibility: "public" },
+      { platform: "tiktok", visibility: "public" }, facts,
     );
   }
 
@@ -496,6 +499,23 @@ export async function processClaimedComment(
   const gated = shouldGate(decision.source, comment.text, target.priceKeywords);
   if (!gated) patch.private_status = "public";
 
+  /*
+   * How this particular price travels. Narrowest wins.
+   *
+   * `decision.priceDelivery` is set by whatever produced the answer — the matched
+   * keyword group or the video's own override — and is absent when nothing
+   * narrower than the account had an opinion. So a merchant can say "prices under
+   * THIS video go behind a code" without touching the other nineteen, and "anyone
+   * asking about the made-to-order one goes to the queue" without touching the
+   * video at all.
+   *
+   * `delivery` replaces every read of `target.privateDelivery` below. The account
+   * setting is now the FLOOR, not the law.
+   */
+  const delivery = decision.priceDelivery
+    ?? (overrideForVideo(target.postOverrides, comment.videoId)?.price_delivery)
+    ?? target.privateDelivery;
+
   // Set only on the link path: the card exists to carry a code, and the other
   // paths do not mint one.
   let cardToken: string | null = null;
@@ -510,7 +530,7 @@ export async function processClaimedComment(
   let reply: string | null;
   if (privateSent) {
     reply = decision.publicText || decision.privateText;
-  } else if (gated && decision.privateText && target.privateDelivery === "assist" && comment.username) {
+  } else if (gated && decision.privateText && (delivery === "assist" || delivery === "queue") && comment.username) {
     /*
      * Assisted mode: the price goes to a queue a human sends from the real
      * TikTok app, and the comment says only that an answer is coming.
@@ -541,7 +561,7 @@ export async function processClaimedComment(
       // a promise of a message nobody was told to send.
       reply = decision.privateText || decision.publicText;
     }
-  } else if (gated && decision.privateText && target.privateDelivery === "link") {
+  } else if (gated && decision.privateText && (delivery === "link" || delivery === "code")) {
     const url = await createPrivateLink({
       configId: target.configId,
       userId: target.userId,

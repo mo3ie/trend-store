@@ -63,6 +63,11 @@ export interface ReplyGroup {
   private_reply?:  string;
   attachments?:    BotAttachment[];
   like?:           boolean;   // like comments this group answers
+  /**
+   * How THIS group's price travels: code+QR, the queue, or out loud. Absent
+   * means follow the video, then the account. See PriceDelivery.
+   */
+  price_delivery?: "default" | "code" | "queue" | "public";
 }
 
 export interface PostOverride {
@@ -82,6 +87,8 @@ export interface PostOverride {
   banned_action?:  "delete" | "hide" | "ignore";
   mention?:        boolean;
   once_per_user?:  boolean;
+  /** How THIS video's price travels, unless a matched group says otherwise. */
+  price_delivery?: "default" | "code" | "queue" | "public";
 }
 
 // Finds the override for a post. Webhook post ids are "{pageId}_{postId}" while the

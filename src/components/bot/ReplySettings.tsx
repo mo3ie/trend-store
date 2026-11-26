@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Plus, Trash2, Save, Package, Sparkles, Newspaper } from "lucide-react";
+import { PriceDeliveryPicker, type PriceDelivery } from "@/components/bot/PriceDeliveryPicker";
 
 /**
  * The reply-configuration pieces both bots share.
@@ -15,6 +16,8 @@ import { Loader2, Plus, Trash2, Save, Package, Sparkles, Newspaper } from "lucid
 export interface ReplyGroup {
   id?: string; label?: string; keywords: string[];
   public_replies?: string[]; private_reply?: string; like?: boolean;
+  /** How this group's price travels. See PriceDeliveryPicker. */
+  price_delivery?: PriceDelivery;
 }
 
 export interface BotPalette {
@@ -35,12 +38,18 @@ function inputStyle(c: BotPalette): React.CSSProperties {
 
 /** Keyword groups: "price" comments get the price, "phone" comments get the numbers. */
 export function ReplyGroupsEditor({
-  groups, onChange, onSave, c, t, accent, compact,
+  groups, onChange, onSave, c, t, accent, compact, priceSurface,
 }: {
   groups: ReplyGroup[];
   onChange: (g: ReplyGroup[]) => void;
   onSave?: () => void;
   c: BotPalette; t: TF; accent: string; compact?: boolean;
+  /**
+   * Present on TikTok, where a price can travel three different ways and the
+   * group should be able to choose. Absent elsewhere, and then no picker is
+   * drawn at all — the group keeps whatever the account decided.
+   */
+  priceSurface?: { accountDefault: string | null };
 }) {
   const inp = inputStyle(c);
   const set = (i: number, p: Partial<ReplyGroup>) =>
@@ -67,8 +76,25 @@ export function ReplyGroupsEditor({
             style={{ ...inp, resize: "vertical", marginBottom: 8 }} />
           {!compact && (
             <textarea value={g.private_reply || ""} onChange={(e) => set(i, { private_reply: e.target.value })}
-              rows={2} placeholder={t("الرسالة التفصيلية (السعر/التفاصيل)", "Detailed message (price/details)")}
+              rows={2} placeholder={t("السعر — وما يُقال معه", "The price — and what goes with it")}
               style={{ ...inp, resize: "vertical" }} />
+          )}
+          {/*
+            How THIS group's price travels, asked where the price is written.
+            Shown only when the group HAS a price: a group answering "وين محلكم"
+            has nothing to deliver, and offering it a delivery mechanism is
+            exactly the kind of stray control that made the screen feel arbitrary.
+          */}
+          {!compact && priceSurface && (g.private_reply || "").trim() && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: c.muted, marginBottom: 6 }}>
+                {t("كيف يصل سعر هذه المجموعة؟", "How does this group's price travel?")}
+              </div>
+              <PriceDeliveryPicker
+                value={g.price_delivery} onChange={(v) => set(i, { price_delivery: v })}
+                c={c} t={t} accountDefault={priceSurface.accountDefault} compact
+              />
+            </div>
           )}
           <label style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 8, fontSize: 12, color: c.muted, cursor: "pointer" }}>
             <input type="checkbox" checked={g.like !== false} onChange={(e) => set(i, { like: e.target.checked })} />

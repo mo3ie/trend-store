@@ -22,7 +22,17 @@ import {
 import { PostOverrideEditor, type PostOverrideValue } from "@/components/bot/PostOverrideEditor";
 import { PrivateReplyPanel } from "@/components/tiktok/PrivateReplyPanel";
 import { DmQueue } from "@/components/tiktok/DmQueue";
+import { ShopFactsCard } from "@/components/tiktok/ShopFactsCard";
 import { botColors } from "@/lib/botTheme";
+
+/*
+ * Mirrors DEFAULT_LINK_TEXT in src/lib/privateLinks.ts, which is the source of
+ * truth and cannot be imported here — it pulls in supabaseAdmin, and this is a
+ * client component. Copied rather than re-exported so no server module is
+ * dragged into the browser bundle just to show a placeholder; if the default
+ * there changes, change it here.
+ */
+const FALLBACK_LINK_TEXT = "كودك {code} — افتح الرابط في البايو واكتب الكود لترى السعر 🔑";
 
 /**
  * The comment auto-reply bot, for TikTok.
@@ -627,6 +637,25 @@ function TikTokBotInner() {
         {tab === "videos" && (
           <>
             {/*
+              The shop's own facts, first on the screen after linking.
+
+              The operator asked for them here in those words: after I link my
+              account I should see my videos AND my general data, and the AI
+              should answer from it. It was only in the Studio, so the bot could
+              not answer "وين محلكم" while the address sat two screens away in
+              the merchant's own handwriting. Same row, same endpoint — not a copy.
+            */}
+            {st?.account && (
+              <ShopFactsCard
+                pageId={pageId}
+                c={c} t={t} rtl={rtl}
+                cardStyle={ttCard(c)}
+                inputStyle={ttInput(c)}
+                primaryStyle={(busy) => ttPrimary(rtl, busy)}
+              />
+            )}
+
+            {/*
               The default reply, moved here from the old "Try it" tab.
 
               It belongs above the grid and nowhere else: this is the answer every
@@ -770,6 +799,11 @@ function TikTokBotInner() {
                     onClose={() => setEditingVideo(null)}
                     c={bot} t={t} accent={c.pinkInk}
                     unitLabel={t("الفيديو", "video")}
+                    priceSurface={{
+                      accountDefault: config?.private_delivery ?? "off",
+                      commentTemplate: config?.private_link_text || FALLBACK_LINK_TEXT,
+                      host: typeof window === "undefined" ? "" : window.location.host,
+                    }}
                     privateNote={
                       (config?.private_delivery || "off") === "link"
                         ? t("يُرسل خلف رابط خاص لمن يعلّق تحت هذا الفيديو وحده، ولا يظهر في التعليقات. يتجاوز السعر الافتراضي من تبويب «الردّ الخاص».",
@@ -799,6 +833,7 @@ function TikTokBotInner() {
               <ReplyGroupsEditor
                 groups={groups} onChange={setGroups}
                 c={bot} t={t} accent={c.pinkInk}
+                priceSurface={{ accountDefault: config?.private_delivery ?? "off" }}
               />
               <button onClick={() => patch({ reply_groups: groups })}
                 style={{ ...ttSecondary(c), width: "100%", marginTop: 12 }}>

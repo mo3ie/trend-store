@@ -21,7 +21,31 @@ export interface ReplyGroup {
   private_reply?:  string;
   attachments?:    BotAttachment[];
   like?:           boolean;
+  /** How THIS group's price travels. See PriceDelivery below. */
+  price_delivery?: PriceDelivery;
 }
+
+/**
+ * How a price reaches the customer.
+ *
+ * This used to be ONE account-wide setting (`bot_configs.private_delivery`), and
+ * that was the hidden source of the incoherence the operator reported. A shop
+ * does not want the same mechanism for everything: a cheap accessory can have its
+ * price said out loud, a phone should cost a comment and a code, and a
+ * made-to-order item is worth a human in the queue. Forcing one answer for the
+ * whole account meant every video and every keyword inherited a decision taken
+ * for a different product.
+ *
+ *   "default" | undefined  follow the account setting (the old behaviour)
+ *   "code"                 behind a one-off code + QR card
+ *   "queue"                a human sends it from the real TikTok app
+ *   "public"               said out loud in the comment
+ *
+ * Resolution order is narrowest-wins: the matched keyword group, then the video's
+ * override, then the account. The narrowest is the one someone chose for THIS
+ * product while looking at it.
+ */
+export type PriceDelivery = "default" | "code" | "queue" | "public";
 
 /** The merged view of a Page/account config and a per-post override. */
 export interface ReplyPolicy {
@@ -37,6 +61,8 @@ export interface ReplyPolicy {
   flatPublic?:    string[] | null;
   flatPrivate?:   string | null;
   flatAttachments?: BotAttachment[] | null;
+  /** The video's own choice of how its price travels. */
+  flatPriceDelivery?: PriceDelivery | null;
   /** Account-wide fallbacks. */
   defaultPublic?:  string[] | null;
   defaultPublicOne?: string | null;
@@ -56,6 +82,12 @@ export type Decision =
       privateText: string | null;
       attachments: BotAttachment[];
       like: boolean;
+      /**
+       * Set only when the thing that produced this answer named a shape. Absent
+       * means "nothing narrower than the account had an opinion", which the
+       * engine reads as the account setting.
+       */
+      priceDelivery?: PriceDelivery;
     };
 
 /**
@@ -132,6 +164,8 @@ export function decide(params: {
   ruleAttachments?: BotAttachment[] | null;
   ruleMatched?: boolean;
   /** Text the catalog matcher produced for the product this comment is about. */
+  /** The matched rule's own choice, if it named one. */
+  rulePriceDelivery?: PriceDelivery | null;
   catalogText?: string | null;
   /** Text the AI produced, when the caller chose to ask it. */
   aiText?: string | null;
@@ -151,6 +185,7 @@ export function decide(params: {
     atts: BotAttachment[],
     like: boolean,
     label?: string,
+    priceDelivery?: PriceDelivery | null,
   ): Decision => ({
     kind: "reply",
     source,
@@ -159,6 +194,9 @@ export function decide(params: {
     privateText: priv,
     attachments: atts,
     like,
+    // "default" is not an opinion, it is the absence of one, so it is dropped
+    // here rather than carried down and re-checked by every caller.
+    ...(priceDelivery && priceDelivery !== "default" ? { priceDelivery } : {}),
   });
 
   const defPublic = () => pickVariant(policy.defaultPublic, policy.defaultPublicOne ?? null);
@@ -177,6 +215,7 @@ export function decide(params: {
         group.attachments || [],
         group.like ?? baseLike,
         group.label || group.keywords?.[0],
+        group.price_delivery ?? null,
       );
     }
   }
@@ -193,6 +232,8 @@ export function decide(params: {
       policy.flatPrivate || policy.defaultPrivate || null,
       policy.flatAttachments || [],
       baseLike,
+      undefined,
+      policy.flatPriceDelivery ?? null,
     );
   }
 
@@ -204,6 +245,8 @@ export function decide(params: {
       params.rulePrivate || policy.defaultPrivate || null,
       params.ruleAttachments || [],
       baseLike,
+      undefined,
+      params.rulePriceDelivery ?? null,
     );
   }
 
