@@ -12,9 +12,27 @@ import { useState } from "react";
  * and a merchant who blames the tool.
  */
 
+/*
+ * The same variables the price page defines, for the same reason: the app's
+ * dark/light toggle floats over this screen and could not reach a hex literal
+ * inside an inline style. Declared here too because a customer can land on /r
+ * directly from the bio link without ever opening /r/{token}.
+ */
+const THEME_CSS = `
+:root{
+  --pl-bg:#0b0f1a; --pl-card:#141a2b; --pl-border:#242c42;
+  --pl-text:#f2f4f8; --pl-muted:#98a0b8; --pl-accent:#fe2c55; --pl-inset:#0f1424;
+}
+html.light{
+  --pl-bg:#eef1f8; --pl-card:#ffffff; --pl-border:#dfe4f0;
+  --pl-text:#121829; --pl-muted:#5d6680; --pl-accent:#e0133f; --pl-inset:#f6f8fc;
+}
+html, body { background: var(--pl-bg); }
+`;
+
 const C = {
-  bg: "#0b0f1a", card: "#141a2b", border: "#242c42", text: "#f2f4f8",
-  muted: "#98a0b8", accent: "#fe2c55",
+  bg: "var(--pl-bg)", card: "var(--pl-card)", border: "var(--pl-border)",
+  text: "var(--pl-text)", muted: "var(--pl-muted)", accent: "var(--pl-accent)",
 };
 
 /** Mirrors the mint alphabet: no 0/O/1/I/l, so those are never valid input. */
@@ -44,9 +62,10 @@ export function CodeEntry() {
   return (
     <div dir="rtl" style={{
       minHeight: "100dvh", background: C.bg, display: "flex", alignItems: "center",
-      justifyContent: "center", padding: "24px 16px",
+      justifyContent: "center", padding: "24px 16px 92px",
       fontFamily: "system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif",
     }}>
+      <style>{THEME_CSS}</style>
       <form onSubmit={go} style={{
         width: "100%", maxWidth: 400, background: C.card,
         border: `1px solid ${C.border}`, borderRadius: 18, padding: "26px 22px",
@@ -71,7 +90,7 @@ export function CodeEntry() {
           aria-label="الكود"
           style={{
             width: "100%", boxSizing: "border-box", marginTop: 18,
-            background: "#0f1424", border: `1.5px solid ${err ? C.accent : C.border}`,
+            background: "var(--pl-inset)", border: `1.5px solid ${err ? C.accent : C.border}`,
             borderRadius: 13, padding: "16px 14px", color: C.text,
             fontSize: 30, fontWeight: 800, textAlign: "center",
             letterSpacing: "9px", direction: "ltr", fontFamily: "ui-monospace, monospace",

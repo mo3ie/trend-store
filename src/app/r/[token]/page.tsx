@@ -33,9 +33,39 @@ interface OpenResult {
   max_opens?: number;
 }
 
+/**
+ * Colours as CSS variables, not hex literals.
+ *
+ * The app's dark/light toggle lives in the root layout, so its button floated
+ * over this page and did nothing: every colour here was a hard-coded hex inside
+ * an inline style, which no class on <html> can reach. The customer pressed the
+ * sun and the page stayed black.
+ *
+ * Every value is read through `var()` now and redefined under `html.light`,
+ * which is the class the toggle flips (see components/ThemeToggle). That also
+ * keeps this page a SERVER component — a `useTheme` hook would have forced it
+ * client-side, and this page must render its price on the server, uncached.
+ *
+ * `:root` carries the dark values rather than a wrapper class, so the variables
+ * exist before this page's own markup does and nothing flashes.
+ */
+const THEME_CSS = `
+:root{
+  --pl-bg:#0b0f1a; --pl-card:#141a2b; --pl-inset:#0f1424; --pl-border:#242c42;
+  --pl-text:#f2f4f8; --pl-muted:#98a0b8; --pl-accent:#fe2c55; --pl-wa:#25d366;
+  --pl-warn-bg:#2a1420; --pl-warn-text:#ffb3c6; --pl-shadow:0 18px 40px rgba(0,0,0,.35);
+}
+html.light{
+  --pl-bg:#eef1f8; --pl-card:#ffffff; --pl-inset:#f6f8fc; --pl-border:#dfe4f0;
+  --pl-text:#121829; --pl-muted:#5d6680; --pl-accent:#e0133f; --pl-wa:#1ebe5b;
+  --pl-warn-bg:#fff1f4; --pl-warn-text:#a3123a; --pl-shadow:0 14px 34px rgba(20,30,60,.10);
+}
+`;
+
 const C = {
-  bg: "#0b0f1a", card: "#141a2b", border: "#242c42", text: "#f2f4f8",
-  muted: "#98a0b8", accent: "#fe2c55", wa: "#25d366",
+  bg: "var(--pl-bg)", card: "var(--pl-card)", inset: "var(--pl-inset)",
+  border: "var(--pl-border)", text: "var(--pl-text)", muted: "var(--pl-muted)",
+  accent: "var(--pl-accent)", wa: "var(--pl-wa)",
 };
 
 export async function generateMetadata() {
@@ -76,7 +106,7 @@ export default async function PrivateReplyPage({ params }: { params: Params }) {
     <Shell>
       <div style={{
         background: C.card, border: `1px solid ${C.border}`, borderRadius: 18,
-        padding: "22px 20px", boxShadow: "0 18px 40px rgba(0,0,0,.35)",
+        padding: "22px 20px", boxShadow: "var(--pl-shadow)",
       }}>
         {/*
           The shop, with its face.
@@ -123,7 +153,7 @@ export default async function PrivateReplyPage({ params }: { params: Params }) {
         */}
         <div style={{
           fontSize: 17, lineHeight: 1.85, color: C.text, whiteSpace: "pre-wrap",
-          wordBreak: "break-word", background: "#0f1424", border: `1px solid ${C.border}`,
+          wordBreak: "break-word", background: C.inset, border: `1px solid ${C.border}`,
           borderRadius: 13, padding: "16px 16px 10px",
         }}>
           {r.body}
@@ -144,7 +174,7 @@ export default async function PrivateReplyPage({ params }: { params: Params }) {
         */}
         {(shop.addresses.length > 0 || shop.phones.length > 0 || shop.hours || shop.extra) && (
           <div style={{
-            marginTop: 16, background: "#0f1424", border: `1px solid ${C.border}`,
+            marginTop: 16, background: C.inset, border: `1px solid ${C.border}`,
             borderRadius: 13, padding: "14px 16px",
           }}>
             {shop.addresses.map((a) => <Fact key={a} icon="📍" value={a} />)}
@@ -163,13 +193,13 @@ export default async function PrivateReplyPage({ params }: { params: Params }) {
           does the merchant's work for them: the way back is another comment.
         */}
         <div style={{
-          marginTop: 16, background: "#2a1420", border: `1px solid ${C.accent}66`,
+          marginTop: 16, background: "var(--pl-warn-bg)", border: "1px solid color-mix(in srgb, var(--pl-accent) 40%, transparent)",
           borderRadius: 12, padding: "13px 14px",
         }}>
           <div style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
             <span style={{ fontSize: 17, lineHeight: 1.2 }} aria-hidden>⚠️</span>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: "#ffb3c6", lineHeight: 1.6 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "var(--pl-warn-text)", lineHeight: 1.6 }}>
                 هذا الرابط صالح لمرة واحدة فقط
               </div>
               <div style={{ fontSize: 14, color: C.text, lineHeight: 1.85, marginTop: 5 }}>
@@ -284,12 +314,28 @@ function Closed({ state }: { state: OpenResult["state"] }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div dir="rtl" style={{
-      minHeight: "100dvh", background: C.bg, display: "flex", alignItems: "center",
-      justifyContent: "center", padding: "24px 16px",
-      fontFamily: "system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif",
-    }}>
-      <div style={{ width: "100%", maxWidth: 440 }}>{children}</div>
-    </div>
+    <>
+      {/*
+        The variables, and a background painted on <html> as well as here.
+
+        The toggle only changes a class; something has to translate that class
+        into colour, and on this page nothing did. Setting it on the root element
+        too means the area behind a short card — and the overscroll rubber-band
+        on iOS — follows the theme instead of staying black under a white card.
+      */}
+      <style>{`${THEME_CSS}
+html, body { background: var(--pl-bg); }
+`}</style>
+      <div dir="rtl" style={{
+        minHeight: "100dvh", background: C.bg, display: "flex", alignItems: "center",
+        justifyContent: "center", padding: "24px 16px",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif",
+        // The toggle is a fixed button in the corner; without this the card can
+        // sit under it on a short screen.
+        paddingBottom: 92,
+      }}>
+        <div style={{ width: "100%", maxWidth: 440 }}>{children}</div>
+      </div>
+    </>
   );
 }
