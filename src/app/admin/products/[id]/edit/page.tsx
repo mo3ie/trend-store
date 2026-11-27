@@ -15,6 +15,7 @@ export default function EditProduct() {
   const [name,           setName]           = useState("");
   const [description,    setDescription]    = useState("");
   const [price,          setPrice]          = useState("");
+  const [oldPrice, setOldPrice] = useState("");
   const [stock,          setStock]          = useState("");
   const [category,       setCategory]       = useState(categories[0]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
@@ -35,6 +36,7 @@ export default function EditProduct() {
         setName(data.name || "");
         setDescription(data.description || "");
         setPrice(String(data.price ?? ""));
+        setOldPrice(data.old_price != null ? String(data.old_price) : "");
         setStock(String(data.stock ?? ""));
         setCategory(data.category || categories[0]);
         setExistingImages(data.images?.length ? data.images : data.image_url ? [data.image_url] : []);
@@ -99,6 +101,7 @@ export default function EditProduct() {
       body: JSON.stringify({
         name, description,
         price: parseFloat(price),
+        old_price: oldPrice.trim() ? parseFloat(oldPrice) : null,
         stock: parseInt(stock),
         category,
         image_url: allImages[0] || null,
@@ -152,6 +155,13 @@ export default function EditProduct() {
               <label className="text-[var(--muted)] text-sm mb-1.5 block">الكمية *</label>
               <input type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} placeholder="0" className="input-field" required />
             </div>
+          </div>
+          <div>
+            <label className="text-[var(--muted)] text-sm mb-1.5 block">السعر قبل التخفيض (اختياري — للعروض)</label>
+            <input type="number" min="0" step="0.01" value={oldPrice} onChange={e => setOldPrice(e.target.value)} placeholder="اتركه فارغاً إذا لا يوجد عرض" className="input-field" />
+            {Number(oldPrice) > Number(price) && Number(price) > 0
+              ? <p className="text-xs mt-1.5 text-green-500 font-bold">يظهر للزبون: <s className="text-red-400">{oldPrice}</s> ← {price} د.ل (خصم {Math.round((1 - Number(price) / Number(oldPrice)) * 100)}%)</p>
+              : oldPrice ? <p className="text-xs mt-1.5 text-amber-500">لن يظهر — يجب أن يكون أعلى من السعر الحالي.</p> : null}
           </div>
           <div>
             <label className="text-[var(--muted)] text-sm mb-1.5 block">التصنيف *</label>

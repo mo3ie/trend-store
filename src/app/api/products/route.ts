@@ -37,8 +37,11 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   try {
-    const { name, description, price, stock, category, image_url, images, variants } =
+    const { name, description, price, stock, category, image_url, images, variants, old_price } =
       await req.json();
+    // "Before" price for offers: kept only when it is a positive number; empty clears it.
+    const oldPrice = old_price === "" || old_price == null ? null : Number(old_price);
+    if (oldPrice !== null && !(oldPrice > 0)) return NextResponse.json({ error: "السعر قبل التخفيض غير صحيح" }, { status: 400 });
 
     if (!name || price == null || stock == null) {
       return NextResponse.json({ error: "بيانات ناقصة" }, { status: 400 });
@@ -48,6 +51,7 @@ export async function POST(req: NextRequest) {
       name,
       description,
       price,
+      old_price: oldPrice,
       quantity: stock,
       category,
       image_url: image_url || null,

@@ -6,6 +6,7 @@ export type CartItem = {
   id: string;
   name: string;
   price: number;
+  old_price?: number | null; // "before" price during an offer (display only)
   image_url?: string;
   quantity: number;
   stock: number;
@@ -93,8 +94,37 @@ export function useCart() {
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
+  // Re-read current prices from the server (prices change by hand, e.g. on offer day).
+  // Display only — the order route always prices from the database anyway.
+  const refreshPrices = useCallback(async () => {
+    const ids = [...new Set(readStorage().map((i) => i.id))];
+    if (!ids.length) return;
+    const fresh = new Map<string, { price: number; old_price: number | null; name: string }>();
+    await Promise.all(ids.map(async (id) => {
+      try {
+        const r = await fetch(`/api/products/${encodeURIComponent(id)}`, { cache: "no-store" });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (d && d.price != null) fresh.set(id, { price: Number(d.price), old_price: d.old_price != null ? Number(d.old_price) : null, name: d.name });
+      } catch { /* keep the stored line */ }
+    }));
+    if (!fresh.size) return;
+    setItems((prev) => {
+      let changed = false;
+      const next = prev.map((i) => {
+        const f = fresh.get(i.id);
+        if (!f || (f.price === i.price && (f.old_price ?? null) === (i.old_price ?? null))) return i;
+        changed = true;
+        return { ...i, price: f.price, old_price: f.old_price, name: f.name || i.name };
+      });
+      if (!changed) return prev;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const count = items.reduce((sum, i) => sum + i.quantity, 0);
 
-  return { items, addItem, removeItem, updateQuantity, clearCart, total, count };
+  return { items, addItem, removeItem, updateQuantity, clearCart, total, count, refreshPrices };
 }

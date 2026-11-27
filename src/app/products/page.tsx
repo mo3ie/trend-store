@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import SaleBanner from "@/components/sale/SaleBanner";
+import OldPrice from "@/components/sale/OldPrice";
 import { useRouter } from "next/navigation";
 import {
   Search, ShoppingCart, Bell, User, Package, SlidersHorizontal, ArrowRight,
@@ -15,6 +17,7 @@ type Product = {
   name: string;
   description?: string;
   price: number;
+  old_price?: number | null;
   stock: number;
   category: string;
   image_url?: string;
@@ -123,6 +126,7 @@ export default function ProductsPage() {
       </header>
 
       <div className="p-6 space-y-5 max-w-6xl mx-auto w-full">
+        <SaleBanner compact />
 
         <div className="flex items-center justify-between">
           <div>
@@ -208,6 +212,7 @@ export default function ProductsPage() {
                 <div className="p-3 space-y-1.5">
                   <span className="text-xs text-purple-400/70">{product.category}</span>
                   <p className="text-sm font-semibold text-[var(--text)] leading-tight line-clamp-2">{product.name}</p>
+                  <OldPrice price={product.price} oldPrice={product.old_price} unit={t("د", "LYD")} />
                   <div className="flex items-center justify-between pt-1">
                     <span className="font-black text-base bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">{product.price} {t("د", "LYD")}</span>
                     <span className="text-xs font-medium text-green-400">{t("متوفر", "In stock")}</span>

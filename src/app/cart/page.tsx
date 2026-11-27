@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSale } from "@/hooks/useSale";
+import OldPrice from "@/components/sale/OldPrice";
+import { fmtLibyaTime, fmtCountdown } from "@/lib/sale";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight, ShoppingCart, User, Package,
@@ -47,7 +50,14 @@ type MobicashStep = null | "card" | "sending" | "otp";
 export default function CartPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { items, removeItem, updateQuantity, clearCart, total, count } = useCart();
+  const { items, removeItem, updateQuantity, clearCart, total, count, refreshPrices } = useCart();
+  const { state: sale } = useSale();
+  // Fresh prices on open, every minute, and the moment buying opens on an offer day.
+  useEffect(() => {
+    refreshPrices();
+    const id = window.setInterval(refreshPrices, 60000);
+    return () => window.clearInterval(id);
+  }, [refreshPrices, sale.locked]);
   const { t, rtl } = useLang();
 
   const [notes,         setNotes]         = useState("");
@@ -104,6 +114,7 @@ export default function CartPage() {
 
   async function startCheckout() {
     if (!user) { router.push("/login"); return; }
+    if (sale.locked) return; // buying hasn't opened yet (the server refuses too)
     if (addresses.length > 0 && !selectedAddr) {
       setSelectedAddr(addresses.find(a => a.is_default)?.id || addresses[0]?.id || "__new");
     } else if (addresses.length === 0) {
@@ -438,6 +449,7 @@ export default function CartPage() {
                       </p>
                     )}
                     <p className="text-purple-400 font-black mt-1">{item.price} {t("د", "LYD")}</p>
+                    <OldPrice price={item.price} oldPrice={item.old_price} unit={t("د", "LYD")} />
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button onClick={() => updateQuantity(item.cartKey, item.quantity - 1)} className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 border border-[var(--border)] flex items-center justify-center transition-colors">
@@ -467,6 +479,10 @@ export default function CartPage() {
                   </div>
                 ))}
               </div>
+              {(() => { const saved = items.reduce((n, i) => n + (i.old_price && i.old_price > i.price ? (i.old_price - i.price) * i.quantity : 0), 0); return saved > 0 ? (
+                <div className="flex justify-between text-sm font-bold" style={{ color: "#16a34a" }}>
+                  <span>{t("وفّرت مع العروض", "You save")}</span><span>{Math.round(saved * 100) / 100} {t("د", "LYD")}</span>
+                </div>) : null; })()}
               <div className="border-t border-[var(--border)] pt-3 flex justify-between items-center">
                 <span className="font-bold text-[var(--text)]">{t("الإجمالي", "Total")}</span>
                 <span className="text-2xl font-black bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
@@ -489,14 +505,21 @@ export default function CartPage() {
 
             {/* CTA */}
             <div className="space-y-3">
+              {sale.locked && sale.opensAt && (
+                <div className="rounded-xl p-3 text-sm font-bold text-center" style={{ background: "rgba(245,158,11,.12)", border: "1px solid rgba(245,158,11,.35)", color: "#d97706" }}>
+                  {t(`عروض الجمعة: الشراء يبدأ الساعة ${fmtLibyaTime(sale.opensAt)}. سلتك محفوظة — ارجع عند بدء الشراء.`, `Friday offers: buying opens at ${fmtLibyaTime(sale.opensAt, false)}. Your cart is saved.`)}
+                </div>
+              )}
               <button
                 onClick={startCheckout}
-                disabled={ordering}
+                disabled={ordering || sale.locked}
                 className="gp-btn gp-btn-main w-full disabled:opacity-50"
               >
                 {ordering
                   ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  : <><ShoppingBag size={18} /> {t("تأكيد الطلب", "Checkout")}</>
+                  : sale.locked
+                    ? <>⏳ {t(`يبدأ الشراء بعد ${fmtCountdown(sale.msLeft)}`, `Buying opens in ${fmtCountdown(sale.msLeft, false)}`)}</>
+                    : <><ShoppingBag size={18} /> {t("تأكيد الطلب", "Checkout")}</>
                 }
               </button>
               <a href="/products" className="gp-btn gp-btn-ghost w-full text-sm">

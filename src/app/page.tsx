@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import SaleBanner from "@/components/sale/SaleBanner";
+import OldPrice from "@/components/sale/OldPrice";
 import { Home as HomeIcon, ShoppingCart, Wrench, Laptop, Gamepad2, Globe, Smartphone, Megaphone, Package, Heart, Wallet, Settings, Menu, Search, Sun, Moon, Building2, Headphones, Phone, MapPin, ShieldCheck, Truck, RotateCcw, Lock, BadgeCheck, MessageCircle, Check, X, MessagesSquare, Music2, Stethoscope, LayoutDashboard, Gift, Zap, Send, Download } from "lucide-react";
 import WalletModal from "@/components/WalletModal";
 import DiagnoseShowcase from "@/components/DiagnoseShowcase";
@@ -16,7 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
 import { useLang } from "@/hooks/useLang";
 
-type Product = { id: string; name: string; price: number; stock: number; category: string; image_url?: string };
+type Product = { id: string; name: string; price: number; old_price?: number | null; stock: number; category: string; image_url?: string };
 type Branch = { name: string; phone: string; addrAr: string; addrEn: string };
 type SiteSettings = {
   branches?: Branch[];
@@ -76,7 +78,7 @@ export default function Home() {
   const toggleTheme = () => { const n = !light; setLight(n); document.documentElement.classList.toggle("light", n); try { localStorage.setItem("theme", n ? "light" : "dark"); } catch {} };
   // Customers never see stock limits, so the cart doesn't cap them; the owner keeps real caps.
   const isOwner = user?.email === "mo3iemohamed@gmail.com";
-  const addToCart = (p: Product) => addItem({ id: p.id, name: p.name, price: p.price, image_url: p.image_url, stock: isOwner ? p.stock : Math.max(p.stock, 999) });
+  const addToCart = (p: Product) => addItem({ id: p.id, name: p.name, price: p.price, old_price: p.old_price ?? null, image_url: p.image_url, stock: isOwner ? p.stock : Math.max(p.stock, 999) });
   const go = (href?: string) => { if (href) window.location.href = href; };
   const closeModal = () => { setModal(null); setMDoneId(null); };
 
@@ -191,6 +193,7 @@ export default function Home() {
         </aside>
 
         <main className="content">
+          <SaleBanner />
           <section className="g-stage" aria-label={t("اختيارات ترند", "Trend picks")}>
             <HeroRobot />
             <span className="g-arrow" aria-hidden="true"><svg viewBox="0 0 44 30"><path d="M42 15H6M16 5 6 15l10 10" fill="none" stroke="#E8FFFF" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
@@ -208,6 +211,7 @@ export default function Home() {
                     <a className="g-img" href={`/products/${p.id}`}><img src={p.image_url} alt={p.name} /></a>
                     <b>{p.name}</b>
                     <span className="g-price">{p.price} {t("د.ل", "LYD")}</span>
+                    <OldPrice price={p.price} oldPrice={p.old_price} />
                     {p.category && <span className="g-cat">{p.category}</span>}
                   </div>
                 ))}
@@ -282,6 +286,7 @@ export default function Home() {
                 <div key={p.id} className="lp" style={{ animationDelay: `${k * 0.06}s` }}>
                   <a className="lp-img" href={`/products/${p.id}`}>{p.image_url ? <img src={p.image_url} alt={p.name} loading="lazy" /> : <Package />}</a>
                   <a className="lp-name" href={`/products/${p.id}`}>{p.name}</a>
+                  <OldPrice price={p.price} oldPrice={p.old_price} unit={t("د.ل", "LYD")} />
                   <div className="lp-row">
                     <b>{p.price} <small>{t("د.ل", "LYD")}</small></b>
                     <button className="lp-add" onClick={() => addToCart(p)} aria-label={t("أضف للسلة", "Add to cart")}><ShoppingCart size={16} /></button>

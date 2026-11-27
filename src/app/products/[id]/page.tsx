@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import OldPrice from "@/components/sale/OldPrice";
+import { useSale } from "@/hooks/useSale";
+import { fmtLibyaTime, fmtCountdown } from "@/lib/sale";
 import { useRouter, useParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
@@ -19,7 +22,7 @@ import LangToggle from "@/components/LangToggle";
 
 type Variant = { name: string; options: string[] };
 type Product = {
-  id: string; name: string; description?: string; price: number; stock: number;
+  id: string; name: string; description?: string; price: number; old_price?: number | null; stock: number;
   category: string; image_url?: string; images?: string[]; created_at?: string; variants?: Variant[];
   spin_images?: string[]; model_url?: string | null;
 };
@@ -29,6 +32,7 @@ export default function ProductView() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const { addItem, count } = useCart();
+  const { state: sale } = useSale();
   const { t, rtl } = useLang();
   // Owner sees true stock (quantities / sold-out); customers only ever see "available".
   const isOwner = user?.email === "mo3iemohamed@gmail.com";
@@ -74,7 +78,7 @@ export default function ProductView() {
       if (!selectedVars[v.name]) { alert(`${t("يرجى اختيار", "Please choose")} ${v.name}`); return; }
     }
     addItem({
-      id: product.id, name: product.name, price: product.price, image_url: product.image_url,
+      id: product.id, name: product.name, price: product.price, old_price: product.old_price ?? null, image_url: product.image_url,
       // Customers never see stock limits, so the cart doesn't cap them; the owner keeps real caps.
       stock: isOwner ? product.stock : Math.max(product.stock, 999),
       variants: Object.keys(selectedVars).length > 0 ? selectedVars : undefined,
@@ -194,6 +198,12 @@ export default function ProductView() {
                 <div className="gp-price">
                   <b>{product.price}</b><span>{t("دينار", "LYD")}</span>
                 </div>
+                <OldPrice price={product.price} oldPrice={product.old_price} unit={t("دينار", "LYD")} size="lg" />
+                {sale.locked && sale.opensAt && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(245,158,11,.12)", border: "1px solid rgba(245,158,11,.35)", color: "#d97706", fontSize: 14, fontWeight: 700 }}>
+                    ⏳ {t(`الشراء يبدأ الساعة ${fmtLibyaTime(sale.opensAt)} — أضفه لسلتك الآن (${fmtCountdown(sale.msLeft)})`, `Buying opens at ${fmtLibyaTime(sale.opensAt, false)} — add it to your cart now (${fmtCountdown(sale.msLeft, false)})`)}
+                  </div>
+                )}
                 <div className="gp-stock ok"><CheckCircle size={15} />{t("متوفر", "Available")}</div>
 
                 {product.variants && product.variants.length > 0 && (
@@ -248,7 +258,7 @@ export default function ProductView() {
                 which would otherwise trap this fixed bar inside the page. (Only renders
                 after the client fetch, so there is no server render to mismatch.) */}
             {createPortal(<div className="gp-buybar">
-              <div className="gp-buybar-price"><b>{product.price}</b><span>{t("دينار", "LYD")}</span></div>
+              <div className="gp-buybar-price"><b>{product.price}</b><span>{t("دينار", "LYD")}</span>{product.old_price && product.old_price > product.price ? <s style={{ fontSize: 12, opacity: .7, marginInlineStart: 6 }}>{product.old_price}</s> : null}</div>
               <button onClick={handleAddToCart} disabled={!canAdd} className={`gp-btn gp-btn-main ${added ? "done" : ""}`}>
                 {added ? <><CheckCircle size={17} /> {t("تمت", "Added")}</> : <><ShoppingCart size={17} /> {t("أضف للسلة", "Add")}</>}
               </button>

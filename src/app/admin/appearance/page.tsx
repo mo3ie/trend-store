@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ImageIcon, Plus, Trash2, Save, Loader2, Check } from "lucide-react";
+import { ImageIcon, Plus, Trash2, Save, Loader2, Check, Tag } from "lucide-react";
+import type { SaleSettings } from "@/lib/sale";
+
+// <input type="datetime-local"> works in the admin's local clock (Libya); store an ISO moment.
+const toLocalInput = (iso?: string) => { if (!iso) return ""; const d = new Date(iso); if (isNaN(+d)) return ""; const p = (n: number) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : undefined);
 
 type Branch = { name: string; phone: string; addrAr: string; addrEn: string };
 type Settings = {
@@ -9,6 +14,7 @@ type Settings = {
   branches?: Branch[];
   socials?: { whatsapp?: string; facebook?: string; instagram?: string };
   images?: { hero?: string; offer?: string; shein?: string };
+  sale?: SaleSettings;
 };
 
 const input = "w-full px-3 py-2.5 rounded-xl bg-[var(--input)] border border-[var(--border)] text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60";
@@ -26,6 +32,7 @@ export default function AppearancePage() {
   }, []);
 
   const setImg = (k: "hero" | "offer" | "shein", url: string) => setS((p) => ({ ...p, images: { ...p.images, [k]: url } }));
+  const setSale = (patch: Partial<SaleSettings>) => setS((p) => ({ ...p, sale: { ...p.sale, ...patch } }));
   const setSocial = (k: "whatsapp" | "facebook" | "instagram", v: string) => setS((p) => ({ ...p, socials: { ...p.socials, [k]: v } }));
 
   async function upload(slot: "hero" | "offer" | "shein", file: File) {
@@ -63,6 +70,25 @@ export default function AppearancePage() {
       <div>
         <h1 className="text-2xl font-bold">مظهر الموقع وبيانات التواصل</h1>
         <p className="text-[var(--muted-2)] text-sm mt-0.5">غيّر صور الواجهة وأرقام التواصل والروابط — تظهر مباشرة في الموقع.</p>
+      </div>
+
+      {/* White Friday / store offer */}
+      <div className="bg-[var(--surface)] border border-red-500/30 rounded-2xl p-5 space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="font-bold text-sm flex items-center gap-2"><Tag size={16} className="text-red-400" /> عرض الجمعة البيضاء (بانر كبير + موعد بدء الشراء)</h2>
+          <label className="flex items-center gap-2 text-sm font-bold cursor-pointer">
+            <input type="checkbox" checked={!!s.sale?.enabled} onChange={(e) => setSale({ enabled: e.target.checked })} className="w-4 h-4 accent-red-500" />
+            {s.sale?.enabled ? "العرض مفعّل" : "العرض متوقف"}
+          </label>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div><span className={label}>العنوان</span><input className={input} value={s.sale?.title ?? ""} onChange={(e) => setSale({ title: e.target.value })} placeholder="الجمعة البيضاء" /></div>
+          <div><span className={label}>السطر الثاني (اختياري)</span><input className={input} value={s.sale?.subtitle ?? ""} onChange={(e) => setSale({ subtitle: e.target.value })} placeholder="تخفيضات على الهواتف واللابتوبات والإكسسوارات" /></div>
+          <div><span className={label}>تخفيضات تصل إلى (%)</span><input className={input} type="number" min={0} max={99} value={s.sale?.upTo ?? ""} onChange={(e) => setSale({ upTo: e.target.value === "" ? undefined : Number(e.target.value) })} placeholder="50" /></div>
+          <div><span className={label}>يبدأ الشراء (قبله يُمنع إتمام الطلب، والسلة متاحة)</span><input className={input} type="datetime-local" value={toLocalInput(s.sale?.opensAt)} onChange={(e) => setSale({ opensAt: fromLocalInput(e.target.value) })} /></div>
+          <div><span className={label}>ينتهي العرض (اختياري — يختفي البانر بعده)</span><input className={input} type="datetime-local" value={toLocalInput(s.sale?.endsAt)} onChange={(e) => setSale({ endsAt: fromLocalInput(e.target.value) })} /></div>
+        </div>
+        <p className="text-[var(--muted-2)] text-xs leading-6">الأسعار يدوية: من «المنتجات» اكتب «السعر قبل التخفيض» و«السعر الآن» لكل منتج — يظهر القديم مشطوباً مع نسبة الخصم. لإنهاء العرض على منتج امسح «قبل التخفيض». لا تنسَ «حفظ التغييرات» أسفل الصفحة.</p>
       </div>
 
       {/* images */}

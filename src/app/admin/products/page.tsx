@@ -8,6 +8,7 @@ type Product = {
   id: string;
   name: string;
   price: number;
+  old_price?: number | null;
   stock: number;
   category: string;
   image_url?: string;
@@ -111,7 +112,7 @@ export default function AdminProducts() {
                 <tr className="text-[var(--muted-2)] text-xs border-b border-[var(--border)]">
                   <th className="text-right px-5 py-3 font-medium">المنتج</th>
                   <th className="text-right px-5 py-3 font-medium">التصنيف</th>
-                  <th className="text-right px-5 py-3 font-medium">السعر</th>
+                  <th className="text-right px-5 py-3 font-medium">السعر <span className="font-normal">(قبل التخفيض ← الآن)</span></th>
                   <th className="text-right px-5 py-3 font-medium">الكمية</th>
                   <th className="text-right px-5 py-3 font-medium">إجراءات</th>
                 </tr>
@@ -135,7 +136,7 @@ export default function AdminProducts() {
                     <td className="px-5 py-3.5">
                       <span className="px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-400 text-xs">{product.category}</span>
                     </td>
-                    <td className="px-5 py-3.5 text-[var(--text)] font-semibold">{product.price} $</td>
+                    <td className="px-5 py-3.5"><PriceCell product={product} onSaved={(np, op) => setProducts((ps) => ps.map((x) => x.id === product.id ? { ...x, price: np, old_price: op } : x))} /></td>
                     <td className="px-5 py-3.5">
                       <span className={`font-semibold ${product.stock === 0 ? "text-red-400" : product.stock < 5 ? "text-yellow-400" : "text-green-400"}`}>
                         {product.stock}
@@ -172,6 +173,38 @@ export default function AdminProducts() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Quick offer-day pricing: "before" (struck through for customers) and the price paid. */
+function PriceCell({ product, onSaved }: { product: Product; onSaved: (price: number, old: number | null) => void }) {
+  const [price, setPrice] = useState(String(product.price ?? ""));
+  const [old, setOld] = useState(product.old_price != null ? String(product.old_price) : "");
+  const [busy, setBusy] = useState(false);
+  const [ok, setOk] = useState(false);
+  const dirty = price !== String(product.price ?? "") || old !== (product.old_price != null ? String(product.old_price) : "");
+  const pct = Number(old) > Number(price) && Number(price) > 0 ? Math.round((1 - Number(price) / Number(old)) * 100) : 0;
+
+  async function save() {
+    setBusy(true);
+    const r = await fetch(`/api/products/${product.id}/price`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ price: Number(price), old_price: old.trim() ? Number(old) : null }) });
+    const d = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) { alert(d.error || "تعذّر حفظ السعر"); return; }
+    onSaved(Number(d.product.price), d.product.old_price != null ? Number(d.product.old_price) : null);
+    setOk(true); setTimeout(() => setOk(false), 1500);
+  }
+
+  const box = "w-20 px-2 py-1.5 rounded-lg bg-[var(--input)] border border-[var(--border)] text-[var(--text)] text-sm focus:outline-none focus:border-purple-500/60";
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <input type="number" min="0" step="0.01" value={old} onChange={(e) => setOld(e.target.value)} placeholder="قبل" title="السعر قبل التخفيض (فارغ = لا يوجد عرض)" className={`${box} line-through decoration-red-400`} />
+      <span className="text-[var(--muted-2)]">←</span>
+      <input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && dirty) save(); }} title="السعر الحالي (يدفعه الزبون)" className={`${box} font-bold`} />
+      {pct > 0 && <span className="px-1.5 py-0.5 rounded-md bg-red-500 text-white text-[11px] font-bold" dir="ltr">-{pct}%</span>}
+      {dirty && <button onClick={save} disabled={busy || !(Number(price) >= 0) || price === ""} className="px-2.5 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-bold disabled:opacity-50">{busy ? "…" : "حفظ"}</button>}
+      {ok && <span className="text-green-500 text-xs font-bold">✓</span>}
     </div>
   );
 }

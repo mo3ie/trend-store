@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { saleState, SALE_LOCK_MESSAGE, type SaleSettings } from "@/lib/sale";
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import { notifyUser, NOTICES } from "@/lib/notify";
@@ -48,6 +49,14 @@ export async function POST(req: NextRequest) {
 
     if (!Array.isArray(items) || !items.length || items.length > 100) {
       return NextResponse.json({ error: "بيانات ناقصة" }, { status: 400 });
+    }
+
+    // Offer day («الجمعة البيضاء»): ordering opens at the configured time. This is the only
+    // route that creates a store order, so every payment method is held back here.
+    const { data: st } = await supabaseAdmin.from("store_settings").select("data").eq("id", 1).maybeSingle();
+    const sale = saleState((st?.data as { sale?: SaleSettings } | null)?.sale);
+    if (sale.locked && sale.opensAt) {
+      return NextResponse.json({ error: SALE_LOCK_MESSAGE(sale.opensAt), opensAt: new Date(sale.opensAt).toISOString() }, { status: 423 });
     }
 
     // Price every line from the products table. The browser's prices and total
