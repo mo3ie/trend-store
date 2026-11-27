@@ -29,10 +29,14 @@ function flush(beacon = false) {
   const events = queue.splice(0, 60);
   const body = JSON.stringify({ sid: getSid(), ref, events });
   ref = null;
+  // keepalive fetch survives navigation/tab close; sendBeacon only as a fallback.
   try {
-    if (beacon && navigator.sendBeacon) { navigator.sendBeacon("/api/track", new Blob([body], { type: "text/plain" })); return; }
-    fetch("/api/track", { method: "POST", body, keepalive: true, headers: { "Content-Type": "text/plain" } }).catch(() => {});
-  } catch { /* never break the page */ }
+    fetch("/api/track", { method: "POST", body, keepalive: true, headers: { "Content-Type": "text/plain" } }).catch(() => {
+      if (beacon) try { navigator.sendBeacon?.("/api/track", new Blob([body], { type: "text/plain" })); } catch { /* ignore */ }
+    });
+  } catch {
+    try { navigator.sendBeacon?.("/api/track", new Blob([body], { type: "text/plain" })); } catch { /* never break the page */ }
+  }
 }
 
 const skip = (p: string) => p.startsWith("/admin") || p.startsWith("/api");
@@ -64,6 +68,15 @@ export default function ActivityTracker() {
       if (href) { try { const u = new URL(href, location.href); t = u.host === location.host ? u.pathname : u.host; } catch { /* ignore */ } }
       if (!label && !t) return;
       queue.push({ k: "click", p, l: label || undefined, t, at: Date.now() });
+      // a link may unload the page right now — send before it does
+      if (href) {
+        const c = cur.current;
+        if (c && !skip(c.p)) {
+          const ms = c.visibleMs + (c.shownAt != null ? Date.now() - c.shownAt : 0);
+          if (ms > 500) { queue.push({ k: "event", p: c.p, l: "__leave", d: ms, at: Date.now() }); c.visibleMs = 0; c.shownAt = document.visibilityState === "visible" ? Date.now() : null; }
+        }
+        flush(true);
+      }
     };
     document.addEventListener("click", onClick, { capture: true, passive: true });
 
