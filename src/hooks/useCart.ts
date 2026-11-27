@@ -25,6 +25,8 @@ function makeCartKey(id: string, variants?: Record<string, string>): string {
   return `${id}_${JSON.stringify(sorted)}`;
 }
 
+function announce() { if (typeof window !== "undefined") setTimeout(() => window.dispatchEvent(new Event("trend:cart")), 0); }
+
 function readStorage(): CartItem[] {
   if (typeof window === "undefined") return [];
   try {
@@ -39,13 +41,19 @@ function readStorage(): CartItem[] {
 export function useCart() {
   const [items, setItems] = useState<CartItem[]>([]);
 
+  // Every component has its own copy (header badge, bottom nav, cart page…); a write by
+  // one tells the others to re-read, so badges never show a stale count.
   useEffect(() => {
     setItems(readStorage());
+    const sync = () => setItems(readStorage());
+    window.addEventListener("trend:cart", sync);
+    window.addEventListener("storage", sync);
+    return () => { window.removeEventListener("trend:cart", sync); window.removeEventListener("storage", sync); };
   }, []);
 
   function save(next: CartItem[]) {
     setItems(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); announce();
   }
 
   const addItem = useCallback((item: Omit<CartItem, "quantity" | "cartKey">) => {
@@ -59,7 +67,7 @@ export function useCart() {
               : i
           )
         : [...prev, { ...item, quantity: 1, cartKey: key }];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); announce();
       return next;
     });
     // Sound + cart-icon bump in the TREND Glass layer (components/UiFx).
@@ -70,7 +78,7 @@ export function useCart() {
   const removeItem = useCallback((key: string) => {
     setItems((prev) => {
       const next = prev.filter((i) => i.cartKey !== key && i.id !== key);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); announce();
       return next;
     });
   }, []);
@@ -84,14 +92,14 @@ export function useCart() {
               ? { ...i, quantity: Math.min(quantity, i.stock) }
               : i
           );
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); announce();
       return next;
     });
   }, []);
 
   const clearCart = useCallback(() => {
     setItems([]);
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY); announce();
   }, []);
 
   // Re-read current prices from the server (prices change by hand, e.g. on offer day).
@@ -118,7 +126,7 @@ export function useCart() {
         return { ...i, price: f.price, old_price: f.old_price, name: f.name || i.name };
       });
       if (!changed) return prev;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); announce();
       return next;
     });
   }, []);
