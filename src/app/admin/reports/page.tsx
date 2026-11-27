@@ -14,6 +14,7 @@ const PAGE_NAMES: [RegExp, string][] = [
   [/^\/ads\/connect/, "ربط صفحة (إعلانات)"], [/^\/ads/, "الإعلانات"], [/^\/bot/, "بوت الرد"], [/^\/studio/, "الموظف الذكي"],
   [/^\/subscriptions/, "الاشتراكات"], [/^\/tiktok/, "أدوات تيك توك"], [/^\/our-sites/, "مواقعنا"], [/^\/privacy/, "الخصوصية"], [/^\/terms/, "الشروط"],
 ];
+const decodePath = (p: string) => { try { return decodeURIComponent(p); } catch { return p; } };
 const pageName = (p: string) => { const base = (p || "/").split("?")[0]; const hit = PAGE_NAMES.find(([re]) => re.test(base)); return hit ? hit[1] : base; };
 const OPS: Record<string, { label: string; color: string }> = {
   order: { label: "طلبات المتجر", color: "#8b5cf6" }, wallet: { label: "المحفظة", color: "#0ea5e9" }, card: { label: "الكروت", color: "#f59e0b" },
@@ -164,8 +165,8 @@ function Columns({ data, labelOf, valueOf, tipOf, height = 150 }: { data: any[];
     <div className="relative" dir="ltr">
       <div className="flex items-end gap-[2px]" style={{ height }} onMouseLeave={() => setHover(null)}>
         {data.map((d, i) => (
-          <div key={i} className="flex-1 h-full flex items-end cursor-default" onMouseEnter={() => setHover(i)} onTouchStart={() => setHover(i)}>
-            <div className="w-full rounded-t-[4px]" style={{ height: `${(valueOf(d) / max) * 100}%`, minHeight: valueOf(d) ? 2 : 0, background: ACCENT, opacity: hover === null || hover === i ? 1 : 0.45 }} />
+          <div key={i} className="flex-1 h-full flex items-end justify-center cursor-default" onMouseEnter={() => setHover(i)} onTouchStart={() => setHover(i)}>
+            <div className="w-full max-w-[44px] rounded-t-[4px]" style={{ height: `${(valueOf(d) / max) * 100}%`, minHeight: valueOf(d) ? 2 : 0, background: ACCENT, opacity: hover === null || hover === i ? 1 : 0.45 }} />
           </div>
         ))}
       </div>
@@ -448,7 +449,7 @@ function UserDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                   <li key={i} className="ms-4 text-sm">
                     <span className={`absolute -start-[7px] mt-1.5 w-3 h-3 rounded-full ${e.kind === "click" ? "bg-amber-500" : "bg-purple-500"}`} />
                     {e.kind === "view"
-                      ? <span>فتح <b>{pageName(e.path)}</b> <span className="text-xs text-[var(--muted-2)]" dir="ltr">{e.path}</span>{e.stay ? <span className="text-xs text-[var(--muted-2)]"> — بقي {secs(e.stay / 1000)}</span> : null}</span>
+                      ? <span>فتح <b>{pageName(e.path)}</b> <span className="text-xs text-[var(--muted-2)] break-all" dir="ltr">{decodePath(e.path)}</span>{e.stay ? <span className="text-xs text-[var(--muted-2)]"> — بقي {secs(e.stay / 1000)}</span> : null}</span>
                       : <span>ضغط <b>«{e.label}»</b> <span className="text-xs text-[var(--muted-2)]">في {pageName(e.path)}</span></span>}
                     <div className="text-[11px] text-[var(--muted-2)]">{dt(e.at)} · {e.device}</div>
                   </li>
