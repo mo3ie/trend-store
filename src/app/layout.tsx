@@ -5,6 +5,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import PWARegister from "@/components/PWARegister";
 import PushPrompt from "@/components/PushPrompt";
 import UiFx from "@/components/UiFx";
+import ActivityTracker from "@/components/ActivityTracker";
 import GlassNav from "@/components/GlassNav";
 import HoloBot from "@/components/holo/HoloBot";
 import { preloadScript } from "@/lib/uiGlass";
@@ -79,6 +80,7 @@ export default function RootLayout({
         {children}
         <ThemeToggle />
         <UiFx />
+        <ActivityTracker />
         <GlassNav />
         <HoloBot />
         <PWARegister />
