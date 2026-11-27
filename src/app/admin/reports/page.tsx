@@ -41,7 +41,7 @@ type Tab = "overview" | "live" | "users" | "subs" | "ops";
 export default function ReportsPage() {
   const [tab, setTab] = useState<Tab>("overview");
   const [days, setDays] = useState(7);
-  const [data, setData] = useState<any>(null);
+  const [res, setRes] = useState<{ tab: Tab; d: any } | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
@@ -53,12 +53,15 @@ export default function ReportsPage() {
     if (tab === "users" && q.trim()) qs.set("q", q.trim());
     const r = await fetch(`/api/admin/reports?${qs}`, { cache: "no-store" });
     const d = await r.json().catch(() => null);
-    if (!r.ok) setErr(d?.error || "تعذّر تحميل التقرير"); else setData(d);
+    if (!r.ok) setErr(d?.error || "تعذّر تحميل التقرير"); else setRes({ tab, d });
     setLoading(false);
   }, [tab, days, q]);
 
-  useEffect(() => { setData(null); const tm = setTimeout(load, tab === "users" ? 300 : 0); return () => clearTimeout(tm); }, [load, tab]);
+  useEffect(() => { const tm = setTimeout(load, tab === "users" ? 300 : 0); return () => clearTimeout(tm); }, [load, tab]);
   useEffect(() => { if (tab !== "live") return; const id = setInterval(load, 15000); return () => clearInterval(id); }, [tab, load]);
+
+  // only ever hand a tab the data that was loaded FOR it (shapes differ per tab)
+  const data = res && res.tab === tab ? res.d : null;
 
   const tabs: [Tab, string, React.ComponentType<{ size?: number }>][] = [
     ["overview", "نظرة عامة", BarChart3], ["live", "الآن على الموقع", Radio], ["users", "العملاء ونشاطهم", Users], ["subs", "المشتركون", Crown], ["ops", "العمليات", Activity],
