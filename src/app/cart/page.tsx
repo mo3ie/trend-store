@@ -51,7 +51,15 @@ export default function CartPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { items, removeItem, updateQuantity, clearCart, total, count, refreshPrices } = useCart();
-  const { state: sale } = useSale();
+  const { sale: saleCfg, state: sale } = useSale();
+  // Offer rule (enforced by the server too): one piece per customer of each discounted product.
+  const limitOn = sale.on && saleCfg?.limitOne !== false;
+  const isOne = (i: { price: number; old_price?: number | null }) => limitOn && Number(i.old_price) > Number(i.price);
+  const perProduct = items.reduce<Record<string, number>>((m, i) => { m[i.id] = (m[i.id] || 0) + i.quantity; return m; }, {});
+  useEffect(() => {
+    for (const i of items) if (isOne(i) && i.quantity > 1) updateQuantity(i.cartKey, 1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, limitOn]);
   // Fresh prices on open, every minute, and the moment buying opens on an offer day.
   useEffect(() => {
     refreshPrices();
@@ -450,13 +458,16 @@ export default function CartPage() {
                     )}
                     <p className="text-purple-400 font-black mt-1">{item.price} {t("د", "LYD")}</p>
                     <OldPrice price={item.price} oldPrice={item.old_price} unit={t("د", "LYD")} />
+                    {isOne(item) && (perProduct[item.id] > 1
+                      ? <p className="text-xs font-bold mt-1 text-red-500">{t("قطعة واحدة فقط من هذا المنتج بسعر التخفيض — احذف الزائد", "Only one of this product at the offer price — remove the extra")}</p>
+                      : <p className="text-xs font-bold mt-1 text-amber-500">{t("قطعة واحدة لكل زبون", "One per customer")}</p>)}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button onClick={() => updateQuantity(item.cartKey, item.quantity - 1)} className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 border border-[var(--border)] flex items-center justify-center transition-colors">
                       <Minus size={12} />
                     </button>
                     <span className="w-6 text-center text-sm font-bold">{item.quantity}</span>
-                    <button onClick={() => updateQuantity(item.cartKey, item.quantity + 1)} disabled={item.quantity >= item.stock} className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 border border-[var(--border)] flex items-center justify-center transition-colors disabled:opacity-30">
+                    <button onClick={() => updateQuantity(item.cartKey, item.quantity + 1)} disabled={item.quantity >= item.stock || isOne(item)} title={isOne(item) ? t("قطعة واحدة لكل زبون بسعر التخفيض", "One per customer at the offer price") : undefined} className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 border border-[var(--border)] flex items-center justify-center transition-colors disabled:opacity-30">
                       <Plus size={12} />
                     </button>
                     <button onClick={() => removeItem(item.cartKey)} className="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 flex items-center justify-center text-red-400 transition-colors mr-1">

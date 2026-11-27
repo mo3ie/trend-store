@@ -54,7 +54,8 @@ export async function POST(req: NextRequest) {
     // Offer day («الجمعة البيضاء»): ordering opens at the configured time. This is the only
     // route that creates a store order, so every payment method is held back here.
     const { data: st } = await supabaseAdmin.from("store_settings").select("data").eq("id", 1).maybeSingle();
-    const sale = saleState((st?.data as { sale?: SaleSettings } | null)?.sale);
+    const saleCfg = (st?.data as { sale?: SaleSettings } | null)?.sale;
+    const sale = saleState(saleCfg);
     if (sale.locked && sale.opensAt) {
       return NextResponse.json({ error: SALE_LOCK_MESSAGE(sale.opensAt), opensAt: new Date(sale.opensAt).toISOString() }, { status: 423 });
     }
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
     const ids = [...new Set(items.map((i: { id?: unknown }) => String(i?.id ?? "")))];
     const { data: prods, error: prodErr } = await supabaseAdmin
       .from("products")
-      .select("id, name, price, image_url")
+      .select("id, name, price, old_price, image_url")
       .in("id", ids);
     if (prodErr) return NextResponse.json({ error: prodErr.message }, { status: 500 });
     const byId = new Map((prods ?? []).map((p) => [String(p.id), p]));
@@ -83,6 +84,45 @@ export async function POST(req: NextRequest) {
     }
     const total = Math.round(sum * 100) / 100;
     if (!(total > 0)) return NextResponse.json({ error: "المبلغ غير صحيح" }, { status: 400 });
+
+    // Offer rule: ONE piece per customer of each discounted product (old_price > price)
+    // while the offer is on — counted across variants, this cart and earlier orders.
+    if (sale.on && saleCfg?.limitOne !== false) {
+      const discounted = new Map<string, { name: string; qty: number }>();
+      for (const it of items) {
+        const p = byId.get(String(it?.id ?? ""));
+        if (!p || !(Number(p.old_price) > Number(p.price))) continue;
+        const cur = discounted.get(String(p.id)) ?? { name: p.name, qty: 0 };
+        cur.qty += Math.floor(Number(it.quantity));
+        discounted.set(String(p.id), cur);
+      }
+      const over = [...discounted.values()].find((d) => d.qty > 1);
+      if (over) return NextResponse.json({ error: `عروض الجمعة: قطعة واحدة فقط لكل زبون من «${over.name}» بسعر التخفيض. عدّل الكمية إلى 1.` }, { status: 409 });
+
+      if (discounted.size) {
+        // Earlier orders during the offer that really count: paid ones, cash-on-delivery,
+        // and an electronic payment still in progress (≤15 min). A failed/abandoned
+        // electronic payment never blocks the customer from trying again.
+        const since = sale.opensAt ? new Date(Math.min(sale.opensAt, Date.now() - 3600_000)).toISOString() : new Date(Date.now() - 24 * 3600_000).toISOString();
+        const fresh = Date.now() - 15 * 60_000;
+        const { data: prev } = await supabaseAdmin.from("store_orders")
+          .select("products, payment_method, payment_status, status, created_at")
+          .eq("user_id", user.id).is("deleted_at", null).gte("created_at", since).limit(200);
+        for (const o of prev ?? []) {
+          if (["cancelled", "canceled", "rejected", "refunded"].includes(String(o.status))) continue;
+          const counts = o.payment_status === "paid" || o.payment_method === "cash" || new Date(o.created_at).getTime() >= fresh;
+          if (!counts) continue;
+          for (const l of (Array.isArray(o.products) ? o.products : []) as { id?: unknown }[]) {
+            const d = discounted.get(String(l?.id ?? ""));
+            if (!d) continue;
+            const inProgress = o.payment_status !== "paid" && o.payment_method !== "cash";
+            return NextResponse.json({ error: inProgress
+              ? `لديك طلب قيد الدفع فيه «${d.name}». أكمل دفعه، أو انتظر 15 دقيقة ثم أعد المحاولة.`
+              : `عروض الجمعة: سبق أن اشتريت «${d.name}» بسعر التخفيض — قطعة واحدة فقط لكل زبون. احذفه من السلة لإكمال طلبك.` }, { status: 409 });
+          }
+        }
+      }
+    }
 
     const { data, error } = await supabaseAdmin.from("store_orders").insert({
       user_id: user.id,

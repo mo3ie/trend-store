@@ -13,6 +13,7 @@ export type SaleSettings = {
   upTo?: number;         // headline percentage, e.g. 50
   opensAt?: string;      // ISO — ordering is blocked until this moment
   endsAt?: string;       // ISO — optional; banner disappears after it
+  limitOne?: boolean;    // one piece per customer of each DISCOUNTED product while the offer is on
 };
 
 export type SaleState = {

@@ -88,6 +88,10 @@ export default function AppearancePage() {
           <div><span className={label}>يبدأ الشراء (قبله يُمنع إتمام الطلب، والسلة متاحة)</span><input className={input} type="datetime-local" value={toLocalInput(s.sale?.opensAt)} onChange={(e) => setSale({ opensAt: fromLocalInput(e.target.value) })} /></div>
           <div><span className={label}>ينتهي العرض (اختياري — يختفي البانر بعده)</span><input className={input} type="datetime-local" value={toLocalInput(s.sale?.endsAt)} onChange={(e) => setSale({ endsAt: fromLocalInput(e.target.value) })} /></div>
         </div>
+        <label className="flex items-center gap-2 text-sm font-bold cursor-pointer">
+          <input type="checkbox" checked={s.sale?.limitOne !== false} onChange={(e) => setSale({ limitOne: e.target.checked })} className="w-4 h-4 accent-red-500" />
+          قطعة واحدة فقط لكل زبون من كل منتج مخفّض (طوال مدة العرض)
+        </label>
         <p className="text-[var(--muted-2)] text-xs leading-6">الأسعار يدوية: من «المنتجات» اكتب «السعر قبل التخفيض» و«السعر الآن» لكل منتج — يظهر القديم مشطوباً مع نسبة الخصم. لإنهاء العرض على منتج امسح «قبل التخفيض». لا تنسَ «حفظ التغييرات» أسفل الصفحة.</p>
       </div>
 

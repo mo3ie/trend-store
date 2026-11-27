@@ -31,8 +31,8 @@ export default function ProductView() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const { addItem, count } = useCart();
-  const { state: sale } = useSale();
+  const { addItem, count, items: cartItems } = useCart();
+  const { sale: saleCfg, state: sale } = useSale();
   const { t, rtl } = useLang();
   // Owner sees true stock (quantities / sold-out); customers only ever see "available".
   const isOwner = user?.email === "mo3iemohamed@gmail.com";
@@ -74,6 +74,11 @@ export default function ProductView() {
 
   function handleAddToCart() {
     if (!product) return;
+    // Offer rule: one piece per customer of each discounted product (server enforces it too).
+    if (sale.on && saleCfg?.limitOne !== false && Number(product.old_price) > Number(product.price) && cartItems.some((i) => i.id === product.id)) {
+      alert(t("هذا المنتج في سلتك بالفعل — عروض الجمعة: قطعة واحدة لكل زبون بسعر التخفيض.", "Already in your cart — one per customer at the offer price."));
+      return;
+    }
     for (const v of product.variants || []) {
       if (!selectedVars[v.name]) { alert(`${t("يرجى اختيار", "Please choose")} ${v.name}`); return; }
     }
@@ -199,6 +204,9 @@ export default function ProductView() {
                   <b>{product.price}</b><span>{t("دينار", "LYD")}</span>
                 </div>
                 <OldPrice price={product.price} oldPrice={product.old_price} unit={t("دينار", "LYD")} size="lg" />
+                {sale.on && saleCfg?.limitOne !== false && Number(product.old_price) > Number(product.price) && (
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: "#d97706" }}>🔒 {t("قطعة واحدة لكل زبون بسعر التخفيض", "One per customer at the offer price")}</div>
+                )}
                 {sale.locked && sale.opensAt && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(245,158,11,.12)", border: "1px solid rgba(245,158,11,.35)", color: "#d97706", fontSize: 14, fontWeight: 700 }}>
                     ⏳ {t(`الشراء يبدأ الساعة ${fmtLibyaTime(sale.opensAt)} — أضفه لسلتك الآن (${fmtCountdown(sale.msLeft)})`, `Buying opens at ${fmtLibyaTime(sale.opensAt, false)} — add it to your cart now (${fmtCountdown(sale.msLeft, false)})`)}
