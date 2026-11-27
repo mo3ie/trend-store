@@ -30,10 +30,12 @@ export default function GlassNav() {
     const sync = () => setCount(cartCount());
     sync();
     window.addEventListener("trend:add", sync);
+    window.addEventListener("trend:cart", sync); // any cart write (qty change, remove, clear)
     window.addEventListener("storage", sync);
     window.addEventListener("focus", sync);
     return () => {
       window.removeEventListener("trend:add", sync);
+      window.removeEventListener("trend:cart", sync);
       window.removeEventListener("storage", sync);
       window.removeEventListener("focus", sync);
     };
