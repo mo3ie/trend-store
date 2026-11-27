@@ -47,14 +47,16 @@ export async function POST(req: NextRequest) {
     const ts = Number.isFinite(at) && at > now - 6 * 3600_000 && at <= now + 60_000 ? at : now;
     const d = Number(e?.d);
     return [{
-      sid, user_id: user?.id ?? null, kind, path,
+      sid, eid: typeof e?.id === "string" && /^[a-z0-9]{6,24}$/i.test(e.id) ? e.id : null,
+      user_id: user?.id ?? null, kind, path,
       label: clip(e?.l, 80), target: clip(e?.t, 300),
       dur_ms: (kind === "view" || kind === "event") && Number.isFinite(d) && d > 0 ? Math.min(Math.round(d), 6 * 3600_000) : null,
       device, ref: i === 0 ? ref : null,
       created_at: new Date(ts).toISOString(),
     }];
   });
-  if (rows.length) await supabaseAdmin.from("site_events").insert(rows);
+  // A re-sent event (same sid+eid) is ignored, so the browser can retry freely.
+  if (rows.length) await supabaseAdmin.from("site_events").upsert(rows, { onConflict: "sid,eid", ignoreDuplicates: true });
 
   // Light housekeeping: keep ~6 months.
   if (Math.random() < 0.002) {

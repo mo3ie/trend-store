@@ -208,3 +208,8 @@ $$;
 revoke all on function public.admin_report_overview(int), public.admin_report_live(), public.admin_report_users(int, text, int),
   public.report_ops(timestamptz, uuid, int), public.admin_report_ops(int), public.admin_report_subs(), public.admin_report_user(uuid)
   from public, anon, authenticated;
+
+-- Delivery: each browser event carries an id; unsent events are kept in the browser and
+-- re-sent on the next page, so a duplicate delivery must be harmless.
+alter table public.site_events add column if not exists eid text;
+create unique index if not exists site_events_sid_eid on public.site_events (sid, eid);
